@@ -1,0 +1,448 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Classes
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Domain.Entities
+@using BlazorAdminTemplate.Components.Calendar
+@inject IStaffManagementService StaffManagementService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudCard Elevation="0">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.FitnessCenter" Class="mr-2" />
+                Træningshold
+            </MudText>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        <!-- Date Range Filter -->
+        <MudCard Elevation="1" Class="mb-4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.subtitle1">
+                        <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Class="mr-2" />
+                        Filtrer efter dato
+                    </MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudGrid>
+                    <MudItem xs="12" sm="5">
+                        <MudDatePicker @bind-Date="fromDate"
+                                       Label="Fra dato"
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
+                                       Culture="@danishCulture"
+                                       DateFormat="dd/MM/yyyy"
+                                       Placeholder="Vælg startdato"
+                                       MaxDate="@(toDate ?? DateTime.Today.AddYears(1))"
+                                       Clearable="true"
+                                       ShowWeekNumbers="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="2" Class="d-flex align-center justify-center">
+                        <MudText Typo="Typo.body1" Class="text-center">til</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="5">
+                        <MudDatePicker @bind-Date="toDate"
+                                       Label="Til dato"
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
+                                       Culture="@danishCulture"
+                                       DateFormat="dd/MM/yyyy"
+                                       Placeholder="Vælg slutdato"
+                                       MinDate="@(fromDate ?? DateTime.Today.AddYears(-1))"
+                                       Clearable="true"
+                                       ShowWeekNumbers="true" />
+                    </MudItem>
+                </MudGrid>
+
+                <!-- Quick Date Selection Buttons -->
+                <div class="d-flex gap-2 mt-3 mb-3 flex-wrap">
+                    <MudButton Variant="Variant.Text"
+                               Size="Size.Small"
+                               OnClick="@SetCurrentWeek"
+                               Disabled="@isLoading">
+                        Denne uge
+                    </MudButton>
+                    <MudButton Variant="Variant.Text"
+                               Size="Size.Small"
+                               OnClick="@SetCurrentMonth"
+                               Disabled="@isLoading">
+                        Denne måned
+                    </MudButton>
+                    <MudButton Variant="Variant.Text"
+                               Size="Size.Small"
+                               OnClick="@SetLast30Days"
+                               Disabled="@isLoading">
+                        Sidste 30 dage
+                    </MudButton>
+                    <MudButton Variant="Variant.Text"
+                               Size="Size.Small"
+                               OnClick="@SetNext30Days"
+                               Disabled="@isLoading">
+                        Næste 30 dage
+                    </MudButton>
+                </div>
+
+                <div class="d-flex gap-2 mt-3">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Search"
+                               OnClick="@ApplyDateFilter"
+                               Disabled="@isLoading">
+                        Søg
+                    </MudButton>
+                    <MudButton Variant="Variant.Text"
+                               StartIcon="@Icons.Material.Filled.Clear"
+                               OnClick="@ClearDateFilter"
+                               Disabled="@isLoading">
+                        Ryd filter
+                    </MudButton>
+                   
+                </div>
+            </MudCardContent>
+        </MudCard>
+
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center align-center pa-4">
+                <MudProgressCircular Indeterminate="true" />
+                <MudText Class="ml-3">Indlæser træningshold...</MudText>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">
+                @errorMessage
+            </MudAlert>
+        }
+        else if (bookedClasses != null && bookedClasses.Classes.Count > 0)
+        {
+            <!-- Summary Cards -->
+            <MudGrid Class="mb-4">
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Elevation="1" Class="pa-4 summary-card">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.EventAvailable" Color="Color.Success" Size="Size.Large" Class="mr-3" />
+                            <div class="card-text-content">
+                                <MudText Typo="Typo.h6" Class="card-number">@totalClassesCount</MudText>
+                                <MudText Typo="Typo.caption" Class="card-label">Total tilmeldinger</MudText>
+                            </div>
+                        </div>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Elevation="1" Class="pa-4 summary-card">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Schedule" Color="Color.Info" Size="Size.Large" Class="mr-3" />
+                            <div class="card-text-content">
+                                <MudText Typo="Typo.h6" Class="card-number">@upcomingClassesCount</MudText>
+                                <MudText Typo="Typo.caption" Class="card-label">Kommende hold</MudText>
+                            </div>
+                        </div>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Elevation="1" Class="pa-4 summary-card">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.History" Color="Color.Primary" Size="Size.Large" Class="mr-3" />
+                            <div class="card-text-content">
+                                <MudText Typo="Typo.h6" Class="card-number">@pastClassesCount</MudText>
+                                <MudText Typo="Typo.caption" Class="card-label">Afsluttede hold</MudText>
+                            </div>
+                        </div>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+
+            <!-- Classes List - Simple Table Format -->
+            <MudTable Items="@bookedClasses.Classes"
+                      Dense="true"
+                      Hover="true"
+                      Striped="true"
+                      Elevation="1"
+                      Class="training-classes-table">
+                <HeaderContent>
+                    <MudTh>Holdnavn</MudTh>
+                    <MudTh>Type</MudTh>
+                    <MudTh>Instruktør</MudTh>
+                    <MudTh>Dato & Tid</MudTh>
+                    <MudTh>Varighed</MudTh>
+                    <MudTh>Status</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Holdnavn">
+                        <MudText Typo="Typo.body2">@context.TrainingClassClassesName</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Type">
+                        <MudText Typo="Typo.body2">@context.TrainingClassTypesName</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Instruktør">
+                        <MudText Typo="Typo.body2">@context.TrainingClassClassesTrainerName</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Dato & Tid">
+                        <div>
+                            <MudText Typo="Typo.body2">
+                                @context.TrainingClassClassesStartDateTime.ToString("dd/MM/yyyy")
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @context.TrainingClassClassesStartDateTime.ToString("HH:mm") -
+                                @context.TrainingClassClassesStartDateTime.AddMinutes(context.TrainingClassClassesDuration).ToString("HH:mm")
+                            </MudText>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Varighed">
+                        <MudText Typo="Typo.body2">@context.TrainingClassClassesDuration min</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        @if (context.TrainingClassClassesStartDateTime > DateTime.Now)
+                        {
+                            <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Class="mr-1" />
+                                Kommende
+                            </MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Default" Variant="Variant.Filled" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="mr-1" />
+                                Afsluttet
+                            </MudChip>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+        else
+        {
+            <div class="text-center pa-8">
+                <MudIcon Icon="@Icons.Material.Filled.EventBusy" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+                <MudText Typo="Typo.body1">Ingen træningshold fundet</MudText>
+                @if (hasDateFilter)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Default">
+                        Ingen hold fundet for den valgte periode
+                    </MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Default">Dette medlem har ikke tilmeldt sig nogle hold endnu</MudText>
+                }
+            </div>
+        }
+    </MudCardContent>
+</MudCard>
+
+<style>
+    .summary-card {
+        height: 88px !important;
+        display: flex !important;
+        align-items: center !important;
+        overflow: hidden !important;
+    }
+
+        .summary-card .mud-card-content {
+            padding: 16px !important;
+            height: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+            width: 100% !important;
+            overflow: hidden !important;
+        }
+
+    .card-text-content {
+        flex: 1 !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .card-number {
+        font-size: 1.5rem !important;
+        font-weight: 600 !important;
+        line-height: 1.2 !important;
+        margin-bottom: 2px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .card-label {
+        font-size: 0.75rem !important;
+        line-height: 1.1 !important;
+        margin: 0 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .training-classes-table {
+        border-radius: 8px;
+    }
+
+        .training-classes-table .mud-table-container {
+            border-radius: 8px;
+        }
+</style>
+
+@code {
+    [Parameter] public string MemberGuid { get; set; } = string.Empty;
+
+    private MemberBookedClassesResponseDTO? bookedClasses;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+
+    // Date filter properties (replacing week filter)
+    private DateTime? fromDate;
+    private DateTime? toDate;
+    private bool hasDateFilter => fromDate.HasValue || toDate.HasValue;
+    private readonly System.Globalization.CultureInfo danishCulture = new("da-DK");
+
+    // Summary statistics
+    private int totalClassesCount => bookedClasses?.Classes?.Count ?? 0;
+    private int upcomingClassesCount => bookedClasses?.Classes?.Count(c => c.TrainingClassClassesStartDateTime > DateTime.Now) ?? 0;
+    private int pastClassesCount => bookedClasses?.Classes?.Count(c => c.TrainingClassClassesStartDateTime <= DateTime.Now) ?? 0;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(MemberGuid))
+        {
+            await LoadTrainingClasses();
+        }
+    }
+
+    private async Task LoadTrainingClasses()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            StateHasChanged();
+
+            // Load booked classes for this member with optional date filtering
+            bookedClasses = await StaffManagementService.GetMembersBookedClassesAsync(
+                MemberGuid,
+                startDate: fromDate,
+                endDate: toDate
+            );
+
+            
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading training classes: {ex.Message}");
+            errorMessage = $"Fejl ved indlæsning af træningshold: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ApplyDateFilter()
+    {
+        // Validate input
+        if (fromDate.HasValue && toDate.HasValue)
+        {
+            if (fromDate > toDate)
+            {
+                Snackbar.Add("'Fra dato' skal være før eller lig med 'Til dato'", Severity.Warning);
+                return;
+            }
+        }
+
+        await LoadTrainingClasses();
+
+        if (hasDateFilter)
+        {
+            Snackbar.Add($"Filtreret efter {GetDateFilterText()}", Severity.Success);
+        }
+    }
+
+    private async Task ClearDateFilter()
+    {
+        fromDate = null;
+        toDate = null;
+        await LoadTrainingClasses();
+        Snackbar.Add("Filter fjernet - viser alle hold", Severity.Info);
+    }
+
+    private string GetDateFilterText()
+    {
+        if (fromDate.HasValue && toDate.HasValue)
+        {
+            return $"{fromDate.Value:dd/MM/yyyy} - {toDate.Value:dd/MM/yyyy}";
+        }
+        else if (fromDate.HasValue)
+        {
+            return $"Fra {fromDate.Value:dd/MM/yyyy}";
+        }
+        else if (toDate.HasValue)
+        {
+            return $"Til {toDate.Value:dd/MM/yyyy}";
+        }
+        return "";
+    }
+
+    // Quick date selection methods
+    private async Task SetCurrentWeek()
+    {
+        var today = DateTime.Today;
+        var startOfWeek = today.AddDays(-(int)today.DayOfWeek + (int)DayOfWeek.Monday);
+        if (today.DayOfWeek == DayOfWeek.Sunday)
+            startOfWeek = startOfWeek.AddDays(-7);
+
+        fromDate = startOfWeek;
+        toDate = startOfWeek.AddDays(6);
+        await ApplyDateFilter();
+    }
+
+    private async Task SetCurrentMonth()
+    {
+        var today = DateTime.Today;
+        fromDate = new DateTime(today.Year, today.Month, 1);
+        toDate = fromDate.Value.AddMonths(1).AddDays(-1);
+        await ApplyDateFilter();
+    }
+
+    private async Task SetLast30Days()
+    {
+        toDate = DateTime.Today;
+        fromDate = toDate.Value.AddDays(-30);
+        await ApplyDateFilter();
+    }
+
+    private async Task SetNext30Days()
+    {
+        fromDate = DateTime.Today;
+        toDate = fromDate.Value.AddDays(30);
+        await ApplyDateFilter();
+    }
+
+    private async Task OpenDatePickerDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            ["SelectedDate"] = fromDate ?? DateTime.Today
+        };
+
+        var options = new DialogOptions()
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseButton = true,
+            Position = DialogPosition.Center
+        };
+
+        var dialog = await DialogService.ShowAsync<DatePickerDialog>("Vælg dato", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is DateTime selectedDate)
+        {
+            fromDate = selectedDate;
+            toDate = null; // Clear end date when selecting from calendar
+            await ApplyDateFilter();
+        }
+    }
+}

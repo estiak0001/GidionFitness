@@ -1,0 +1,282 @@
+﻿@page "/classes/create-single"
+@using BlazorAdminTemplate.Application.DTOs.Classes
+@using BlazorAdminTemplate.Application.DTOs.Location
+@using BlazorAdminTemplate.Application.DTOs.ClassTypes
+@using BlazorAdminTemplate.Application.DTOs.Memberships
+@inject IStaffManagementService StaffService
+@inject IMembershipService MembershipService
+@inject ITrainingClassesService TrainingClassesService
+@inject ISnackbar Snackbar
+
+<PageTitle>Create New Class</PageTitle>
+
+<div class="d-flex justify-center pa-4">
+    <div style="max-width: 900px; width: 100%;">
+        <MudText Typo="Typo.h4" GutterBottom="true" Class="text-center mb-6">
+            Create New Training Class
+        </MudText>
+
+        <MudPaper Class="pa-8" Elevation="6" Style="border-radius: 16px;">
+            <EditForm Model="@dto" OnValidSubmit="SubmitClass">
+                <DataAnnotationsValidator />
+
+                <MudGrid Spacing="4">
+
+                    <!-- Class Type -->
+                    <MudItem xs="12">
+                        <MudSelect T="string" Label="Class Type" @bind-Value="dto.TrainingClassTypesGUID" Required="true">
+                            @foreach (var ct in classTypes)
+                            {
+                                <MudSelectItem Value="@ct.TrainingClassTypesGUID">
+                                    @ct.TrainingClassTypesName (@ct.TrainingClassLocationName)
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <!-- Location -->
+                    <MudItem xs="12">
+                        <MudSelect T="string" Label="Location" @bind-Value="dto.TrainingClassLocationGUID" Required="true">
+                            @foreach (var loc in locations)
+                            {
+                                <MudSelectItem Value="@loc.TrainingClassLocationGUID">@loc.TrainingClassLocationName</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <!-- Name -->
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="dto.TrainingClassClassesName"
+                                      Label="Class Name"
+                                      Required="true"
+                                      RequiredError="Name is required" />
+                    </MudItem>
+
+                    <!-- Date + Time -->
+                    <MudItem xs="12" md="6">
+                        <MudDatePicker Label="Date" @bind-Date="selectedDate" Required="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTimePicker Label="Start Time" @bind-Time="selectedTime" Required="true" />
+                    </MudItem>
+
+                    <!-- Duration -->
+                    <MudItem xs="12" md="6">
+                        <MudNumericField @bind-Value="dto.TrainingClassClassesDuration"
+                                         Label="Duration (minutes)"
+                                         Min="15"
+                                         Required="true" />
+                    </MudItem>
+
+                    <!-- Description -->
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle1" Class="mb-2">Description</MudText>
+                        <MudHtmlEditor @bind-Content="dto.TrainingClassClassesDescription"
+                                       Style="height: 300px;"
+                                       Placeholder="Write a detailed description..." />
+                    </MudItem>
+
+                    <!-- Access Control -->
+                    <MudItem xs="12">
+                        <MudCheckBox T="bool" @bind-Value="allHaveAccess"
+                                     Label="All members can enroll"
+                                     Color="Color.Primary" />
+                    </MudItem>
+
+                    @if (!allHaveAccess)
+                    {
+                        <MudItem xs="12">
+                            <MudSelect T="string"
+                                       Label="Allowed Membership Groups"
+                                       MultiSelection="true"
+                                       MultiSelectionTextFunc="@GetGroupDisplayText"
+                                       @bind-SelectedValues="selectedGroupGuids"
+                                      >
+                                @foreach (var group in membershipGroups)
+                                {
+                                    <MudSelectItem Value="@group.MemberPaymentGroupGUID">
+                                        @group.MemberPaymentGroupName (@group.MemberPaymentPrice:C)/month
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudText Typo="Typo.body2" Class="mt-2 mud-text-secondary">
+                                Selected: @selectedGroupGuids.Count() group@(selectedGroupGuids.Count() == 1 ? "" : "s")
+                            </MudText>
+                        </MudItem>
+                    }
+
+                    <!-- Capacity -->
+                    <MudItem xs="12" md="6">
+                        <MudNumericField @bind-Value="dto.TrainingClassClassesMax" Label="Max Participants" Min="1" Required="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudNumericField @bind-Value="dto.TrainingClassClassesMin" Label="Min Participants" Min="1" />
+                    </MudItem>
+
+
+                    <!-- Cancellation & Fine -->
+                    <MudItem xs="12" md="4">
+                        <MudNumericField @bind-Value="dto.TrainingClassClassesMaxCancellationTime"
+                                         Label="Cancel allowed (min before)"
+                                         Min="0" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudCheckBox T="bool" @bind-Value="autoCancelEnabled" Label="Auto-cancel if below min" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudCheckBox T="bool" @bind-Value="applyFine" Label="Fine if no-show" />
+                    </MudItem>
+
+
+                    <!-- Trainer -->
+                    <MudItem xs="12" md="12">
+                        <MudSelect T="string" Label="Trainer (Optional)" @bind-Value="dto.TrainingClassTemplateTrainerGUID" Clearable="true" Placeholder="None">
+                            @foreach (var t in trainers)
+                            {
+                                <MudSelectItem Value="@t.MemberGUID">@t.TrainerName</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+
+                </MudGrid>
+
+                <div class="d-flex justify-content-end mt-10">
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               Color="Color.Success"
+                               Size="Size.Large"
+                               Style="min-width: 280px;">
+                        Create Class
+                    </MudButton>
+                </div>
+            </EditForm>
+        </MudPaper>
+    </div>
+</div>
+
+@code {
+    private StaffTrainingClassAddDTO dto = new();
+    private List<StaffTrainingClassTypeDTO> classTypes = new();
+    private List<StaffTrainingClassLocationDTO> locations = new();
+    private List<MembershipsDTO> membershipGroups = new();
+    private List<StaffTrainerDTO> trainers = new();
+
+    // UI state
+    private DateTime? selectedDate;
+    private TimeSpan? selectedTime = TimeSpan.FromHours(18); // default 18:00
+    private bool allHaveAccess = true;
+    private bool autoCancelEnabled = false;
+    private bool applyFine = false;
+    private IEnumerable<string> selectedGroupGuids = new HashSet<string> { };
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(
+            LoadClassTypes(),
+            LoadLocations(),
+            LoadMembershipGroups(),
+            LoadTrainers()
+        );
+    }
+
+    private async Task LoadClassTypes()
+    {
+        var resp = await StaffService.StaffGetClassTypesAsync(1, 200);
+        classTypes = resp.types ?? new();
+    }
+
+    private async Task LoadLocations()
+    {
+        var resp = await StaffService.StaffGetClassLocationsAsync(1, 100);
+        locations = resp.StaffTrainingClassLocations ?? new();
+    }
+
+    private async Task LoadMembershipGroups()
+    {
+        try
+        {
+            var resp = await MembershipService.GetMembershipListAsync(); // Your existing endpoint
+            membershipGroups = resp.PaymentGroups ?? new();
+            Console.Write(membershipGroups);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Failed to load membership groups: " + ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task LoadTrainers()
+    {
+        try
+        {
+            var resp = await TrainingClassesService.GetTrainerListAsync();
+            trainers = resp.Data ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Failed to load trainers: " + ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task SubmitClass()
+    {
+        if (!selectedDate.HasValue || !selectedTime.HasValue)
+        {
+            Snackbar.Add("Please select date and time", Severity.Error);
+            return;
+        }
+
+        dto.TrainingClassClassesStartDateTime = selectedDate.Value.Date.Add(selectedTime.Value);
+
+        // Access logic
+        dto.TrainingClassClassesAccess = allHaveAccess ? 1 : 0;
+        dto.TrainingClassClassesAccessGUIDs = allHaveAccess
+            ? Array.Empty<string>()
+            : selectedGroupGuids.ToArray();
+
+        dto.TrainingClassClassesAutomaticCancellation = autoCancelEnabled ? 1 : 0;
+        dto.TrainingClassClassesFine = applyFine ? 1 : 0;
+
+        // PLACEHOLDER - Replace with real POST
+        // Console.WriteLine("Creating class:");
+        // Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(dto, options: new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+
+        StaffTrainingClassActionResponseDTO result = await TrainingClassesService.StaffCreateSingleClass(dto);
+        if (!result.Success)
+        {
+            Snackbar.Add("Failed to create class: " + result.Message, Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Class created successfully!", Severity.Success);
+
+        // Reset form
+        dto = new();
+        // selectedGroups.Clear();
+        allHaveAccess = true;
+        selectedDate = null;
+        selectedTime = TimeSpan.FromHours(18);
+    }
+
+    private string GetGroupDisplayText(List<string> guids)
+    {
+        if (guids == null || !guids.Any())
+            return "No groups selected";
+
+        var displayNames = guids
+            .Select(guid =>
+            {
+                var group = membershipGroups.FirstOrDefault(g => g.MemberPaymentGroupGUID == guid);
+                return group != null
+                    ? $"{group.MemberPaymentGroupName} ({group.MemberPaymentPrice:C}/month)"
+                    : guid; // fallback for unmatched GUID
+            })
+            .ToList();
+
+        // If 3+ selected, show count for brevity; otherwise, list them
+        return displayNames.Count > 2
+            ? $"{displayNames.Count} group{(displayNames.Count == 1 ? "" : "s")} selected"
+            : string.Join(", ", displayNames);
+    }
+
+}

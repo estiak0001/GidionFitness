@@ -1,0 +1,286 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Members
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Application.Validators
+@using FluentValidation
+@using MudBlazor
+@inject IMemberService MemberService
+@inject ISnackbar Snackbar
+
+@if (isLoading)
+{
+    <div class="d-flex flex-column align-center justify-center pa-8">
+        <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+        <MudText Class="mt-4">Indlæser personlige oplysninger...</MudText>
+    </div>
+}
+else if (!string.IsNullOrEmpty(errorMessage))
+{
+    <MudAlert Severity="MudBlazor.Severity.Error" Class="mb-4">
+        @errorMessage
+    </MudAlert>
+}
+else
+{
+    <MudForm @ref="form" Model="@request" Validation="@validator.ValidateValue" ValidationDelay="0">
+        <MudStack Spacing="4">
+
+            <!-- Personal Information -->
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.Person" Class="mr-2" />
+                            Personlige oplysninger
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="request.MemberFirstName"
+                                          For="@(() => request.MemberFirstName)"
+                                          Label="Fornavn" Required="true"
+                                          Variant="Variant.Outlined" Immediate="true" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="request.MemberLastName"
+                                          For="@(() => request.MemberLastName)"
+                                          Label="Efternavn" Required="true"
+                                          Variant="Variant.Outlined" Immediate="true" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudDatePicker @bind-Date="request.MemberBirthday"
+                                           Label="Fødselsdato"
+                                           Variant="Variant.Outlined"
+                                           DateFormat="dd/MM/yyyy"
+                                           MaxDate="DateTime.Today.AddYears(-13)"
+                                           Clearable="true" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect @bind-Value="request.MemberSex"
+                                       Label="Køn"
+                                       Variant="Variant.Outlined"
+                                       Clearable="true">
+                                <MudSelectItem Value="@((byte?)1)">Mand</MudSelectItem>
+                                <MudSelectItem Value="@((byte?)2)">Kvinde</MudSelectItem>
+                                <MudSelectItem Value="@((byte?)3)">Andet</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="request.MemberCPR"
+                                          For="@(() => request.MemberCPR)"
+                                          Label="CPR-nummer"
+                                          Variant="Variant.Outlined"
+                                          Placeholder="DDMMYY-XXXX"
+                                          Immediate="true" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="request.MemberJobTitle"
+                                          Label="Jobtitel"
+                                          Variant="Variant.Outlined"
+                                          Immediate="true" />
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            <!-- Contact -->
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.ContactMail" Class="mr-2" />
+                            Kontaktoplysninger
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="request.MemberEmail"
+                                          For="@(() => request.MemberEmail)"
+                                          Label="Email" Required="true"
+                                          InputType="InputType.Email"
+                                          Variant="Variant.Outlined" Immediate="true" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="request.MemberPhonePrivate"
+                                          Label="Privat telefon"
+                                          Variant="Variant.Outlined" Immediate="true" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="request.MemberPhoneWork"
+                                          Label="Arbejdstelefon"
+                                          Variant="Variant.Outlined" Immediate="true" />
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            <!-- Address -->
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.Home" Class="mr-2" />
+                            Adresseoplysninger
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="request.MemberAddress"
+                                          Label="Adresse"
+                                          Variant="Variant.Outlined" Immediate="true" />
+                        </MudItem>
+                        <MudItem xs="12" md="8">
+                            <MudTextField @bind-Value="request.MemberCity"
+                                          Label="By"
+                                          Variant="Variant.Outlined" Immediate="true" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudNumericField @bind-Value="request.MemberZipCode"
+                                             Label="Postnummer"
+                                             Variant="Variant.Outlined"
+                                             HideSpinButtons="true"
+                                             Min="1000" Max="9999" />
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            <!-- Health Insurance -->
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.LocalHospital" Class="mr-2" />
+                            Sundhedsforsikring
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudSelect @bind-Value="request.MemberHealthInsurance"
+                               Label="Sundhedsforsikring"
+                               Variant="Variant.Outlined"
+                               Clearable="true">
+                        <MudSelectItem Value="@((byte?)0)">Nej</MudSelectItem>
+                        <MudSelectItem Value="@((byte?)1)">Ja</MudSelectItem>
+                    </MudSelect>
+                </MudCardContent>
+            </MudCard>
+
+            <!-- Save Button for this tab only -->
+            <div class="d-flex justify-end mt-4">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           OnClick="SaveAsync"
+                           Disabled="@isSaving"
+                           StartIcon="@Icons.Material.Filled.Save">
+                    @if (isSaving)
+                    {
+                        <MudProgressCircular Class="ms-2" Size="Size.Small" Indeterminate="true" />
+                    }
+                    Gem personlige oplysninger
+                </MudButton>
+            </div>
+
+        </MudStack>
+    </MudForm>
+}
+
+@code {
+    [Parameter, EditorRequired] public string MemberGuid { get; set; } = string.Empty;
+
+    private StaffUpdateMemberRequestDTO request = new();
+    private MudForm form = new();
+    private readonly UpdateMemberRequestValidator validator = new();
+
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            isLoading = true;
+            var member = await MemberService.GetSpecificMemberAsync(MemberGuid);
+
+            if (member == null)
+            {
+                errorMessage = "Medlem ikke fundet.";
+                return;
+            }
+
+            request = new StaffUpdateMemberRequestDTO
+            {
+                MemberGuid = member.MemberGUID,
+                OrganisationMainGuid = member.OrganisationMainGuid,
+                OrganisationSubGuid = member.OrganisationSubGuid,
+                MemberPaymentGroupGuid = member.MemberPaymentGroupGuid,
+
+                MemberFirstName = member.MemberFirstName,
+                MemberLastName = member.MemberLastName,
+                MemberBirthday = member.MemberBirthday,
+                MemberSex = member.MemberSex,
+                MemberCPR = member.MemberCPR,
+                MemberJobTitle = member.MemberJobTitle,
+                MemberEmail = member.MemberEmail,
+                MemberPhonePrivate = member.MemberPhonePrivate,
+                MemberPhoneWork = member.MemberPhoneWork,
+                MemberAddress = member.MemberAddress,
+                MemberCity = member.MemberCity,
+                MemberZipCode = member.MemberZipCode,
+                MemberHealthInsurance = null,
+                // Password fields stay empty until user types
+                CurrentPassword = string.Empty,
+                NewPassword = string.Empty
+            };
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Fejl: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        isSaving = true;
+        StateHasChanged();
+
+        try
+        {
+            await form.Validate();
+            if (!form.IsValid)
+            {
+                Snackbar.Add("Ret venligst fejl i formularen", MudBlazor.Severity.Warning);
+                return;
+            }
+
+            await MemberService.UpdateMemberAsync(request);
+
+            Snackbar.Add("Personlige oplysninger gemt", MudBlazor.Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fejl: {ex.Message}", MudBlazor.Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+}

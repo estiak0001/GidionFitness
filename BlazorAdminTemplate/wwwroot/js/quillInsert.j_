@@ -1,0 +1,70 @@
+﻿window.quill = {
+    // Focus the editor and force Quill to restore selection
+    focus: (editorId) => {
+        const container = document.querySelector(`#${editorId} .ql-editor`);
+        if (container) {
+            container.focus();
+            // Small trick: dispatch a mouseup to force Quill to update selection
+            container.dispatchEvent(new Event('mouseup', { bubbles: true }));
+        }
+    },
+
+    getSelectionIndex: (editorId) => {
+        const container = document.querySelector(`#${editorId} .ql-editor`);
+        if (!container) return null;
+
+        const quillInstance = Quill.find(container);
+        if (!quillInstance) return null;
+
+        // Ensure focus first
+        quillInstance.focus();
+
+        const selection = quillInstance.getSelection();
+        if (selection) {
+            return selection.index;
+        }
+
+        // If no selection (still unfocused or empty), default to end
+        return quillInstance.getLength();
+    },
+
+    insertText: (editorId, text, source = "user") => {
+        const container = document.querySelector(`#${editorId} .ql-editor`);
+        if (!container) return;
+
+        const quillInstance = Quill.find(container);
+        if (!quillInstance) return;
+
+        // Critical: Focus the editor before any operation
+        quillInstance.focus();
+
+        let index = quillInstance.getSelection()?.index;
+
+        // If still no selection, insert at the end
+        if (index === null || index === undefined) {
+            index = quillInstance.getLength();
+        }
+
+        quillInstance.insertText(index, text, source);
+
+        // Place cursor right after the inserted text
+        const newIndex = index + text.length;
+        quillInstance.setSelection(newIndex, 0);
+
+        // Optional: scroll to cursor
+        quillInstance.scrollIntoView?.();
+    },
+
+    // Helper: insert directly without needing separate index call
+    insertPlaceholder: (editorId, placeholderText) => {
+        window.quill.insertText(editorId, placeholderText);
+    },
+
+    // Optional: get current text content
+    getText: (editorId) => {
+        const container = document.querySelector(`#${editorId} .ql-editor`);
+        if (!container) return "";
+        const quillInstance = Quill.find(container);
+        return quillInstance ? quillInstance.getText() : "";
+    }
+};

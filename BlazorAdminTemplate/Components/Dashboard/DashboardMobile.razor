@@ -1,0 +1,439 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Classes
+@using BlazorAdminTemplate.Application.DTOs.NewsDTO
+@using BlazorAdminTemplate.Application.DTOs.Pagination
+@using BlazorAdminTemplate.Components.News
+@using BlazorAdminTemplate.Domain.Entities
+@using TrainingClassEntity = BlazorAdminTemplate.Domain.Entities.TrainingClasses
+@inject IDialogService DialogService
+
+<!-- Mobile Header -->
+<div class="mobile-dashboard-header">
+    <div class="welcome-section">
+        <MudIcon Icon="@Icons.Material.Filled.WavingHand" Size="Size.Medium" Color="Color.Surface" />
+        <div>
+            <MudText Typo="Typo.h6" Class="welcome-text">Velkommen, @DisplayName</MudText>
+            <MudText Typo="Typo.caption" Class="welcome-subtitle">Her er din oversigt for i dag</MudText>
+        </div>
+    </div>
+</div>
+
+<!-- Warning Alerts -->
+@if (ShowNoCardWarning)
+{
+    <MudAlert Severity="Severity.Warning" Dense="true" Class="mobile-alert mb-3">
+        <div class="alert-content">
+            <MudIcon Icon="@Icons.Material.Filled.Payment" Class="mr-2" />
+            <div>
+                <MudText Typo="Typo.subtitle2">Tilføj betalingskort</MudText>
+                <MudText Typo="Typo.caption">Du mangler et betalingskort</MudText>
+            </div>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
+                           Color="Color.Inherit"
+                           OnClick="OnNavigateToBilling" />
+        </div>
+    </MudAlert>
+}
+
+@if (ShowUnsignedContractWarning)
+{
+    <MudAlert Severity="Severity.Warning" Dense="true" Class="mobile-alert mb-3">
+        <div class="alert-content">
+            <MudIcon Icon="@Icons.Material.Filled.Description" Class="mr-2" />
+            <div>
+                <MudText Typo="Typo.subtitle2">Kontrakt afventer</MudText>
+                <MudText Typo="Typo.caption">Klik for at gennemse og underskrive</MudText>
+            </div>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
+                           Color="Color.Inherit"
+                           OnClick="OnOpenContractPreview" />
+        </div>
+    </MudAlert>
+}
+
+<!-- Quick Stats Cards -->
+<div class="quick-stats-grid">
+    <div class="stat-card @(ActiveSection == DashboardSection.Classes ? "stat-card-active" : "")"
+         @onclick="@(() => SetActiveSection(DashboardSection.Classes))">
+        <MudIcon Icon="@Icons.Material.Filled.FitnessCenter"
+                 Color="@(ActiveSection == DashboardSection.Classes ? Color.Surface : Color.Primary)" />
+        <div>
+            <MudText Typo="Typo.h6">@TodayClassesCount</MudText>
+            <MudText Typo="Typo.caption">Hold i dag</MudText>
+        </div>
+        @if (ActiveSection == DashboardSection.Classes)
+        {
+            <div class="active-indicator">
+                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Surface" />
+            </div>
+        }
+    </div>
+
+    <div class="stat-card @(ActiveSection == DashboardSection.News ? "stat-card-active" : "")"
+         @onclick="@(() => SetActiveSection(DashboardSection.News))">
+        <MudIcon Icon="@Icons.Material.Filled.Campaign"
+                 Color="@(ActiveSection == DashboardSection.News ? Color.Surface : Color.Info)" />
+        <div>
+            <MudText Typo="Typo.h6">@NewsCount</MudText>
+            <MudText Typo="Typo.caption">Nyheder</MudText>
+        </div>
+        @if (ActiveSection == DashboardSection.News)
+        {
+            <div class="active-indicator">
+                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Surface" />
+            </div>
+        }
+    </div>
+
+    <div class="stat-card @(ActiveSection == DashboardSection.Campaigns ? "stat-card-active" : "")"
+         @onclick="@(() => SetActiveSection(DashboardSection.Campaigns))">
+        <MudIcon Icon="@Icons.Material.Filled.LocalOffer"
+                 Color="@(ActiveSection == DashboardSection.Campaigns ? Color.Surface : Color.Secondary)" />
+        <div>
+            <MudText Typo="Typo.h6">@CampaignsCount</MudText>
+            <MudText Typo="Typo.caption">Kampagner</MudText>
+        </div>
+        @if (ActiveSection == DashboardSection.Campaigns)
+        {
+            <div class="active-indicator">
+                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Surface" />
+            </div>
+        }
+    </div>
+
+    <div class="stat-card @(ActiveSection == DashboardSection.Appointments ? "stat-card-active" : "")"
+         @onclick="@(() => SetActiveSection(DashboardSection.Appointments))">
+        <MudIcon Icon="@Icons.Material.Filled.EventAvailable"
+                 Color="@(ActiveSection == DashboardSection.Appointments ? Color.Surface : Color.Success)" />
+        <div>
+            <MudText Typo="Typo.h6">@AppointmentsCount</MudText>
+            <MudText Typo="Typo.caption">Aftaler</MudText>
+        </div>
+        @if (ActiveSection == DashboardSection.Appointments)
+        {
+            <div class="active-indicator">
+                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Surface" />
+            </div>
+        }
+    </div>
+</div>
+
+<MudDivider />
+
+
+<!-- Content Sections -->
+<div class="mobile-dashboard-content">
+    @switch (ActiveSection)
+    {
+        case DashboardSection.Classes:
+            <div class="section-header">
+                <MudText Typo="Typo.h6">Hold i dag</MudText>
+                <MudButton Variant="Variant.Text"
+                           Color="Color.Primary"
+                           EndIcon="@Icons.Material.Filled.ArrowForward"
+                           OnClick="OnNavigateToClasses"
+                           Size="Size.Small">
+                    Se alle
+                </MudButton>
+            </div>
+
+            @if (ClassesLoading)
+            {
+                <div class="loading-content">
+                    <MudProgressCircular Indeterminate="true" />
+                    <MudText Class="mt-2">Indlæser hold…</MudText>
+                </div>
+            }
+            else if (!TodayClasses.Any())
+            {
+                <div class="empty-content">
+                    <MudIcon Icon="@Icons.Material.Filled.EventBusy" Size="Size.Large" />
+                    <MudText Typo="Typo.body1" Class="mt-2">Ingen hold i dag</MudText>
+                </div>
+            }
+            else
+            {
+                <div class="mobile-classes-list">
+                    @foreach (var trainingClass in TodayClasses)
+                    {
+                        var isBooked = BookedClassGuids.Contains(trainingClass.TrainingClassClassesGUID);
+                        var (chipColor, chipText) = GetAvailability(trainingClass, isBooked);
+
+                        <MudCard Class="mobile-class-card" Elevation="2" @onclick="@(() => OnClassClicked.InvokeAsync(trainingClass))">
+                            <MudCardContent Class="mobile-class-card-content">
+                                <div class="class-time-badge">
+                                    <MudText Typo="Typo.caption">@trainingClass.TrainingClassClassesStartDateTime.ToString("HH:mm")</MudText>
+                                </div>
+                                <div class="class-info">
+                                    <MudText Typo="Typo.subtitle1" Class="class-name">@trainingClass.TrainingClassClassesName</MudText>
+                                    <MudText Typo="Typo.caption" Class="class-details">
+                                        @trainingClass.TrainingClassClassesTrainerName • @trainingClass.OrganisationSubName
+                                    </MudText>
+                                </div>
+                                <div class="class-status">
+                                    <MudChip T="string" Color="@chipColor" Size="Size.Small" Variant="Variant.Filled">
+                                        @chipText
+                                    </MudChip>
+                                    <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" />
+                                </div>
+                            </MudCardContent>
+                        </MudCard>
+                    }
+                </div>
+            }
+            break;
+
+        case DashboardSection.News:
+            <div class="section-header">
+                <MudText Typo="Typo.h6">Nyheder</MudText>
+            </div>
+
+            @if (NewsLoading)
+            {
+                <div class="loading-content">
+                    <MudProgressCircular Indeterminate="true" />
+                    <MudText Class="mt-2">Indlæser nyheder…</MudText>
+                </div>
+            }
+            else if (!NewsItems.Any())
+            {
+                <div class="empty-content">
+                    <MudIcon Icon="@Icons.Material.Filled.Article" Size="Size.Large" />
+                    <MudText Typo="Typo.body1" Class="mt-2">Ingen nyheder</MudText>
+                </div>
+            }
+            else
+            {
+                <div class="mobile-news-list">
+                    @foreach (var newsItem in NewsItems)
+                    {
+                        <MudCard Class="mobile-news-card" Elevation="1" @onclick="@(() => OnNewsItemClicked.InvokeAsync(newsItem))">
+                            <MudCardContent Class="mobile-news-card-content">
+                                <div class="news-icon">
+                                    <MudIcon Icon="@Icons.Material.Filled.Article" Color="Color.Primary" />
+                                </div>
+                                <div class="news-info">
+                                    <MudText Typo="Typo.subtitle2" Class="news-title">@newsItem.MemberNewsSubject</MudText>
+                                    <MudText Typo="Typo.caption" Class="news-date">
+                                        @newsItem.MemberNewsDate.ToString("dd. MMM yyyy")
+                                    </MudText>
+                                </div>
+                                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" />
+                            </MudCardContent>
+                        </MudCard>
+                    }
+                </div>
+
+                <!-- Pagination for mobile -->
+                @if (NewsPagination.TotalPages > 1)
+                {
+                    <div class="mobile-pagination">
+                        <MudButton Variant="Variant.Text"
+                                   StartIcon="@Icons.Material.Filled.ChevronLeft"
+                                   Disabled="@(!NewsPagination.HasPreviousPage)"
+                                   OnClick="@(() => OnLoadNews.InvokeAsync(NewsPagination.CurrentPage - 1))"
+                                   Size="Size.Small">
+                            Forrige
+                        </MudButton>
+
+                        <MudText Typo="Typo.caption" Class="pagination-info">
+                            Side @NewsPagination.CurrentPage af @NewsPagination.TotalPages
+                        </MudText>
+
+                        <MudButton Variant="Variant.Text"
+                                   EndIcon="@Icons.Material.Filled.ChevronRight"
+                                   Disabled="@(!NewsPagination.HasNextPage)"
+                                   OnClick="@(() => OnLoadNews.InvokeAsync(NewsPagination.CurrentPage + 1))"
+                                   Size="Size.Small">
+                            Næste
+                        </MudButton>
+                    </div>
+                }
+            }
+            break;
+
+        case DashboardSection.Campaigns:
+            <div class="section-header">
+                <MudText Typo="Typo.h6">Kampagner</MudText>
+            </div>
+
+            @if (CampaignsLoading)
+            {
+                <div class="loading-content">
+                    <MudProgressCircular Indeterminate="true" />
+                    <MudText Class="mt-2">Indlæser kampagner…</MudText>
+                </div>
+            }
+            else if (!Campaigns.Any())
+            {
+                <div class="empty-content">
+                    <MudIcon Icon="@Icons.Material.Filled.LocalOffer" Size="Size.Large" />
+                    <MudText Typo="Typo.body1" Class="mt-2">Ingen kampagner lige nu</MudText>
+                </div>
+            }
+            else
+            {
+                <div class="mobile-campaigns-list">
+                    @foreach (var campaign in Campaigns)
+                    {
+                        <MudCard Class="mobile-campaign-card" Elevation="1" @onclick="@(() => OnCampaignClicked.InvokeAsync(campaign))">
+                            <MudCardContent Class="mobile-campaign-card-content">
+                                <div class="campaign-icon">
+                                    <MudIcon Icon="@Icons.Material.Filled.LocalOffer" Color="Color.Secondary" />
+                                </div>
+                                <div class="campaign-info">
+                                    <MudText Typo="Typo.subtitle2" Class="campaign-title">@campaign.Title</MudText>
+                                    <MudText Typo="Typo.caption" Class="campaign-description">
+                                        @campaign.Description
+                                    </MudText>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(campaign.ActionText))
+                                {
+                                    <MudButton Variant="Variant.Text"
+                                               Color="Color.Primary"
+                                               Size="Size.Small"
+                                               OnClick="@(() => OnCampaignClicked.InvokeAsync(campaign))">
+                                        @campaign.ActionText
+                                    </MudButton>
+                                }
+                                else
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" />
+                                }
+                            </MudCardContent>
+                        </MudCard>
+                    }
+                </div>
+            }
+            break;
+
+        case DashboardSection.Appointments:
+            <div class="section-header">
+                <MudText Typo="Typo.h6">Aftaler (næste 7 dage)</MudText>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           Size="Size.Small">
+                    Anmod om aftale
+                </MudButton>
+            </div>
+
+            @if (AppointmentsLoading)
+            {
+                <div class="loading-content">
+                    <MudProgressCircular Indeterminate="true" />
+                    <MudText Class="mt-2">Indlæser aftaler…</MudText>
+                </div>
+            }
+            else if (!Appointments.Any())
+            {
+                <div class="empty-content">
+                    <MudIcon Icon="@Icons.Material.Filled.EventBusy" Size="Size.Large" />
+                    <MudText Typo="Typo.body1" Class="mt-2">Ingen kommende aftaler</MudText>
+                </div>
+            }
+            else
+            {
+                <div class="mobile-appointments-list">
+                    @foreach (var appointment in Appointments)
+                    {
+                        <MudCard Class="mobile-appointment-card" Elevation="1">
+                            <MudCardContent Class="mobile-appointment-card-content">
+                                <div class="appointment-icon">
+                                    <MudIcon Icon="@Icons.Material.Filled.Schedule" Color="Color.Success" />
+                                </div>
+                                <div class="appointment-info">
+                                    <MudText Typo="Typo.subtitle2" Class="appointment-title">@appointment.Title</MudText>
+                                    <MudText Typo="Typo.caption" Class="appointment-details">
+                                        @appointment.Start.ToString("dd/MM/yyyy HH:mm") - @appointment.End.ToString("HH:mm")
+                                        @if (!string.IsNullOrWhiteSpace(appointment.Location))
+                                        {
+                                            <br />
+                                            @appointment.Location
+                                        }
+                                    </MudText>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(appointment.ActionText))
+                                {
+                                    <MudButton Variant="Variant.Text"
+                                               Color="Color.Primary"
+                                               Size="Size.Small"
+                                               OnClick="@(() => OnAppointmentAction.InvokeAsync(appointment))">
+                                        @appointment.ActionText
+                                    </MudButton>
+                                }
+                            </MudCardContent>
+                        </MudCard>
+                    }
+                </div>
+            }
+            break;
+    }
+</div>
+
+@code {
+    [Parameter] public string DisplayName { get; set; } = "Bruger";
+
+    // Warning parameters
+    [Parameter] public bool ShowNoCardWarning { get; set; }
+    [Parameter] public bool ShowUnsignedContractWarning { get; set; }
+    [Parameter] public EventCallback OnNavigateToBilling { get; set; }
+    [Parameter] public EventCallback OnOpenContractPreview { get; set; }
+
+    // Classes parameters
+    [Parameter] public bool ClassesLoading { get; set; }
+    [Parameter] public IEnumerable<TrainingClassEntity> TodayClasses { get; set; } = Enumerable.Empty<TrainingClassEntity>();
+    [Parameter] public HashSet<string> BookedClassGuids { get; set; } = new();
+    [Parameter] public EventCallback<TrainingClassEntity> OnClassClicked { get; set; }
+    [Parameter] public EventCallback OnNavigateToClasses { get; set; }
+
+    // News parameters
+    [Parameter] public bool NewsLoading { get; set; }
+    [Parameter] public IEnumerable<News> NewsItems { get; set; } = Enumerable.Empty<News>();
+    [Parameter] public PaginationResponseDTO NewsPagination { get; set; } = new();
+    [Parameter] public EventCallback<News> OnNewsItemClicked { get; set; }
+    [Parameter] public EventCallback<int> OnLoadNews { get; set; }
+
+    // Campaigns parameters
+    [Parameter] public bool CampaignsLoading { get; set; }
+    [Parameter] public IEnumerable<CampaignItem> Campaigns { get; set; } = Enumerable.Empty<CampaignItem>();
+    [Parameter] public EventCallback<CampaignItem> OnCampaignClicked { get; set; }
+
+    // Appointments parameters
+    [Parameter] public bool AppointmentsLoading { get; set; }
+    [Parameter] public IEnumerable<AppointmentItem> Appointments { get; set; } = Enumerable.Empty<AppointmentItem>();
+    [Parameter] public EventCallback<AppointmentItem> OnAppointmentAction { get; set; }
+
+    // Computed properties for quick stats
+    private int TodayClassesCount => TodayClasses?.Count() ?? 0;
+    private int NewsCount => NewsPagination?.TotalRecords ?? 0; // Changed: Use total records from pagination instead of current page count
+    private int CampaignsCount => Campaigns?.Count() ?? 0;
+    private int AppointmentsCount => Appointments?.Count() ?? 0;
+
+    // Section management
+    private DashboardSection ActiveSection { get; set; } = DashboardSection.Classes;
+
+    private void SetActiveSection(DashboardSection section)
+    {
+        ActiveSection = section;
+        StateHasChanged();
+    }
+
+    private static (Color color, string text) GetAvailability(TrainingClassEntity c, bool isBooked)
+    {
+        if (isBooked) return (Color.Primary, "Tilmeldt");
+        if (c.TrainingClassClassesAvailableSlots == 0) return (Color.Error, "Fuldt");
+        if (c.TrainingClassClassesAvailableSlots <= 2) return (Color.Warning, $"{c.TrainingClassClassesAvailableSlots} ledige");
+        return (Color.Success, $"{c.TrainingClassClassesAvailableSlots} ledige");
+    }
+
+    // Records to match the dashboard
+    public record AppointmentItem(string Title, DateTime Start, DateTime End, string? Location, string? ActionText, string? ActionHref);
+    public record CampaignItem(string Title, string Description, string? ActionText, string? ActionHref);
+
+    private enum DashboardSection
+    {
+        Classes,
+        News,
+        Campaigns,
+        Appointments
+    }
+}

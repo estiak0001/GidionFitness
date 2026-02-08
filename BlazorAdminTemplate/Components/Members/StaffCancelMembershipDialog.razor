@@ -1,0 +1,185 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Memberships
+@using MudBlazor
+@using BlazorAdminTemplate.Application.DTOs.Payment
+@using BlazorAdminTemplate.Domain.Enums
+@using System.Net.Http
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Class="mr-3" Color="Color.Warning" />
+            Cancel Membership
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isCheckingEligibility)
+        {
+            <div class="d-flex justify-content-center py-4">
+                <MudProgressCircular Indeterminate="true" />
+            </div>
+        }
+        else if (!canCancelMembership)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">
+                @membershipCancellationPolicy?.Note
+            </MudAlert>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">
+                You are about to <strong>cancel</strong> active membership.
+                This action cannot be undone and will immediately end all membership benefits.
+            </MudAlert>
+            if (!canCancelMembershipNow && membershipCancellationPolicy is not null)
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-4">
+                    Earliest Cancellation Date is <strong>@membershipCancellationPolicy.EarliestCancellationDate</strong>. Staff may override this.
+                </MudAlert>
+            }
+
+            <MudTextField @bind-Value="cancelRequest.CancellationReason"
+                          Label="Cancellation Reason"
+                          Variant="Variant.Outlined"
+                          Lines="3"
+                          Required="true"
+                          Class="mb-4" />
+
+            <MudDatePicker @bind-Date="cancelRequest.CancellationDate"
+                          Label="Effective Date"
+                          MinDate="cancelRequest.CancellationOverride ? DateTime.Today : membershipCancellationPolicy?.EarliestCancellationDate"
+                          Variant="Variant.Outlined"
+                          Required="true"
+                          Class="mb-4" />
+
+            <MudSwitch @bind-Value="cancelRequest.CancellationOverride"
+                        Label="Force Cancellation (Staff Override)"
+                        Color="Color.Error"
+                        Class="mb-4" />
+        }
+
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-4">@ErrorMessage</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog">Cancel</MudButton>
+        @if (!isCheckingEligibility && canCancelMembership)
+        {
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Error"
+                       OnClick="ConfirmCancellation"
+                       Disabled="@(string.IsNullOrEmpty(cancelRequest.CancellationReason) || 
+                                   cancelRequest.CancellationDate == default || 
+                                   IsProcessing)">
+                @if (IsProcessing)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Cancelling...</span>
+                }
+                else
+                {
+                    <span>Confirm Cancellation</span>
+                }
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string MemberGuid { get; set; } = string.Empty;
+
+    private bool isCheckingEligibility = true;
+    private bool canCancelMembership = false;
+    private bool canCancelMembershipNow = false;
+    private StaffCancelMembershipCheckResponseDTO? membershipCancellationPolicy = null;
+
+    private StaffCancelMembershipDTO cancelRequest = new StaffCancelMembershipDTO();
+    private string? ErrorMessage { get; set; }
+    private bool IsProcessing { get; set; }
+
+    [Inject] private IStaffManagementService StaffManagementService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckMembershipCancellationEligibility();
+    }
+
+    private async Task CheckMembershipCancellationEligibility()
+    {
+        isCheckingEligibility = true;
+        ErrorMessage = null;
+
+        try
+        {
+            var checkRequest = new StaffCancelMembershipCheckDTO 
+            { 
+                MemberGuid = MemberGuid 
+            };
+
+            membershipCancellationPolicy = await StaffManagementService.StaffCancelMembershipCheckPolicyAsync(checkRequest);
+
+            if (membershipCancellationPolicy != null)
+            {
+                canCancelMembership = membershipCancellationPolicy.CanCancel;
+                canCancelMembershipNow = membershipCancellationPolicy.CanCancelNow;
+
+                // Set the earliest cancellation date as default
+                if (membershipCancellationPolicy.EarliestCancellationDate.HasValue)
+                {
+                    cancelRequest.CancellationDate = membershipCancellationPolicy.EarliestCancellationDate.Value;
+                }
+            }
+            else
+            {
+                canCancelMembership = false;
+                ErrorMessage = "Failed to retrieve cancellation policy information.";
+            }
+        }
+        catch (Exception ex)
+        {
+            canCancelMembership = false;
+            ErrorMessage = "An error occurred while checking cancellation eligibility. Please try again.";
+            Console.WriteLine($"Error checking membership cancellation eligibility: {ex.Message}");
+        }
+        finally
+        {
+            isCheckingEligibility = false;
+        }
+    }
+
+    private async Task ConfirmCancellation()
+    {
+        if (IsProcessing) return;
+        
+        IsProcessing = true;
+        ErrorMessage = null;
+        
+        try
+        {
+            cancelRequest.MemberGuid = MemberGuid;
+            
+            var result = await StaffManagementService.StaffCancelMembershipAsync(cancelRequest);
+            
+            // Close with the result message, parent will show success
+            MudDialog.Close(DialogResult.Ok(result));
+        }
+        catch (HttpRequestException ex)
+        {
+            ErrorMessage = $"Failed to cancel membership: {ex.Message}";
+            Console.WriteLine($"Error cancelling membership: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = "An unexpected error occurred. Please try again.";
+            Console.WriteLine($"Error cancelling membership: {ex.Message}");
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
+    }
+
+    private void CloseDialog() => MudDialog.Close(DialogResult.Cancel());
+}

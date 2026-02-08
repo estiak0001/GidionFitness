@@ -1,0 +1,290 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.NewsDTO
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Domain.Entities
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Article" Class="mr-2" />
+            @if (_isEditing)
+            {
+                <span>Rediger Nyhed</span>
+            }
+            else
+            {
+                @(News?.MemberNewsSubject ?? "Loading...")
+            }
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <MudStack Spacing="3">
+            @if (_isLoading)
+            {
+                <div class="d-flex align-center justify-center pa-4">
+                    <MudProgressCircular Indeterminate="true" />
+                    <MudText Class="ml-2">Indlæser nyhed...</MudText>
+                </div>
+            }
+            else if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">
+                    @_errorMessage
+                </MudAlert>
+            }
+            else
+            {
+                @if (_isEditing)
+                {
+                    <!-- EDIT MODE -->
+                    <MudTextField @bind-Value="_editSubject"
+                                  Label="Overskrift"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  MaxLength="200" />
+
+                    <MudDatePicker @bind-Date="_editDate"
+                                   Label="Dato"
+                                   Variant="Variant.Outlined" />
+
+                    <MudTextField @bind-Value="_editContent"
+                                  Label="Indhold"
+                                  Variant="Variant.Outlined"
+                                  Lines="8"
+                                  Required="true"
+                                  MaxLength="2000" />
+                }
+                else
+                {
+                    <!-- VIEW MODE -->
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                        <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="mr-1" />
+                        @(News?.MemberNewsDate.ToString("dd. MMMM yyyy") ?? "")
+                    </MudText>
+
+                    <MudDivider Class="my-3" />
+
+                    @if (!string.IsNullOrEmpty(_newsContent))
+                    {
+                        @((MarkupString)_newsContent)
+                    }
+                    else
+                    {
+                        <MudText>Ingen indhold tilgængelig.</MudText>
+                    }
+                }
+            }
+        </MudStack>
+    </DialogContent>
+
+    <DialogActions>
+        <AuthorizeView Policy="StaffOnly">
+            <Authorized>
+                @if (_isEditing)
+                {
+                    <MudButton Color="Color.Success" OnClick="SaveChanges" Disabled="@_isProcessing">
+                        Gem
+                    </MudButton>
+                    <MudButton Color="Color.Default" OnClick="CancelEdit" Disabled="@_isProcessing">
+                        Annuller
+                    </MudButton>
+                }
+                else
+                {
+                    <MudButton Color="Color.Primary" OnClick="StartEdit" Disabled="@_isProcessing">
+                        Rediger
+                    </MudButton>
+                    <MudButton Color="Color.Error" OnClick="DeleteNews" Disabled="@_isProcessing">
+                        Slet
+                    </MudButton>
+                }
+            </Authorized>
+        </AuthorizeView>
+
+        <MudButton OnClick="Close" Disabled="@_isProcessing">
+            Luk
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance MudDialog { get; set; } = default!;
+    [Inject] public INewsService NewsService { get; set; } = default!;
+    [Inject] public ISnackbar Snackbar { get; set; } = default!;
+    [Inject] public IDialogService DialogService { get; set; } = default!;
+
+    [Parameter] public News? News { get; set; }
+    [Parameter] public EventCallback OnNewsUpdated { get; set; }
+
+    private bool _isLoading = true;
+    private bool _isProcessing = false;
+    private bool _isEditing = false;
+    private string _errorMessage = string.Empty;
+    private string _newsContent = string.Empty;
+
+    // Edit variables
+    private string _editSubject = string.Empty;
+    private string _editContent = string.Empty;
+    private DateTime? _editDate = DateTime.Today;
+
+    // Original values for cancel
+    private string _originalSubject = string.Empty;
+    private string _originalContent = string.Empty;
+    private DateTime? _originalDate = DateTime.Today;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (News == null || string.IsNullOrEmpty(News.MemberNewsGUID))
+        {
+            _errorMessage = "Ugyldig nyhed.";
+            _isLoading = false;
+            return;
+        }
+
+        _editSubject = News.MemberNewsSubject ?? "";
+        _editDate = News.MemberNewsDate;
+
+        await LoadNewsDetails();
+    }
+
+    private async Task LoadNewsDetails()
+    {
+        try
+        {
+            _isLoading = true;
+            var response = await NewsService.GetSpecificMemberNewsAsync(News!.MemberNewsGUID);
+
+            if (response != null)
+            {
+                _newsContent = response.MemberNewsText ?? string.Empty;
+                _editSubject = News.MemberNewsSubject ?? "";
+                _editContent = _newsContent;
+                _editDate = News.MemberNewsDate;
+
+                _originalSubject = _editSubject;
+                _originalContent = _editContent;
+                _originalDate = _editDate;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Fejl: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void StartEdit()
+    {
+        _isEditing = true;
+        _errorMessage = string.Empty;
+    }
+
+    private void CancelEdit()
+    {
+        _editSubject = _originalSubject;
+        _editContent = _originalContent;
+        _editDate = _originalDate;
+        _isEditing = false;
+        _errorMessage = string.Empty;
+    }
+
+    private async Task SaveChanges()
+    {
+        if (string.IsNullOrWhiteSpace(_editSubject) || string.IsNullOrWhiteSpace(_editContent) || !_editDate.HasValue)
+        {
+            _errorMessage = "Alle felter skal udfyldes";
+            return;
+        }
+
+        try
+        {
+            _isProcessing = true;
+
+            var editRequest = new StaffEditNewsRequestDTO
+            {
+                MemberNewsGUID = News!.MemberNewsGUID,
+                MemberNewsSubject = _editSubject,
+                MemberNewsText = _editContent,
+                MemberNewsDate = _editDate.Value
+            };
+
+            var response = await NewsService.EditStaffNewsAsync(editRequest);
+
+            if (response?.Message?.Contains("success", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                // Update original values
+                _originalSubject = _editSubject;
+                _originalContent = _editContent;
+                _originalDate = _editDate;
+
+                // Update News object for the title display
+                News.MemberNewsSubject = _editSubject;
+                News.MemberNewsDate = _editDate.Value;
+
+                // Update the content that's displayed in view mode
+                _newsContent = _editContent;
+
+                _isEditing = false;
+                Snackbar.Add("Nyhed opdateret!", Severity.Success);
+                await OnNewsUpdated.InvokeAsync();
+            }
+            else
+            {
+                _errorMessage = response?.Message ?? "Fejl ved opdatering";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Fejl: {ex.Message}";
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private async Task DeleteNews()
+    {
+        if (News == null) return;
+
+        var confirmResult = await DialogService.ShowMessageBox(
+            "Bekræft sletning",
+            $"Slet '{News.MemberNewsSubject}'?",
+            yesText: "Slet", cancelText: "Annuller");
+
+        if (confirmResult != true) return;
+
+        try
+        {
+            _isProcessing = true;
+            var deleteRequest = new StaffDeleteNewsRequestDTO { MemberNewsGUID = News.MemberNewsGUID };
+            var response = await NewsService.DeleteStaffNewsAsync(deleteRequest);
+
+            if (response?.Message?.Contains("success", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                Snackbar.Add("Nyhed slettet!", Severity.Success);
+                await OnNewsUpdated.InvokeAsync();
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add("Fejl ved sletning", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fejl: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private void Close() => MudDialog.Close();
+}

@@ -1,0 +1,1019 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Authentication
+@using BlazorAdminTemplate.Application.Interfaces
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Text.Json
+@inject IJSRuntime JSRuntime
+@inject IImageUploadService ImageUploadService
+@inject IProfileService ProfileService
+@inject ISnackbar Snackbar
+@inject HttpClient HttpClient
+
+<link href="css/imageupload.css" rel="stylesheet" />
+
+<div class="image-upload-container">
+    <div class="d-flex align-center gap-4">
+        <!-- Image Preview -->
+        <div class="flex-shrink-0">
+            @if (!string.IsNullOrEmpty(ImagePreviewUrl))
+            {
+                <MudAvatar Size="@PreviewSize" Style="@($"width: {GetSizePixels()}px; height: {GetSizePixels()}px; border: 3px solid var(--mud-palette-primary);")">
+                    <MudImage Src="@ImagePreviewUrl" Alt="Profile Preview" Style="width: 100%; height: 100%; object-fit: cover;" />
+                </MudAvatar>
+            }
+            else
+            {
+                <MudAvatar Size="@PreviewSize" Style="@($"width: {GetSizePixels()}px; height: {GetSizePixels()}px;")" Color="Color.Secondary">
+                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="@GetIconSize()" />
+                </MudAvatar>
+            }
+        </div>
+
+        <!-- Upload Controls -->
+        <div class="flex-grow-1">
+            <MudStack Spacing="2">
+                <!-- Upload Buttons -->
+                <div class="d-flex gap-2 flex-wrap">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.CloudUpload"
+                               OnClick="@TriggerFileInput"
+                               Disabled="@IsUploading"
+                               Size="Size.Small">
+                        @if (IsUploading && uploadSource == "file")
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            <span>Processing...</span>
+                        }
+                        else
+                        {
+                            <span>Vælg billede</span>
+                        }
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Secondary"
+                               StartIcon="@Icons.Material.Filled.CameraAlt"
+                               OnClick="@StartCameraCapture"
+                               Disabled="@(IsUploading || !isCameraSupported)"
+                               Size="Size.Small">
+                        @if (IsUploading && uploadSource == "camera")
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            <span>Processing...</span>
+                        }
+                        else
+                        {
+                            <span>Tag billede</span>
+                        }
+                    </MudButton>
+
+                    <!-- Only show crop button for newly selected/captured images -->
+                    @if (hasNewImage && !string.IsNullOrEmpty(ImagePreviewUrl))
+                    {
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Info"
+                                   StartIcon="@Icons.Material.Filled.Crop"
+                                   OnClick="@StartCropping"
+                                   Disabled="@IsUploading"
+                                   Size="Size.Small">
+                            Beskær
+                        </MudButton>
+                    }
+
+                    @if (!string.IsNullOrEmpty(ImagePreviewUrl))
+                    {
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Error"
+                                   StartIcon="@Icons.Material.Filled.Delete"
+                                   OnClick="@DeleteImage"
+                                   Disabled="@IsUploading"
+                                   Size="Size.Small">
+                            Fjern
+                        </MudButton>
+                    }
+
+                    
+                </div>
+
+                <!-- Upload Instructions for New Images -->
+                @if (hasNewImage && !isImageCropped)
+                {
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Color="Color.Info" Class="mr-2" />
+                        <MudText Typo="Typo.caption" Color="Color.Info">
+                            Klik på "Beskær" for at justere billedet, eller upload det direkte med "Gem".
+                        </MudText>
+                    </div>
+                }
+
+                <!-- Action Buttons for New Images -->
+                @if (hasNewImage)
+                {
+                    <div class="d-flex gap-2 flex-wrap">
+                        @if (!isImageCropped)
+                        {
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Success"
+                                       StartIcon="@Icons.Material.Filled.Save"
+                                       OnClick="@UploadImageDirectly"
+                                       Disabled="@IsUploading"
+                                       Size="Size.Small">
+                                @if (IsUploading && uploadSource == "direct")
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                    <span>Uploader...</span>
+                                }
+                                else
+                                {
+                                    <span>Gem billede</span>
+                                }
+                            </MudButton>
+                        }
+                        else
+                        {
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Success"
+                                       StartIcon="@Icons.Material.Filled.Save"
+                                       OnClick="@UploadCroppedImage"
+                                       Disabled="@IsUploading"
+                                       Size="Size.Small">
+                                @if (IsUploading && uploadSource == "cropped")
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                    <span>Uploader...</span>
+                                }
+                                else
+                                {
+                                    <span>Gem beskåret billede</span>
+                                }
+                            </MudButton>
+                        }
+
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Secondary"
+                                   StartIcon="@Icons.Material.Filled.Cancel"
+                                   OnClick="@CancelNewImage"
+                                   Disabled="@IsUploading"
+                                   Size="Size.Small">
+                            Fortryd
+                        </MudButton>
+                    </div>
+                }
+
+          
+
+                <!-- Error Display -->
+                @if (!string.IsNullOrEmpty(ErrorMessage))
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true">
+                        @ErrorMessage
+                    </MudAlert>
+                }
+
+                <!-- Camera Support Info -->
+                @if (!isCameraSupported)
+                {
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                        <MudIcon Icon="Icons.Material.Filled.Warning" Size="Size.Small" Class="mr-1" />
+                        @if (!string.IsNullOrEmpty(cameraIssues))
+                        {
+                            @cameraIssues
+                        }
+                        else
+                        {
+                            <span>Kamera ikke tilgængeligt i denne browser</span>
+                        }
+                    </MudText>
+                }
+                else
+                {
+                    <!-- Help Text -->
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                        Max størrelse: 5MB. Understøttede formater: JPEG, PNG, GIF, WebP
+                    </MudText>
+                }
+            </MudStack>
+        </div>
+    </div>
+
+    <!-- Hidden File Input -->
+    <InputFile OnChange="@OnFileSelected"
+               accept="image/*"
+               style="display: none;"
+               id="@fileInputId" />
+
+    <!-- Camera Modal -->
+    @if (showCameraDialog)
+    {
+        <div class="camera-modal-overlay" @onclick="@StopCamera">
+            <div class="camera-modal-content" @onclick:stopPropagation="true">
+                <!-- Header -->
+                <div class="camera-modal-header">
+                    <h3 class="camera-modal-title">
+                        <MudIcon Icon="@Icons.Material.Filled.CameraAlt" />
+                        Tag et billede
+                    </h3>
+                    <button class="camera-modal-close" @onclick="@StopCamera" type="button">
+                        <MudIcon Icon="@Icons.Material.Filled.Close" />
+                    </button>
+                </div>
+
+                <!-- Content -->
+                <div class="camera-modal-body">
+                    <div class="camera-video-container" id="camera-dialog-container">
+
+                        <!-- Video element ALWAYS rendered -->
+                        <video id="camera-video"
+                               width="400"
+                               height="300"
+                               autoplay
+                               muted
+                               playsinline
+                               style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 2px solid var(--mud-palette-primary);"></video>
+
+                        <!-- Loading overlay -->
+                        @if (isCameraLoading)
+                        {
+                            <div class="camera-loading-overlay">
+                                <MudProgressCircular Size="Size.Large" Indeterminate="true" />
+                                <MudText Typo="Typo.subtitle1">Starter kamera...</MudText>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="camera-actions">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.PhotoCamera"
+                                   OnClick="@CapturePhoto"
+                                   Disabled="@(IsUploading || isCameraLoading)">
+                            @if (IsUploading)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                <span>Behandler...</span>
+                            }
+                            else
+                            {
+                                <span>Tag billede</span>
+                            }
+                        </MudButton>
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Secondary"
+                                   OnClick="@StopCamera">
+                            Annuller
+                        </MudButton>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas element for photo capture -->
+        <canvas id="camera-canvas" width="400" height="300" style="display: none;"></canvas>
+    }
+
+    <!-- SIMPLIFIED: Crop Modal without aspect ratio controls -->
+    @if (showCropDialog)
+    {
+        <div class="crop-modal-overlay" @onclick="@CancelCrop">
+            <div class="crop-modal-content" @onclick:stopPropagation="true">
+                <!-- Header -->
+                <div class="crop-modal-header">
+                    <h3 class="crop-modal-title">
+                        <MudIcon Icon="@Icons.Material.Filled.Crop" />
+                        Beskær billede
+                    </h3>
+                    <button class="crop-modal-close" @onclick="@CancelCrop" type="button">
+                        <MudIcon Icon="@Icons.Material.Filled.Close" />
+                    </button>
+                </div>
+
+                <!-- Content -->
+                <div class="crop-modal-body">
+                    <!-- Status Display -->
+                    @if (isCropperInitializing)
+                    {
+                        <div style="text-align: center; padding: 16px;">
+                            <MudProgressCircular Size="Size.Medium" Indeterminate="true" />
+                            <MudText Typo="Typo.body2" Class="mt-2">Indlæser billede til beskæring...</MudText>
+                        </div>
+                    }
+
+                    <!-- FIXED: Crop Area with better image display -->
+                    <div class="crop-area">
+                        @if (!string.IsNullOrEmpty(newImageDataUrl))
+                        {
+                            <img id="@CROP_IMAGE_ID"
+                                 src="@newImageDataUrl"
+                                 alt="Billede til beskæring"
+                                 @onload="OnCropImageLoaded"
+                                 @onerror="OnCropImageError" />
+                        }
+                        else
+                        {
+                            <div style="padding: 40px; text-align: center; color: #666;">
+                                <MudIcon Icon="@Icons.Material.Filled.Error" Size="Size.Large" />
+                                <div>Ingen billede data tilgængelig</div>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- SIMPLIFIED: Crop Controls without aspect ratio -->
+                    <div class="crop-controls">
+                        <!-- Quality Control Only -->
+                        <div style="margin-bottom: 1rem;">
+                            <MudText Typo="Typo.caption" Class="mb-2">Kvalitet: @(cropQuality.ToString("P0"))</MudText>
+                            <MudSlider @bind-Value="cropQuality"
+                                       Min="0.1"
+                                       Max="1"
+                                       Step="0.1"
+                                       Color="Color.Primary"
+                                       Variant="Variant.Filled"
+                                       Disabled="@(!isCropperReady)" />
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="crop-actions">
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Crop"
+                                       OnClick="@ApplyCrop"
+                                       Disabled="@(!isCropperReady)"
+                                       Class="mr-2">
+                                @if (!isCropperReady)
+                                {
+                                    <span>Venter på billede...</span>
+                                }
+                                else
+                                {
+                                    <span>Anvend beskæring</span>
+                                }
+                            </MudButton>
+                            <MudButton Variant="Variant.Text"
+                                       Color="Color.Secondary"
+                                       OnClick="@CancelCrop">
+                                Annuller
+                            </MudButton>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? ImagePreviewUrl { get; set; }
+    [Parameter] public EventCallback<string> ImagePreviewUrlChanged { get; set; }
+    [Parameter] public Size PreviewSize { get; set; } = Size.Large;
+    [Parameter] public EventCallback<MemberImageUploadRequestDTO> OnImageSelected { get; set; }
+    [Parameter] public EventCallback OnImageCleared { get; set; }
+    [Parameter] public bool IsUploading { get; set; }
+    [Parameter] public string? MemberGuid { get; set; } // For loading profile images
+
+    // Static IDs that never change during component lifetime
+    private readonly string fileInputId = $"file-input-{Guid.NewGuid():N}";
+    private const string CROP_IMAGE_ID = "crop-image-static"; // Static ID for cropper
+    private string uploadSource = string.Empty;
+
+    // Static camera IDs
+    private const string CAMERA_VIDEO_ID = "camera-video";
+    private const string CAMERA_CANVAS_ID = "camera-canvas";
+
+    // State management for new workflow
+    private bool hasNewImage = false; // Track if user has selected/captured a new image
+    private bool isImageCropped = false; // Track if new image has been cropped
+    private string newImageDataUrl = string.Empty; // Store new image data for cropping
+    private MemberImageUploadRequestDTO? pendingImageDto = null; // Store pending image data
+
+    private bool showCameraDialog = false;
+    private bool showCropDialog = false;
+    private bool isCameraSupported = false;
+    private bool isCameraLoading = false;
+    private bool isCropperInitializing = false; // Track cropper initialization
+    private bool isCropperReady = false; // Track when cropper is ready
+    private string cameraIssues = string.Empty;
+
+    private string SelectedFileName = string.Empty;
+    private long SelectedFileSize = 0;
+    private string ErrorMessage = string.Empty;
+    // REMOVED: selectedAspectRatio - only quality control now
+    private double cropQuality = 0.8;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckCameraSupport();
+
+        // Load profile image if MemberGuid is provided
+        if (!string.IsNullOrEmpty(MemberGuid))
+        {
+            await LoadProfileImage();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Reload profile image when MemberGuid changes
+        if (!string.IsNullOrEmpty(MemberGuid) && string.IsNullOrEmpty(ImagePreviewUrl))
+        {
+            await LoadProfileImage();
+        }
+    }
+
+    // Load profile image from server (existing image - no cropping allowed)
+    private async Task LoadProfileImage()
+    {
+        if (string.IsNullOrEmpty(MemberGuid)) return;
+
+        try
+        {
+            Console.WriteLine($"Loading profile image for member: {MemberGuid}");
+            var imageUrl = await ProfileService.GetProfileImageUrlAsync();
+
+            if (!string.IsNullOrEmpty(imageUrl))
+            {
+                ImagePreviewUrl = imageUrl;
+                await ImagePreviewUrlChanged.InvokeAsync(ImagePreviewUrl);
+                SelectedFileName = "profile-image.jpg";
+                ErrorMessage = string.Empty;
+
+                // This is an existing image - no cropping allowed
+                hasNewImage = false;
+                isImageCropped = false;
+                newImageDataUrl = string.Empty;
+                pendingImageDto = null;
+
+                Console.WriteLine($"Profile image loaded: {imageUrl}");
+            }
+            else
+            {
+                Console.WriteLine("No profile image found");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading profile image: {ex.Message}");
+            ErrorMessage = "Kunne ikke indlæse profilbillede";
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task CheckCameraSupport()
+    {
+        try
+        {
+            var result = await JSRuntime.InvokeAsync<JsonElement>("testCameraSupport");
+
+            if (result.TryGetProperty("isSupported", out var isSupported))
+            {
+                isCameraSupported = isSupported.GetBoolean();
+            }
+
+            if (result.TryGetProperty("issues", out var issues) && issues.ValueKind == JsonValueKind.Array)
+            {
+                var issuesList = new List<string>();
+                foreach (var issue in issues.EnumerateArray())
+                {
+                    issuesList.Add(issue.GetString() ?? "Unknown issue");
+                }
+                cameraIssues = string.Join(", ", issuesList);
+            }
+
+            Console.WriteLine($"Camera supported: {isCameraSupported}");
+            if (!string.IsNullOrEmpty(cameraIssues))
+            {
+                Console.WriteLine($"Camera issues: {cameraIssues}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Camera support check failed: {ex.Message}");
+            isCameraSupported = false;
+            cameraIssues = "Kunne ikke kontrollere kameraunderstøttelse";
+        }
+    }
+
+    private async Task TriggerFileInput()
+    {
+        uploadSource = "file";
+        await JSRuntime.InvokeVoidAsync("eval", $"document.getElementById('{fileInputId}').click()");
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        await ProcessImageFile(file, "file");
+    }
+
+    private async Task StartCameraCapture()
+    {
+        if (!isCameraSupported)
+        {
+            var message = !string.IsNullOrEmpty(cameraIssues)
+                ? $"Kamera ikke tilgængeligt: {cameraIssues}"
+                : "Kamera er ikke understøttet i denna browser";
+            Snackbar.Add(message, Severity.Warning);
+            return;
+        }
+
+        uploadSource = "camera";
+        isCameraLoading = true;
+        showCameraDialog = true;
+        ErrorMessage = string.Empty;
+        StateHasChanged();
+
+        Console.WriteLine($"Starting camera capture with static video ID: {CAMERA_VIDEO_ID}");
+
+        try
+        {
+            await Task.Delay(500);
+            await JSRuntime.InvokeVoidAsync("startCamera", CAMERA_VIDEO_ID);
+            isCameraLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Camera start error: {ex.Message}");
+            ErrorMessage = ex.Message;
+            Snackbar.Add($"Fejl ved start af kamera: {ex.Message}", Severity.Error);
+            isCameraLoading = false;
+            await StopCamera();
+        }
+    }
+
+    private async Task CapturePhoto()
+    {
+        try
+        {
+            IsUploading = true;
+            uploadSource = "camera";
+            StateHasChanged();
+
+            var imageDataUrl = await JSRuntime.InvokeAsync<string>("capturePhoto", CAMERA_VIDEO_ID, CAMERA_CANVAS_ID);
+
+            if (!string.IsNullOrEmpty(imageDataUrl))
+            {
+                await ProcessCapturedImage(imageDataUrl);
+                Snackbar.Add("Billede taget!", Severity.Success);
+            }
+            else
+            {
+                throw new Exception("Kunne ikke tage billede");
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Snackbar.Add($"Fejl ved billedoptagelse: {ex.Message}", Severity.Error);
+            Console.WriteLine($"Camera capture error: {ex.Message}");
+        }
+        finally
+        {
+            IsUploading = false;
+            await StopCamera();
+        }
+    }
+
+    private async Task StopCamera()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("stopCamera");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error stopping camera: {ex.Message}");
+        }
+        finally
+        {
+            isCameraLoading = false;
+            showCameraDialog = false;
+            uploadSource = string.Empty;
+            StateHasChanged();
+        }
+    }
+
+    // Start cropping (only for new images)
+    private async Task StartCropping()
+    {
+        if (!hasNewImage || string.IsNullOrEmpty(newImageDataUrl))
+        {
+            Snackbar.Add("Du kan kun beskære nye billeder. Tag eller vælg et nyt billede først.", Severity.Warning);
+            return;
+        }
+
+        // Reset states
+        isCropperInitializing = false;
+        isCropperReady = false;
+        showCropDialog = true;
+        StateHasChanged();
+
+        Console.WriteLine($"Starting cropping with new image data URL (length: {newImageDataUrl.Length})");
+    }
+
+    // Handle successful image loading
+    private async void OnCropImageLoaded()
+    {
+        try
+        {
+            Console.WriteLine("✅ Crop image loaded successfully in DOM");
+            isCropperInitializing = true;
+            StateHasChanged();
+
+            // Small delay to ensure DOM is settled
+            await Task.Delay(200);
+
+            await InitializeCropper();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error in OnCropImageLoaded: {ex.Message}");
+            ErrorMessage = $"Fejl ved indlæsning af billede: {ex.Message}";
+            isCropperInitializing = false;
+            StateHasChanged();
+        }
+    }
+
+    // Handle image loading errors
+    private void OnCropImageError()
+    {
+        Console.WriteLine("❌ Image failed to load in crop dialog");
+        ErrorMessage = "Billedet kunne ikke indlæses til beskæring. Prøv at uploade et nyt billede.";
+        isCropperInitializing = false;
+        isCropperReady = false;
+        StateHasChanged();
+    }
+
+    private async Task InitializeCropper()
+    {
+        try
+        {
+            // SIMPLIFIED: No aspect ratio - free cropping only
+            Console.WriteLine($"Calling initializeCropper with ID: {CROP_IMAGE_ID} (free aspect ratio)");
+
+            await JSRuntime.InvokeVoidAsync("initializeCropper", CROP_IMAGE_ID, null);
+
+            isCropperReady = true;
+            isCropperInitializing = false;
+            Console.WriteLine("✅ Cropper initialized successfully!");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error initializing cropper: {ex.Message}");
+            isCropperInitializing = false;
+            isCropperReady = false;
+            throw new Exception("Fejl ved initialisering af beskæring.");
+        }
+    }
+
+    // REMOVED: OnAspectRatioChanged method - no longer needed
+
+    private async Task ApplyCrop()
+    {
+        if (!isCropperReady)
+        {
+            Snackbar.Add("Vent venligst til beskæringen er klar...", Severity.Info);
+            return;
+        }
+
+        try
+        {
+            var croppedImageDataUrl = await JSRuntime.InvokeAsync<string>("getCroppedImage", cropQuality);
+
+            if (!string.IsNullOrEmpty(croppedImageDataUrl))
+            {
+                await ProcessCroppedImage(croppedImageDataUrl);
+                Snackbar.Add("Billede beskåret!", Severity.Success);
+
+                // Close the crop dialog
+                showCropDialog = false;
+            }
+            else
+            {
+                throw new Exception("Kunne ikke beskære billede");
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Snackbar.Add($"Fejl ved beskæring: {ex.Message}", Severity.Error);
+            Console.WriteLine($"Crop error: {ex.Message}");
+        }
+        finally
+        {
+            await CancelCrop();
+        }
+    }
+
+    private async Task CancelCrop()
+    {
+        try
+        {
+            if (isCropperReady)
+            {
+                await JSRuntime.InvokeVoidAsync("destroyCropper");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error destroying cropper: {ex.Message}");
+        }
+        finally
+        {
+            showCropDialog = false;
+            isCropperInitializing = false;
+            isCropperReady = false;
+            StateHasChanged();
+        }
+    }
+
+    // Upload image directly without cropping
+    private async Task UploadImageDirectly()
+    {
+        if (!hasNewImage || pendingImageDto == null)
+        {
+            Snackbar.Add("Ingen nyt billede at uploade.", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            IsUploading = true;
+            uploadSource = "direct";
+            StateHasChanged();
+
+            await OnImageSelected.InvokeAsync(pendingImageDto);
+            Snackbar.Add("Billede uploadet succesfuldt!", Severity.Success);
+
+            // Reset new image state
+            ResetNewImageState();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Snackbar.Add($"Fejl ved upload af billede: {ex.Message}", Severity.Error);
+            Console.WriteLine($"Direct upload error: {ex.Message}");
+        }
+        finally
+        {
+            IsUploading = false;
+            StateHasChanged();
+        }
+    }
+
+    // Upload cropped image
+    private async Task UploadCroppedImage()
+    {
+        if (!hasNewImage || !isImageCropped || pendingImageDto == null)
+        {
+            Snackbar.Add("Ingen beskåret billede at uploade.", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            IsUploading = true;
+            uploadSource = "cropped";
+            StateHasChanged();
+
+            await OnImageSelected.InvokeAsync(pendingImageDto);
+            Snackbar.Add("Beskåret billede uploadet succesfuldt!", Severity.Success);
+
+            // Reset new image state
+            ResetNewImageState();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Snackbar.Add($"Fejl ved upload af beskåret billede: {ex.Message}", Severity.Error);
+            Console.WriteLine($"Cropped upload error: {ex.Message}");
+        }
+        finally
+        {
+            IsUploading = false;
+            StateHasChanged();
+        }
+    }
+
+    // Cancel new image and revert to existing
+    private async Task CancelNewImage()
+    {
+        ResetNewImageState();
+
+        ImagePreviewUrl = string.Empty;
+        // Reload existing profile image if available
+        if (!string.IsNullOrEmpty(MemberGuid))
+        {
+            await LoadProfileImage();
+        }
+        else
+        {
+            await ClearImage();
+        }
+
+        Snackbar.Add("Nyt billede annulleret.", Severity.Info);
+    }
+
+    // Reset new image state
+    private void ResetNewImageState()
+    {
+        hasNewImage = false;
+        isImageCropped = false;
+        newImageDataUrl = string.Empty;
+        pendingImageDto = null;
+        StateHasChanged();
+    }
+
+    private async Task ProcessImageFile(IBrowserFile file, string source)
+    {
+        ErrorMessage = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            if (!ImageUploadService.IsValidImageType(file.ContentType))
+            {
+                ErrorMessage = "Vælg venligst en gyldig billedfil (JPEG, PNG, GIF eller WebP).";
+                return;
+            }
+
+            if (file.Size > 5 * 1024 * 1024)
+            {
+                ErrorMessage = "Filstørrelsen skal være mindre end 5MB.";
+                return;
+            }
+
+            var imageDto = await ImageUploadService.PrepareImageFromBrowserFileAsync(file);
+
+            // Store as new image data
+            newImageDataUrl = $"data:{file.ContentType};base64,{imageDto.ImageFile}";
+            pendingImageDto = imageDto;
+
+            ImagePreviewUrl = newImageDataUrl;
+            await ImagePreviewUrlChanged.InvokeAsync(ImagePreviewUrl);
+
+            SelectedFileName = file.Name;
+            SelectedFileSize = file.Size;
+
+            // Mark as new image
+            hasNewImage = true;
+            isImageCropped = false;
+
+            Console.WriteLine($"New image processed: {SelectedFileName} ({SelectedFileSize} bytes)");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error processing image: {ex.Message}");
+            ErrorMessage = ex.Message;
+            await ClearImage();
+        }
+        finally
+        {
+            uploadSource = string.Empty;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ProcessCapturedImage(string imageDataUrl)
+    {
+        try
+        {
+            var base64Data = imageDataUrl.Split(',')[1];
+            var imageBytes = Convert.FromBase64String(base64Data);
+
+            var imageDto = ImageUploadService.PrepareImageFromBytes(imageBytes, "image/jpeg", "camera-capture.jpg");
+
+            // Store as new image data
+            newImageDataUrl = imageDataUrl;
+            pendingImageDto = imageDto;
+
+            ImagePreviewUrl = imageDataUrl;
+            await ImagePreviewUrlChanged.InvokeAsync(ImagePreviewUrl);
+
+            SelectedFileName = "camera-capture.jpg";
+            SelectedFileSize = imageBytes.Length;
+            ErrorMessage = string.Empty;
+
+            // Mark as new image
+            hasNewImage = true;
+            isImageCropped = false;
+
+            Console.WriteLine($"New camera image processed: {SelectedFileName} ({SelectedFileSize} bytes)");
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error processing captured image: {ex.Message}";
+            Console.WriteLine($"Captured image processing error: {ex.Message}");
+        }
+    }
+
+    private async Task ProcessCroppedImage(string croppedImageDataUrl)
+    {
+        try
+        {
+            var base64Data = croppedImageDataUrl.Split(',')[1];
+            var imageBytes = Convert.FromBase64String(base64Data);
+
+            var imageDto = ImageUploadService.PrepareImageFromBytes(imageBytes, "image/jpeg", GetCroppedFileName());
+
+            // Update with cropped image data
+            newImageDataUrl = croppedImageDataUrl;
+            pendingImageDto = imageDto;
+
+            ImagePreviewUrl = croppedImageDataUrl;
+            await ImagePreviewUrlChanged.InvokeAsync(ImagePreviewUrl);
+
+            SelectedFileName = GetCroppedFileName();
+            SelectedFileSize = imageBytes.Length;
+            ErrorMessage = string.Empty;
+
+            // Mark as cropped
+            isImageCropped = true;
+
+            Console.WriteLine($"Cropped image processed: {SelectedFileName} ({SelectedFileSize} bytes)");
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error processing cropped image: {ex.Message}";
+            Console.WriteLine($"Cropped image processing error: {ex.Message}");
+        }
+    }
+
+    private async Task ClearImage()
+    {
+        ImagePreviewUrl = string.Empty;
+        await ImagePreviewUrlChanged.InvokeAsync(ImagePreviewUrl);
+
+        SelectedFileName = string.Empty;
+        SelectedFileSize = 0;
+        ErrorMessage = string.Empty;
+
+        // Reset new image state
+        ResetNewImageState();
+
+        await OnImageCleared.InvokeAsync();
+        StateHasChanged();
+    }
+
+    private async Task DeleteImage()
+    {
+        try
+        {
+            var result = await ProfileService.DeleteProfileImageAsync();
+            if (result)
+            {
+                ImagePreviewUrl = string.Empty;
+                await ImagePreviewUrlChanged.InvokeAsync(ImagePreviewUrl);
+                SelectedFileName = string.Empty;
+                SelectedFileSize = 0;
+                ErrorMessage = string.Empty;
+                ResetNewImageState();
+                await OnImageCleared.InvokeAsync();
+                Snackbar.Add("Profilbillede slettet.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Kunne ikke slette profilbillede.", Severity.Error);
+            }
+        }catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting image: {ex.Message}");
+            ErrorMessage = ex.Message;
+            return;
+        }
+        StateHasChanged();
+    }
+
+    // REMOVED: GetAspectRatioValue method - no longer needed
+
+    private string GetCroppedFileName()
+    {
+        var originalName = string.IsNullOrEmpty(SelectedFileName) ? "image" : Path.GetFileNameWithoutExtension(SelectedFileName);
+        return $"{originalName}-cropped.jpg";
+    }
+
+    private int GetSizePixels()
+    {
+        return PreviewSize switch
+        {
+            Size.Small => 40,
+            Size.Medium => 60,
+            Size.Large => 80,
+            _ => 120
+        };
+    }
+
+    private Size GetIconSize()
+    {
+        return PreviewSize switch
+        {
+            Size.Small => Size.Small,
+            Size.Medium => Size.Medium,
+            Size.Large => Size.Large,
+            _ => Size.Large
+        };
+    }
+}

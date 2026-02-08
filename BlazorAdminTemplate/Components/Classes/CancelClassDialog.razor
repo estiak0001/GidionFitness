@@ -1,0 +1,97 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Classes
+@using MudBlazor
+@using System.Threading.Tasks
+@inject ITrainingClassesService TrainingClassesService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Class="mr-3" Color="Color.Warning" />
+            Cancel Class
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Class="mb-4">
+            Are you sure you want to cancel the class:<br />
+            <strong>@Class.TrainingClassClassesName</strong><br />
+            on <strong>@Class.TrainingClassClassesStartDateTime.ToString("dddd, MMMM dd, yyyy 'at' HH:mm")</strong>?
+        </MudText>
+
+        <MudAlert Severity="Severity.Warning" Class="mb-4">
+            All registered members will be notified by email about the cancellation.
+        </MudAlert>
+
+        <MudTextField Value="@Reason"
+                      ValueChanged="OnReasonChanged"
+                      T="string"
+                      Label="Reason for cancellation (required – will be sent to members)"
+                      Variant="Variant.Outlined"
+                      Lines="5"
+                      Immediate="true"
+                      Placeholder="e.g. Instructor illness, low sign-ups, facility issue..."
+                      Class="mt-2" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Back</MudButton>
+        <MudButton Color="Color.Error"
+                   Variant="Variant.Filled"
+                   OnClick="Confirm"
+                   Disabled="@(string.IsNullOrWhiteSpace(Reason) || isCancelling)">
+            @if (isCancelling)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Cancelling...</span>
+            }
+            else
+            {
+                <span>Cancel Class</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public StaffTrainingClassGetResponseDTO Class { get; set; } = default!;
+
+    private string Reason { get; set; } = string.Empty;
+    private bool isCancelling = false;
+
+    private void OnReasonChanged(string value)
+    {
+        Reason = value;
+        StateHasChanged();
+    }
+
+    private async Task Confirm()
+    {
+        isCancelling = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await TrainingClassesService.StaffCancelClassAsync(Class.TrainingClassClassesGUID);
+
+            if (!string.IsNullOrEmpty(result.Message))
+            {
+                MudDialog.Close(DialogResult.Ok(Reason.Trim()));
+            }
+            else
+            {
+                MudDialog.Close(DialogResult.Ok(Reason.Trim()));
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error cancelling class: {ex.Message}");
+            isCancelling = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

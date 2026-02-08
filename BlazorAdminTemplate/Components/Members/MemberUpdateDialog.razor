@@ -1,0 +1,505 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Members
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Application.Validators
+@using Microsoft.AspNetCore.Authorization
+@using FluentValidation
+@inject IMemberService MemberService
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Large"
+           FullWidth="true"
+           Style="height: 90vh; max-height: 900px;">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-2" />
+            Rediger medlem
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <div style="min-width: 600px; max-height: 80vh; overflow-y: auto;">
+            @if (isLoading)
+            {
+                <div class="d-flex justify-center align-center pa-8">
+                    <MudProgressCircular Indeterminate="true" />
+                    <MudText Class="ml-3">Indlæser medlemsdata...</MudText>
+                </div>
+            }
+            else if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <MudAlert Severity="MudBlazor.Severity.Error" Class="mb-4">
+                    @errorMessage
+                </MudAlert>
+            }
+            else
+            {
+                <MudTabs Elevation="1"
+                         Rounded="true"
+                         Color="Color.Transparent"
+                         PanelClass="pa-4"
+                         Class="member-details-tabs">
+
+                    <!-- General Details Tab -->
+                    <MudTabPanel Text="Generelle oplysninger"
+                                 Icon="@Icons.Material.Filled.Person">
+                        <MemberUpdateProfileTab MemberGuid="@MemberGuid" />
+                    </MudTabPanel>
+
+                    <!-- Membership Info Tab -->
+                    <MudTabPanel Text="Medlemskab"
+                                 Icon="@Icons.Material.Filled.CardMembership">
+                        <MemberUpdateMembershipTab MemberGuid="@MemberGuid" />
+                    </MudTabPanel>
+
+                    <!-- Payments Tab -->
+                    <MudTabPanel Text="Betalinger"
+                                 Icon="@Icons.Material.Filled.Payment">
+                        <MemberUpdatePaymentTab MemberGuid="@MemberGuid" />
+                    </MudTabPanel>
+
+                    @* <!-- Training History Tab -->
+                    <MudTabPanel Text="Træningshistorik"
+                                 Icon="@Icons.Material.Filled.AccessTime">
+                        <MemberTrainingHistoryTab MemberGuid="@MemberGuid" />
+                    </MudTabPanel> *@
+
+                    @* <!-- Training Classes Tab -->
+                    <MudTabPanel Text="Træningshold"
+                                 Icon="@Icons.Material.Filled.FitnessCenter">
+                        <MemberTrainingClassesTab MemberGuid="@MemberGuid" />
+                    </MudTabPanel> *@
+                    <!--Contract Tab-->
+                    <MudTabPanel Text="Kontrakter"
+                                 Icon="@Icons.Material.Filled.Article">
+                        <MemberUpdateContractTab MemberGuid="@MemberGuid" />
+                    </MudTabPanel>
+
+                    <!--Chip Tab-->
+                    <MudTabPanel Text="Chip"
+                                 Icon="@Icons.Material.Filled.Nfc">
+                        <MemberUpdateChipTab MemberGuid="@MemberGuid" />
+                    </MudTabPanel>
+
+                    <!--Notes Tab-->
+                    <MudTabPanel Text="Notes"
+                                 Icon="@Icons.Material.Filled.EditNote">
+                        <MemberUpdateNotesTab MemberGuid="@MemberGuid" />
+                    </MudTabPanel>
+
+                    <!--Password Tab-->
+                    <MudTabPanel Text="Password"
+                                 Icon="@Icons.Material.Filled.Password">
+                        <MemberUpdatePasswordTab MemberGuid="@MemberGuid" />
+                    </MudTabPanel>
+
+
+                </MudTabs>
+                @* <MudForm @ref="form" Model="updateRequest" Validation="@validator.ValidateValue" ValidationDelay="0">
+                    <MudStack Spacing="4">
+
+                        <!-- Personal Information Section -->
+                        <MudCard Elevation="2">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">
+                                        <MudIcon Icon="@Icons.Material.Filled.Person" Class="mr-2" />
+                                        Personlige oplysninger
+                                    </MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudGrid>
+                                    <MudItem xs="12" md="6">
+                                        <MudTextField @bind-Value="updateRequest.MemberFirstName"
+                                                      For="@(() => updateRequest.MemberFirstName)"
+                                                      Label="Fornavn"
+                                                      Variant="Variant.Outlined"
+                                                      Required="true"
+                                                      Immediate="true" />
+                                    </MudItem>
+                                    <MudItem xs="12" md="6">
+                                        <MudTextField @bind-Value="updateRequest.MemberLastName"
+                                                      For="@(() => updateRequest.MemberLastName)"
+                                                      Label="Efternavn"
+                                                      Variant="Variant.Outlined"
+                                                      Required="true"
+                                                      Immediate="true" />
+                                    </MudItem>
+                                    <MudItem xs="12" md="6">
+                                        <MudDatePicker @bind-Date="updateRequest.MemberBirthday"
+                                                       Label="Fødselsdato"
+                                                       Variant="Variant.Outlined"
+                                                       DateFormat="dd/MM/yyyy"
+                                                       MaxDate="DateTime.Today.AddYears(-13)"
+                                                       Clearable="true" />
+                                    </MudItem>
+                                    <MudItem xs="12" md="6">
+                                        <MudSelect @bind-Value="updateRequest.MemberSex"
+                                                   Label="Køn"
+                                                   Variant="Variant.Outlined"
+                                                   Clearable="true"
+                                                   AnchorOrigin="Origin.BottomCenter">
+                                            <MudSelectItem Value="@((byte?)1)">Mand</MudSelectItem>
+                                            <MudSelectItem Value="@((byte?)2)">Kvinde</MudSelectItem>
+                                            <MudSelectItem Value="@((byte?)3)">Andet</MudSelectItem>
+                                        </MudSelect>
+                                    </MudItem>
+                                    <MudItem xs="12" md="6">
+                                        <MudTextField @bind-Value="updateRequest.MemberCPR"
+                                                      For="@(() => updateRequest.MemberCPR)"
+                                                      Label="CPR-nummer"
+                                                      Variant="Variant.Outlined"
+                                                      Placeholder="DDMMYY-XXXX"
+                                                      Immediate="true" />
+                                    </MudItem>
+                                    <MudItem xs="12" md="6">
+                                        <MudTextField @bind-Value="updateRequest.MemberJobTitle"
+                                                      Label="Jobtitel"
+                                                      Variant="Variant.Outlined"
+                                                      Immediate="true" />
+                                    </MudItem>
+                                </MudGrid>
+                            </MudCardContent>
+                        </MudCard>
+
+                        <!-- Contact Information Section -->
+                        <MudCard Elevation="2">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">
+                                        <MudIcon Icon="@Icons.Material.Filled.ContactMail" Class="mr-2" />
+                                        Kontaktoplysninger
+                                    </MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudGrid>
+                                    <MudItem xs="12">
+                                        <MudTextField @bind-Value="updateRequest.MemberEmail"
+                                                      For="@(() => updateRequest.MemberEmail)"
+                                                      Label="Email"
+                                                      Variant="Variant.Outlined"
+                                                      Required="true"
+                                                      InputType="InputType.Email"
+                                                      Immediate="true" />
+                                    </MudItem>
+                                    <MudItem xs="12" md="6">
+                                        <MudTextField @bind-Value="updateRequest.MemberPhonePrivate"
+                                                      For="@(() => updateRequest.MemberPhonePrivate)"
+                                                      Label="Privat telefon"
+                                                      Variant="Variant.Outlined"
+                                                      Immediate="true" />
+                                    </MudItem>
+                                    <MudItem xs="12" md="6">
+                                        <MudTextField @bind-Value="updateRequest.MemberPhoneWork"
+                                                      For="@(() => updateRequest.MemberPhoneWork)"
+                                                      Label="Arbejdstelefon"
+                                                      Variant="Variant.Outlined"
+                                                      Immediate="true" />
+                                    </MudItem>
+                                </MudGrid>
+                            </MudCardContent>
+                        </MudCard>
+
+                        <!-- Address Information Section -->
+                        <MudCard Elevation="2">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">
+                                        <MudIcon Icon="@Icons.Material.Filled.Home" Class="mr-2" />
+                                        Adresseoplysninger
+                                    </MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudGrid>
+                                    <MudItem xs="12">
+                                        <MudTextField @bind-Value="updateRequest.MemberAddress"
+                                                      For="@(() => updateRequest.MemberAddress)"
+                                                      Label="Adresse"
+                                                      Variant="Variant.Outlined"
+                                                      Immediate="true" />
+                                    </MudItem>
+                                    <MudItem xs="12" md="8">
+                                        <MudTextField @bind-Value="updateRequest.MemberCity"
+                                                      For="@(() => updateRequest.MemberCity)"
+                                                      Label="By"
+                                                      Variant="Variant.Outlined"
+                                                      Immediate="true" />
+                                    </MudItem>
+                                    <MudItem xs="12" md="4">
+                                        <MudNumericField @bind-Value="updateRequest.MemberZipCode"
+                                                         For="@(() => updateRequest.MemberZipCode)"
+                                                         Label="Postnummer"
+                                                         Variant="Variant.Outlined"
+                                                         HideSpinButtons="true"
+                                                         Min="1000"
+                                                         Max="9999" />
+                                    </MudItem>
+                                </MudGrid>
+                            </MudCardContent>
+                        </MudCard>
+
+                        <!-- Organization & Membership Section -->
+                        <MudCard Elevation="2">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">
+                                        <MudIcon Icon="@Icons.Material.Filled.Business" Class="mr-2" />
+                                        Health Insurance
+                                    </MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudGrid>
+                                    <MudItem xs="12" md="6">
+                                        <MudSelect @bind-Value="updateRequest.MemberHealthInsurance"
+                                                   Label="Sundhedsforsikring"
+                                                   Variant="Variant.Outlined"
+                                                   Clearable="true"
+                                                   AnchorOrigin="Origin.BottomCenter">
+                                            <MudSelectItem Value="@((byte?)0)">Nej</MudSelectItem>
+                                            <MudSelectItem Value="@((byte?)1)">Ja</MudSelectItem>
+                                        </MudSelect>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudCardContent>
+                        </MudCard>
+
+                        <!-- Password Section -->
+                        <MudCard Elevation="2">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">
+                                        <MudIcon Icon="@Icons.Material.Filled.Lock" Class="mr-2" />
+                                        Adgangskode
+                                    </MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudAlert Severity="MudBlazor.Severity.Info" Dense="true" Class="mb-4">
+                                    Lad felterne stå tomme hvis adgangskoden ikke skal ændres.
+                                </MudAlert>
+                                <MudGrid>
+                                    <MudItem xs="12" md="6">
+                                        <MudTextField @bind-Value="updateRequest.CurrentPassword"
+                                                      For="@(() => updateRequest.CurrentPassword)"
+                                                      Label="Nuværende adgangskode"
+                                                      Variant="Variant.Outlined"
+                                                      InputType="@(showCurrentPassword? InputType.Text: InputType.Password)"
+                                                      Adornment="Adornment.End"
+                                                      AdornmentIcon="@(showCurrentPassword? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
+                                                      OnAdornmentClick="@(() => showCurrentPassword = !showCurrentPassword)"
+                                                      HelperText="Påkrævet for at ændre adgangskode" />
+                                    </MudItem>
+                                    <MudItem xs="12" md="6">
+                                        <MudTextField @bind-Value="updateRequest.NewPassword"
+                                                      For="@(() => updateRequest.NewPassword)"
+                                                      Label="Ny adgangskode"
+                                                      Variant="Variant.Outlined"
+                                                      InputType="@(showNewPassword? InputType.Text: InputType.Password)"
+                                                      Adornment="Adornment.End"
+                                                      AdornmentIcon="@(showNewPassword? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
+                                                      OnAdornmentClick="@(() => showNewPassword = !showNewPassword)" />
+                                    </MudItem>
+                                </MudGrid>
+                            </MudCardContent>
+                        </MudCard>
+
+                        <!-- Debug Information -->
+                        @if (updateResponse != null && updateResponse.UpdatedFields?.Count > 0)
+                        {
+                            <MudCard Elevation="2">
+                                <MudCardHeader>
+                                    <CardHeaderContent>
+                                        <MudText Typo="Typo.h6">
+                                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" />
+                                            Opdaterede felter
+                                        </MudText>
+                                    </CardHeaderContent>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        @foreach (var field in updateResponse.UpdatedFields)
+                                        {
+                                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">
+                                                @field
+                                            </MudChip>
+                                        }
+                                    </div>
+                                    <MudText Typo="Typo.caption" Class="mt-2">
+                                        Sidst opdateret: @updateResponse.LastUpdated.ToString("dd/MM/yyyy HH:mm")
+                                    </MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        }
+
+                    </MudStack>
+                </MudForm> *@
+            }
+        </div>
+    </DialogContent>
+
+    @* <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Close" Disabled="@isSubmitting">
+            Annuller
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="SaveChanges"
+                   Disabled="@(isSubmitting || isLoading)"
+                   StartIcon="@Icons.Material.Filled.Save">
+            @if (isSubmitting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Gem ændringer
+        </MudButton>
+    </DialogActions> *@
+</MudDialog>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string MemberGuid { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnMemberUpdated { get; set; }
+
+    private MudForm form = new();
+    private StaffUpdateMemberRequestDTO updateRequest = new();
+    private StaffUpdateMemberResponseDTO? updateResponse;
+    private readonly UpdateMemberRequestValidator validator = new(); 
+
+    private bool isLoading = true;
+    private bool isSubmitting = false;
+    private string errorMessage = string.Empty;
+
+    // Password visibility toggles
+    private bool showCurrentPassword = false;
+    private bool showNewPassword = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(MemberGuid))
+        {
+            errorMessage = "Medlem ID mangler.";
+            isLoading = false;
+            return;
+        }
+
+        await LoadMemberData();
+    }
+
+    private async Task LoadMemberData()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            StateHasChanged();
+
+           
+
+            var memberDetails = await MemberService.GetSpecificMemberAsync(MemberGuid);
+
+            if (memberDetails == null || string.IsNullOrEmpty(memberDetails.MemberGUID))
+            {
+                errorMessage = "Kunne ikke indlæse medlemsdata.";
+                return;
+            }
+
+            // Map the response to the update request
+            updateRequest = new StaffUpdateMemberRequestDTO
+            {
+                MemberGuid = memberDetails.MemberGUID,
+                OrganisationMainGuid = memberDetails.OrganisationMainGuid,
+                OrganisationSubGuid = memberDetails.OrganisationSubGuid,
+                MemberPaymentGroupGuid = memberDetails.MemberPaymentGroupGuid,
+                MemberFirstName = memberDetails.MemberFirstName,
+                MemberLastName = memberDetails.MemberLastName,
+                MemberAddress = memberDetails.MemberAddress,
+                MemberCity = memberDetails.MemberCity,
+                MemberZipCode = memberDetails.MemberZipCode,
+                MemberBirthday = memberDetails.MemberBirthday,
+                MemberSex = memberDetails.MemberSex,
+                MemberCPR = memberDetails.MemberCPR,
+                MemberPhonePrivate = memberDetails.MemberPhonePrivate,
+                MemberPhoneWork = memberDetails.MemberPhoneWork,
+                MemberEmail = memberDetails.MemberEmail,
+                MemberJobTitle = memberDetails.MemberJobTitle,
+                MemberLanguageGUID = string.Empty, 
+                MemberHealthInsurance = null, 
+                NewPassword = string.Empty,
+                CurrentPassword = string.Empty
+            };
+
+            
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading member data: {ex.Message}");
+            errorMessage = $"Fejl ved indlæsning: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveChanges()
+    {
+        try
+        {
+            isSubmitting = true;
+            errorMessage = string.Empty;
+            StateHasChanged();
+
+            
+            await form.Validate();
+
+            if (!form.IsValid)
+            {
+                errorMessage = "Ret venligst fejlene i formularen.";
+                return;
+            }
+
+           
+            updateResponse = await MemberService.UpdateMemberAsync(updateRequest);
+
+            if (updateResponse == null || string.IsNullOrEmpty(updateResponse.MemberGUID))
+            {
+                errorMessage = "Der opstod en fejl ved opdatering af medlemmet.";
+                return;
+            }
+
+            
+
+            Snackbar.Add($"Medlem {updateResponse.MemberName} blev opdateret succesfuldt!", MudBlazor.Severity.Success);
+
+            // Notify parent component
+            if (OnMemberUpdated.HasDelegate)
+            {
+                await OnMemberUpdated.InvokeAsync();
+            }
+
+            // Close dialog after a short delay to show the success state
+            await Task.Delay(1500);
+            MudDialog.Close(DialogResult.Ok(updateResponse));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating member: {ex.Message}");
+            errorMessage = $"Fejl ved opdatering: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Close()
+    {
+        MudDialog.Close(DialogResult.Cancel());
+    }
+}

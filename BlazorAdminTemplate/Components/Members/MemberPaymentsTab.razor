@@ -1,0 +1,349 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Payment
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Components.PaginationComponents
+@inject IStaffManagementService StaffManagementService
+@inject ISnackbar Snackbar
+
+<MudCard Elevation="0">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.Payment" Class="mr-2" />
+                Betalingshistorik
+            </MudText>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center align-center pa-4">
+                <MudProgressCircular Indeterminate="true" />
+                <MudText Class="ml-3">Indlæser betalingshistorik...</MudText>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">
+                @errorMessage
+            </MudAlert>
+        }
+        else if (payments != null && payments.Payments.Count > 0)
+        {
+            <!-- Summary Cards -->
+            <MudGrid Class="mb-4">
+                <MudItem xs="12" sm="6" md="3">
+                    <MudCard Elevation="1" Class="pa-4 summary-card">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Receipt" Color="Color.Info" Size="Size.Large" Class="mr-3" />
+                            <div class="card-text-content">
+                                <MudText Typo="Typo.h6" Class="card-number">@totalPayments</MudText>
+                                <MudText Typo="Typo.caption" Class="card-label">Total betalinger</MudText>
+                            </div>
+                        </div>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudCard Elevation="1" Class="pa-4 summary-card">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" Class="mr-3" />
+                            <div class="card-text-content">
+                                <MudText Typo="Typo.h6" Class="card-number">@successfulPayments</MudText>
+                                <MudText Typo="Typo.caption" Class="card-label">Gennemførte</MudText>
+                            </div>
+                        </div>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudCard Elevation="1" Class="pa-4 summary-card">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" Size="Size.Large" Class="mr-3" />
+                            <div class="card-text-content">
+                                <MudText Typo="Typo.h6" Class="card-number">@failedPayments</MudText>
+                                <MudText Typo="Typo.caption" Class="card-label">Fejlede</MudText>
+                            </div>
+                        </div>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudCard Elevation="1" Class="pa-4 summary-card">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Color="Color.Primary" Size="Size.Large" Class="mr-3" />
+                            <div class="card-text-content">
+                                <MudText Typo="Typo.h6" Class="card-number">@totalAmount</MudText>
+                                <MudText Typo="Typo.caption" Class="card-label">Total beløb</MudText>
+                            </div>
+                        </div>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+
+            <!-- Payments Table using PaginatedList component -->
+            <PaginatedList TItem="MemberPaymentDTO"
+                           Items="payments.Payments"
+                           Pagination="payments.Pagination"
+                           OnPageChanged="OnPageChanged">
+                <HeaderTemplate>
+                    <MudTh>Dato</MudTh>
+                    <MudTh>Beløb</MudTh>
+                    <MudTh>Type</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Ordrenummer</MudTh>
+                    <MudTh>Retning</MudTh>
+                </HeaderTemplate>
+                <RowTemplate>
+                    <MudTd>
+                        @{
+                            var formattedDate = DateTime.TryParse(context.MemberPaymentDataDate, out var dt)
+                            ? dt.ToString("dd/MM/yyyy")
+                            : context.MemberPaymentDataDate;
+                        }
+                        @formattedDate
+                    </MudTd>
+                    <MudTd>
+                        <MudText Typo="Typo.body2" Class="@GetAmountClass(context.MemberPaymentDataDirection)">
+                            @context.MemberPaymentDataAmount.ToString("C", new System.Globalization.CultureInfo("da-DK"))
+                        </MudText>
+                    </MudTd>
+                    <MudTd>
+                        <MudChip T="string"
+                                 Color="@GetPaymentTypeColor(context.MemberPaymentDataType)"
+                                 Variant="Variant.Filled"
+                                 Size="Size.Small">
+                            @GetPaymentTypeText(context.MemberPaymentDataType)
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>
+                        @if (context.MemberPaymentDataStatus == 1)
+                        {
+                            <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="mr-1" />
+                                Gennemført
+                            </MudChip>
+                        }
+                        else if (context.MemberPaymentDataStatus == 0)
+                        {
+                            <MudChip T="string" Color="Color.Warning" Variant="Variant.Filled" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Class="mr-1" />
+                                Afventer
+                            </MudChip>
+                        }
+                        else if (context.MemberPaymentDataStatus == 2)
+                        {
+                            <MudChip T="string" Color="Color.Error" Variant="Variant.Filled" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" Class="mr-1" />
+                                Fejlet
+                            </MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Default" Variant="Variant.Filled" Size="Size.Small">
+                                Ukendt
+                            </MudChip>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        <MudText Typo="Typo.body2" Class="font-family-monospace">
+                            @if (!string.IsNullOrEmpty(context.MemberPaymentDataOrderNumber))
+                            {
+                                @context.MemberPaymentDataOrderNumber
+                            }
+                            else
+                            {
+                                <span class="text-muted">-</span>
+                            }
+                        </MudText>
+                    </MudTd>
+                    <MudTd>
+                        @if (context.MemberPaymentDataDirection == 1)
+                        {
+                            <MudChip T="string" Color="Color.Success" Variant="Variant.Text" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small" Class="mr-1" />
+                                Indgående
+                            </MudChip>
+                        }
+                        else if (context.MemberPaymentDataDirection == 0)
+                        {
+                            <MudChip T="string" Color="Color.Error" Variant="Variant.Text" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" Class="mr-1" />
+                                Udgående
+                            </MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Default" Variant="Variant.Text" Size="Size.Small">
+                                Ukendt
+                            </MudChip>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </PaginatedList>
+        }
+        else
+        {
+            <div class="text-center pa-8">
+                <MudIcon Icon="@Icons.Material.Filled.Payment" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+                <MudText Typo="Typo.body1">Ingen betalingshistorik fundet</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Default">Dette medlem har ingen registrerede betalinger</MudText>
+            </div>
+        }
+    </MudCardContent>
+</MudCard>
+
+<style>
+    .summary-card {
+        height: 88px !important;
+        display: flex !important;
+        align-items: center !important;
+        overflow: hidden !important;
+    }
+
+        .summary-card .mud-card-content {
+            padding: 16px !important;
+            height: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+            width: 100% !important;
+            overflow: hidden !important;
+        }
+
+    .card-text-content {
+        flex: 1 !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .card-number {
+        font-size: 1.5rem !important;
+        font-weight: 600 !important;
+        line-height: 1.2 !important;
+        margin-bottom: 2px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .card-label {
+        font-size: 0.75rem !important;
+        line-height: 1.1 !important;
+        margin: 0 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .font-family-monospace {
+        font-family: 'Courier New', monospace !important;
+    }
+
+    .text-muted {
+        color: var(--mud-palette-text-secondary) !important;
+    }
+
+    .amount-incoming {
+        color: var(--mud-palette-success) !important;
+        font-weight: 600 !important;
+    }
+
+    .amount-outgoing {
+        color: var(--mud-palette-error) !important;
+        font-weight: 600 !important;
+    }
+</style>
+
+@code {
+    [Parameter] public string MemberGuid { get; set; } = string.Empty;
+
+    private MemberPaymentListReponseDTO? payments;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private int currentPage = 1;
+    private const int PageSize = 15; // Fixed page size
+
+    // Summary statistics
+    private int totalPayments => payments?.Payments?.Count ?? 0;
+    private int successfulPayments => payments?.Payments?.Count(p => p.MemberPaymentDataStatus == 1) ?? 0;
+    private int failedPayments => payments?.Payments?.Count(p => p.MemberPaymentDataStatus == 2) ?? 0;
+    private string totalAmount => payments?.Payments?
+        .Where(p => p.MemberPaymentDataStatus == 1) // Only successful payments
+        .Sum(p => p.MemberPaymentDataDirection == 1 ? p.MemberPaymentDataAmount : -p.MemberPaymentDataAmount)
+        .ToString("C", new System.Globalization.CultureInfo("da-DK")) ?? "0,00 kr.";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(MemberGuid))
+        {
+            await LoadPayments(1, PageSize);
+        }
+    }
+
+    private async Task LoadPayments(int page, int pageSize)
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            StateHasChanged();
+
+            Console.WriteLine($"Loading payments for member GUID: {MemberGuid}, Page: {page}");
+
+            payments = await StaffManagementService.StaffGetMemberPaymentsAsync(MemberGuid, page, pageSize);
+            currentPage = page;
+
+            if (payments != null)
+            {
+                Console.WriteLine($"Successfully loaded {payments.Payments?.Count ?? 0} payments for member {MemberGuid}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading payments: {ex.Message}");
+            errorMessage = $"Fejl ved indlæsning af betalingshistorik: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        await LoadPayments(page, PageSize);
+    }
+
+    private string GetPaymentTypeText(int paymentType)
+    {
+        return paymentType switch
+        {
+            0 => "Månedligt",
+            1 => "Engangs",
+            2 => "Refusion",
+            3 => "Gebyr",
+            4 => "Rabat",
+            _ => $"Type {paymentType}"
+        };
+    }
+
+    private Color GetPaymentTypeColor(int paymentType)
+    {
+        return paymentType switch
+        {
+            0 => Color.Primary,    // Monthly - Blue
+            1 => Color.Info,       // One-time - Cyan
+            2 => Color.Success,    // Refund - Green
+            3 => Color.Warning,    // Fee - Orange
+            4 => Color.Secondary,  // Discount - Purple
+            _ => Color.Default     // Unknown - Gray
+        };
+    }
+
+    private string GetAmountClass(int direction)
+    {
+        return direction switch
+        {
+            1 => "amount-incoming",  // Incoming payment
+            0 => "amount-outgoing",  // Outgoing payment
+            _ => ""
+        };
+    }
+}

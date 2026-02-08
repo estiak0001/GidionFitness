@@ -1,0 +1,564 @@
+﻿@page "/staff/hold-traeninger"
+@page "/staff/training-classes"
+@using BlazorAdminTemplate.Application.DTOs.Classes
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Components.Calendar
+@using BlazorAdminTemplate.Domain.Entities
+@using BlazorAdminTemplate.Domain.Enums
+@using TrainingClassEntity = BlazorAdminTemplate.Domain.Entities.TrainingClasses
+@inject ITrainingClassesService TrainingClassesService
+@inject ILoginService LoginService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Holdoversigt (Personale)</PageTitle>
+<link href="css/trainingclasses.css" rel="stylesheet" />
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    @if (!isMobile)
+    {
+        <MudText Typo="Typo.h4" GutterBottom="true">
+            <MudIcon Icon="@Icons.Material.Filled.FitnessCenter" Class="mr-2" />
+            Holdoversigt – Personale
+        </MudText>
+    }
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-center my-8">
+            <MudProgressCircular Indeterminate="true" />
+            <MudText Class="ml-3">Indlæser hold...</MudText>
+        </div>
+    }
+    else
+    {
+        @if (isMobile)
+        {
+            <!-- Mobile: Full-screen list with filters -->
+            <TrainingClassesMobile Classes="_filteredClasses"
+                                AvailableClassTypes="availableClassTypes"
+                                AvailableOrganizations="availableOrganizations"
+                                SelectedFilters="selectedFilters"
+                                OnSelectedFiltersChanged="OnFiltersChanged"
+                                OnRemoveFilter="RemoveFilter"
+                                OnClearAll="ClearAllFilters"
+                                OnClassClicked="OpenClassDetails" />
+        }
+
+else
+        {
+            <!-- Desktop: Filters left + Calendar/List right -->
+            <MudGrid Spacing="4">
+                <MudItem xs="12" md="4" lg="3">
+                    <!-- Date Range Controls - Only active in List View -->
+                    <MudPaper Elevation="1" Class="pa-4 mb-4" Style="@(activeTab == 1 ? "" : "opacity: 0.5; pointer-events: none;")">
+                        <MudText Typo="Typo.subtitle1" Class="mb-3">Vis periode (Listevisning)</MudText>
+                        <MudGrid Spacing="2" AlignItems="AlignItems.Center">
+                            @* <MudItem xs="12">
+                                <MudButtonGroup Variant="Variant.Text" Size="Size.Small" Class="mud-width-full">
+                                    <MudButton OnClick="GoToToday" Color="Color.Primary" FullWidth="true" Class="justify-start">
+                                        I dag
+                                    </MudButton>
+                                </MudButtonGroup>
+                            </MudItem> *@
+                            <MudItem xs="12" Class="d-flex align-center gap-2">
+                                <MudButton OnClick="PreviousPeriod"
+                                           Disabled="@(activeTab == 0)"
+                                           StartIcon="@Icons.Material.Filled.ArrowBackIosNew"
+                                           Variant="Variant.Text" />
+                                <MudDateRangePicker @bind-DateRange="listDateRange"
+                                                    Label="Vælg periode"
+                                                    AutoClose="true"
+                                                    MaxDate="DateTime.Today.AddYears(1)"
+                                                    Editable="true"
+                                                    Disabled="@(activeTab == 0)"
+                                                    PickerVariant="PickerVariant.Dialog"
+                                                    Class="flex-grow-1" />
+                                <MudButton OnClick="NextPeriod"
+                                           Disabled="@(activeTab == 0)"
+                                           StartIcon="@Icons.Material.Filled.ArrowForwardIos"
+                                           Variant="Variant.Text" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+
+                    <!-- Existing Filters Panel -->
+                    <ClassFiltersPanel AvailableClassTypes="availableClassTypes"
+                                       AvailableOrganizations="availableOrganizations"
+                                       SelectedFilters="selectedFilters"
+                                       OnSelectedFiltersChanged="OnFiltersChanged"
+                                       OnRemoveFilter="RemoveFilter"
+                                       OnClearAll="ClearAllFilters"
+                                       ShowLegend="true"
+                                       ShowDatePicker="false" />
+                </MudItem>
+
+                <MudItem xs="12" md="8" lg="9">
+                    <MudCard Elevation="2" Class="d-flex flex-column" Style="height: calc(100vh - 180px); min-height: 600px;">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" @bind-ActivePanelIndex="activeTab">
+                                    <MudTabPanel>
+                                        <TabContent>
+                                            <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Class="mr-2" />
+                                            <MudText>Kalender</MudText>
+                                        </TabContent>
+                                    </MudTabPanel>
+                                    <MudTabPanel>
+                                        <TabContent>
+                                            <MudIcon Icon="@Icons.Material.Filled.ListAlt" Class="mr-2" />
+                                            <MudText>Listevisning</MudText>
+                                        </TabContent>
+                                    </MudTabPanel>
+                                </MudTabs>
+                            </CardHeaderContent>
+                            @* <CardHeaderActions>
+                                @if (activeTab == 1)
+                                {
+                                    <MudButtonGroup Variant="Variant.Text" Size="Size.Small">
+                                        <MudButton OnClick="GoToToday" Color="Color.Primary">I dag</MudButton>
+                                        <MudButton OnClick="PreviousPeriod" StartIcon="@Icons.Material.Filled.ArrowBackIosNew" />
+                                        <MudDateRangePicker @bind-DateRange="listDateRange"
+                                                            Label="Periode"
+                                                            AutoClose="true"
+                                                            MaxDate="DateTime.Today.AddYears(1)"
+                                                            PickerVariant="PickerVariant.Dialog" />
+                                        <MudButton OnClick="NextPeriod" StartIcon="@Icons.Material.Filled.ArrowForwardIos" />
+                                    </MudButtonGroup>
+                                }
+                            </CardHeaderActions> *@
+                        </MudCardHeader>
+
+                        <MudCardContent Class="pa-0 flex-grow-1" Style="overflow: hidden;">
+                            @if (activeTab == 0)
+                            {
+                                <!-- Calendar View -->
+                                <MudCalendar @ref="calendarRef"
+                                             T="CalendarItem"
+                                             Items="_calendarItems"
+                                             View="CalendarView.Month"
+                                             DateRangeChanged="OnDateRangeChanged"
+                                             ItemClicked="OnCalendarItemClicked"
+                                             AdditionalDateTimeClassesFunc="@GetAdditionalDateClasses"
+                                             Class="mud-height-full">
+                                    <MonthTemplate>
+                                        <div class="d-flex flex-column gap-1">
+                                            <div class="d-flex align-center gap-1">
+                                                <MudIcon Icon="@GetIcon(context)"
+                                                         Color="@GetColor(context)"
+                                                         Size="Size.Small" />
+                                                <MudText Typo="Typo.caption" Class="text-truncate" Style="max-width: 120px;">
+                                                    @context.Text
+                                                </MudText>
+                                            </div>
+                                        </div>
+                                    </MonthTemplate>
+                                </MudCalendar>
+                            }
+                            else
+                            {
+                                <!-- List View -->
+                                <MudTable Dense="true" Hover="true" Bordered="false" Striped="true"
+                                          Items="_filteredClassesInListRange"
+                                          Class="mud-height-full"
+                                          Style="background: transparent;">
+                                    <HeaderContent>
+                                        <MudTh>Dato & Tid</MudTh>
+                                        <MudTh>Hold</MudTh>
+                                        <MudTh>Instruktør</MudTh>
+                                        <MudTh Style="text-align: center;">Pladser</MudTh>
+                                        <MudTh Style="text-align: center;">Status</MudTh>
+                                        <MudTh Style="width:160px; text-align: center;">Handlinger</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd DataLabel="Dato">
+                                            <MudText Typo="Typo.body2">
+                                                <b>@context.TrainingClassClassesStartDateTime.ToString("ddd d. MMM")</b><br />
+                                                @context.TrainingClassClassesStartDateTime.ToString("HH:mm") - @context.TrainingClassClassesEndDateTime.ToString("HH:mm")
+                                            </MudText>
+                                        </MudTd>
+                                        <MudTd DataLabel="Hold">
+                                            <MudText>@context.TrainingClassClassesName</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Info">
+                                                @(availableClassTypes?.FirstOrDefault(t => t.TrainingClassTypesGUID == context.TrainingClassTypesGUID)?.TrainingClassTypesName ?? "")
+                                            </MudText>
+                                        </MudTd>
+                                        <MudTd DataLabel="Instruktør">
+                                            <MudText Typo="Typo.body2">@context.TrainingClassClassesTrainerName</MudText>
+                                        </MudTd>
+                                        <MudTd DataLabel="Pladser" Style="text-align: center;">
+                                            <MudChip T="string" Size="Size.Small" Color="@(context.TrainingClassClassesAvailableSlots == 0 ? Color.Error :
+                                                                                                                                           context.TrainingClassClassesAvailableSlots <= 3 ? Color.Warning : Color.Success)">
+                                    @context.TrainingClassClassesAvailableSlots / @context.TrainingClassClassesMax
+                                </MudChip>
+                            </MudTd>
+                            <MudTd DataLabel="Status" Style="text-align: center;">
+                                @if (context.TrainingClassClassesAvailableSlots == 0)
+                                            {
+                                                <MudChip T="string" Color="Color.Error" Size="Size.Small">Fuldbooket</MudChip>
+                                            }
+                                            else if (context.TrainingClassClassesAvailableSlots <= 3)
+                                            {
+                                                <MudChip T="string" Color="Color.Warning" Size="Size.Small">Få pladser</MudChip>
+                                            }
+                                            else
+                                            {
+                                                <MudChip T="string" Color="Color.Success" Size="Size.Small">Ledige pladser</MudChip>
+                                            }
+                                        </MudTd>
+                                        <MudTd DataLabel="Handlinger" Style="text-align: center;">
+                                            <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Edit" Color="Color.Primary"
+                                                       OnClick="@(() => EditClass(context))">
+                                                Rediger
+                                            </MudButton>
+                                            <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Cancel" Color="Color.Warning" Class="ml-1"
+                                                       OnClick="@(() => CancelClass(context))">
+                                                Annuller
+                                            </MudButton>
+                                            <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.DeleteForever" Color="Color.Error" Class="ml-1"
+                                                       OnClick="@(() => DeleteClass(context))">
+                                                Slet
+                                            </MudButton>
+                                        </MudTd>
+                                    </RowTemplate>
+                                    <NoRecordsContent>
+                                        <MudText Typo="Typo.body1" Class="pa-8" Color="Color.Tertiary">
+                                            Ingen hold fundet i den valgte periode.
+                                        </MudText>
+                                    </NoRecordsContent>
+                                </MudTable>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+        }
+        }
+    
+</MudContainer>
+
+@code {
+    private MudCalendar<CalendarItem>? calendarRef;
+    private List<CalendarItem> _calendarItems = new();
+    private List<TrainingClassEntity> _allClasses = new();
+    private List<TrainingClassEntity> _filteredClasses = new();
+
+    private List<ClassTypes>? availableClassTypes;
+    private List<GuestTrainingClasses>? availableOrganizations;
+
+    private IReadOnlyCollection<FilterItem> selectedFilters = new HashSet<FilterItem>();
+
+    private DateRange currentRange = new();
+    private bool isLoading = true;
+    private bool isMobile = false;
+
+    private string calendarKey => $"staff-cal-{currentRange.Start:yyyyMM}";
+
+    private int activeTab = 0; // 0 = Calendar, 1 = List
+
+    private DateRange listDateRange = new DateRange(
+        DateTime.Today.AddDays(-14),
+        DateTime.Today.AddDays(30)
+    );
+
+    private List<TrainingClassEntity> _filteredClassesInListRange => _filteredClasses
+        .Where(c => c.TrainingClassClassesStartDateTime.Date >= listDateRange.Start?.Date &&
+                    c.TrainingClassClassesStartDateTime.Date <= listDateRange.End?.Date)
+        .OrderBy(c => c.TrainingClassClassesStartDateTime)
+        .ToList();
+
+    private void GoToToday()
+    {
+        var today = DateTime.Today;
+        listDateRange = new DateRange(today.AddDays(-7), today.AddDays(21));
+        StateHasChanged();
+    }
+
+    private void PreviousPeriod()
+    {
+        var days = (listDateRange.End!.Value - listDateRange.Start!.Value).Days;
+        listDateRange = new DateRange(
+            listDateRange.Start.Value.AddDays(-days),
+            listDateRange.End.Value.AddDays(-days)
+        );
+        StateHasChanged();
+    }
+
+    private void NextPeriod()
+    {
+        var days = (listDateRange.End!.Value - listDateRange.Start!.Value).Days;
+        listDateRange = new DateRange(
+            listDateRange.Start.Value.AddDays(days),
+            listDateRange.End.Value.AddDays(days)
+        );
+        StateHasChanged();
+    }
+
+    // Optional: Update list when filters change
+    protected override void OnParametersSet()
+    {
+        StateHasChanged(); // Ensures list updates when filters change
+    }
+
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        var mobile = breakpoint <= Breakpoint.Sm;
+
+        if (isMobile != mobile)
+        {
+            isMobile = mobile;
+            // NO StateHasChanged() needed
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await LoginService.IsAuthenticatedAsync())
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        // Default: current month
+        var today = DateTime.Today;
+        var monthStart = new DateTime(today.Year, today.Month, 1);
+        var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+
+        currentRange = new DateRange(monthStart, monthEnd);
+
+        await LoadDataAndFilters();
+    }
+
+    private async Task LoadDataAndFilters()
+    {
+        try
+        {
+            isLoading = true;
+            // StateHasChanged();
+
+            var response = await TrainingClassesService.GetMemberClassesListAsync(
+                startDate: currentRange.Start!.Value,
+                endDate: currentRange.End!.Value);
+
+            if (response != null)
+            {
+                availableClassTypes = response.AvailableClassTypes ?? new();
+                availableOrganizations = response.AllowedGuestOrganisations ?? new();
+
+                // Optionally include current org at top
+                if (response.CurrentUserOrganisation != null)
+                {
+                    var currentOrg = new GuestTrainingClasses
+                    {
+                        OrganisationSubGUID = response.CurrentUserOrganisation.OrganisationSubGUID,
+                        OrganisationSubName = response.CurrentUserOrganisation.OrganisationSubName
+                    };
+                    if (!availableOrganizations.Any(o => o.OrganisationSubGUID == currentOrg.OrganisationSubGUID))
+                    {
+                        availableOrganizations.Insert(0, currentOrg);
+                    }
+                }
+
+                _allClasses = response.AvailableClasses ?? new();
+            }
+            else
+            {
+                _allClasses = new();
+            }
+
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Fejl ved indlæsning af hold: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnDateRangeChanged(DateRange range)
+    {
+        if (!range.Start.HasValue || !range.End.HasValue)
+            return;
+
+        if (range.Start == currentRange.Start && range.End == currentRange.End)
+            return;
+
+        currentRange = range;
+        await LoadDataAndFilters();
+    }
+
+    private void OnFiltersChanged(IReadOnlyCollection<FilterItem> newFilters)
+    {
+        selectedFilters = newFilters ?? new HashSet<FilterItem>();
+        ApplyFilters();
+    }
+
+    private void RemoveFilter(FilterItem filter)
+    {
+        var set = selectedFilters.ToHashSet();
+        set.Remove(filter);
+        selectedFilters = set;
+        ApplyFilters();
+    }
+
+    private void ClearAllFilters()
+    {
+        selectedFilters = new HashSet<FilterItem>();
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        var filtered = _allClasses.ToList();
+
+        var typeGuids = selectedFilters
+            .Where(f => f.Type == FilterType.ClassType)
+            .Select(f => f.Guid)
+            .ToHashSet();
+
+        var orgGuids = selectedFilters
+            .Where(f => f.Type == FilterType.Organization)
+            .Select(f => f.Guid)
+            .ToHashSet();
+
+        if (typeGuids.Any())
+            filtered = filtered.Where(c => typeGuids.Contains(c.TrainingClassTypesGUID)).ToList();
+
+        if (orgGuids.Any())
+            filtered = filtered.Where(c => orgGuids.Contains(c.OrganisationSubGUID)).ToList();
+
+        _filteredClasses = filtered;
+        _calendarItems = _filteredClasses.Select(c => new CalendarItem
+        {
+            Text = $"{c.TrainingClassClassesName} ({c.TrainingClassClassesAvailableSlots}/{c.TrainingClassClassesMax})",
+            Start = c.TrainingClassClassesStartDateTime,
+            End = c.TrainingClassClassesEndDateTime
+        }).ToList();
+    }
+
+    private string GetAdditionalDateClasses(DateTime date, CalendarView view) => string.Empty;
+
+    private Color GetColor(CalendarItem item)
+    {
+        var cls = _filteredClasses.FirstOrDefault(c => c.TrainingClassClassesStartDateTime == item.Start);
+        if (cls == null) return Color.Default;
+
+        if (cls.TrainingClassClassesAvailableSlots == 0)
+            return Color.Error;
+        if (cls.TrainingClassClassesAvailableSlots <= 3)
+            return Color.Warning;
+
+        return Color.Success;
+    }
+
+    private string GetIcon(CalendarItem item)
+    {
+        var cls = _filteredClasses.FirstOrDefault(c => c.TrainingClassClassesStartDateTime == item.Start);
+        return cls?.TrainingClassClassesAvailableSlots == 0
+            ? Icons.Material.Filled.Cancel
+            : Icons.Material.Filled.FitnessCenter;
+    }
+
+    private async Task OnCalendarItemClicked(CalendarItem item)
+    {
+        var trainingClass = _filteredClasses.FirstOrDefault(c =>
+            c.TrainingClassClassesStartDateTime == item.Start &&
+            c.TrainingClassClassesName == item.Text.Split('(').First().Trim());
+
+        if (trainingClass != null)
+        {
+            await OpenClassDetails(trainingClass);
+        }
+    }
+
+    private async Task OpenClassDetails(TrainingClassEntity cls)
+    {
+        var parameters = new DialogParameters
+        {
+            ["TrainingClass"] = cls,
+            ["IsStaffView"] = true  // Optional: create a staff-only details dialog if needed
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true
+        };
+
+        await DialogService.ShowAsync<TrainingClassDetailsDialog>("Holddetaljer", parameters, options);
+    }
+    private void EditClass(TrainingClassEntity cls)
+    {
+        // Example: navigate to edit page – adjust route as needed
+        Navigation.NavigateTo($"/staff/training-classes/edit/{cls.TrainingClassClassesGUID}");
+    }
+
+    private async Task CancelClass(TrainingClassEntity cls)
+    {
+        var parameters = new DialogParameters { ["Class"] = cls };
+        var dialog = await DialogService.ShowAsync<CancelClassDialog>("Annuller hold", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            var reason = (string)result.Data;
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+
+                // Call your service – assume you have this method
+                // await TrainingClassesService.CancelClassAsync(cls.TrainingClassClassesGUID, reason);
+
+                Snackbar.Add("Holdet blev annulleret og medlemmerne er informeret.", Severity.Success);
+                await LoadDataAndFilters(); // refresh list
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add("Fejl ved annullering: " + ex.Message, Severity.Error);
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+    }
+
+    private async Task DeleteClass(TrainingClassEntity cls)
+    {
+        var parameters = new DialogParameters { ["Class"] = cls };
+        var dialog = await DialogService.ShowAsync<DeleteClassDialog>("Slet hold permanent", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+
+                // Assume you have a delete method in your service
+                // await TrainingClassesService.DeleteClassAsync(cls.TrainingClassClassesGUID);
+
+                Snackbar.Add("Holdet blev slettet permanent.", Severity.Success);
+                await LoadDataAndFilters();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add("Fejl ved sletning: " + ex.Message, Severity.Error);
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+    }
+}

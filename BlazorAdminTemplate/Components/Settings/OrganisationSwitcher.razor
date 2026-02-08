@@ -1,0 +1,178 @@
+@using BlazorAdminTemplate.Application.DTOs.Organisations
+@using BlazorAdminTemplate.Application.Interfaces
+@inject IOrganisationService OrganisationService
+@inject ILoginService LoginService
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<MudMenu Icon="@Icons.Material.Filled.Business" Color="Color.Inherit" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
+    <ActivatorContent>
+        <MudTooltip Text="Skift center">
+            <MudIconButton Icon="@Icons.Material.Filled.Business" Color="Color.Inherit" />
+        </MudTooltip>
+    </ActivatorContent>
+    <ChildContent>
+        <MudText Typo="Typo.subtitle2" Class="px-4 pt-2 pb-1" Style="color: var(--mud-palette-text-secondary);">
+            <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" Class="mr-1" />
+            Nuværende center
+        </MudText>
+        <MudText Typo="Typo.body2" Class="px-4 pb-2 font-weight-bold">
+            @CurrentOrganisationName
+        </MudText>
+        <MudDivider />
+        
+        @if (isLoading)
+        {
+            <MudMenuItem>
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                Indlæser...
+            </MudMenuItem>
+        }
+        else if (availableOrganisations != null && availableOrganisations.Any())
+        {
+            <MudText Typo="Typo.caption" Class="px-4 pt-2 pb-1" Style="color: var(--mud-palette-text-secondary);">
+                Skift til:
+            </MudText>
+            @foreach (var org in availableOrganisations.Where(o => o.OrganisationSubGUID != currentOrganisationGuid))
+            {
+                <MudMenuItem OnClick="@(() => SwitchOrganisation(org.OrganisationSubGUID, org.OrganisationSubName))" Disabled="isSwitching">
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Small" Class="mr-2" />
+                        <span>@org.OrganisationSubName</span>
+                    </div>
+                </MudMenuItem>
+            }
+        }
+        else
+        {
+            <MudMenuItem Disabled="true">
+                <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
+                    Ingen andre centre tilgængelige
+                </MudText>
+            </MudMenuItem>
+        }
+    </ChildContent>
+</MudMenu>
+
+@code {
+    private List<SubOrganisation>? availableOrganisations;
+    private string currentOrganisationGuid = string.Empty;
+    private string CurrentOrganisationName = "Indlæser...";
+    private bool isLoading = true;
+    private bool isSwitching = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrganisations();
+    }
+
+    private async Task LoadOrganisations()
+    {
+        try
+        {
+            isLoading = true;
+            
+            // Get current organisation from JWT token
+            var token = await LoginService.GetTokenAsync();
+            if (!string.IsNullOrEmpty(token))
+            {
+                currentOrganisationGuid = GetClaimFromToken(token, "OrganisationSubGUID");
+                var mainOrgGuid = GetClaimFromToken(token, "OrganisationMainGUID");
+                
+                if (!string.IsNullOrEmpty(mainOrgGuid))
+                {
+                    var response = await OrganisationService.GetSubOrganisationsAsync(mainOrgGuid);
+                    availableOrganisations = response.OrganisationSubs;
+                    
+                    var currentOrg = availableOrganisations?.FirstOrDefault(o => o.OrganisationSubGUID == currentOrganisationGuid);
+                    CurrentOrganisationName = currentOrg?.OrganisationSubName ?? "Ukendt center";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fejl ved indlæsning af centre: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetClaimFromToken(string token, string claimType)
+    {
+        try
+        {
+            var parts = token.Split('.');
+            if (parts.Length < 2) return string.Empty;
+
+            var payload = parts[1];
+            var jsonBytes = ParseBase64WithoutPadding(payload);
+            var json = System.Text.Encoding.UTF8.GetString(jsonBytes);
+            var claims = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, System.Text.Json.JsonElement>>(json);
+
+            if (claims != null && claims.ContainsKey(claimType))
+            {
+                return claims[claimType].GetString() ?? string.Empty;
+            }
+
+            return string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private byte[] ParseBase64WithoutPadding(string base64)
+    {
+        switch (base64.Length % 4)
+        {
+            case 2: base64 += "=="; break;
+            case 3: base64 += "="; break;
+        }
+        return Convert.FromBase64String(base64);
+    }
+
+    private async Task SwitchOrganisation(string newOrgGuid, string newOrgName)
+    {
+        if (isSwitching || newOrgGuid == currentOrganisationGuid)
+            return;
+
+        try
+        {
+            isSwitching = true;
+            
+            var request = new StaffChangeOrganisationDTO
+            {
+                NewOrganisationSubGUID = newOrgGuid
+            };
+
+            var response = await OrganisationService.ChangeOrganisationAsync(request);
+
+            if (!string.IsNullOrEmpty(response.AccessToken))
+            {
+                // Store the new token in localStorage
+                await JSRuntime.InvokeVoidAsync("localStorage.setItem", "authToken", response.AccessToken);
+                
+                Snackbar.Add($"Skiftet til {newOrgName}", Severity.Success);
+                
+                // Reload the page to update all data and navigation with new permissions
+                NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
+            }
+            else
+            {
+                Snackbar.Add("Kunne ikke skifte center - intet token modtaget", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fejl ved skift af center: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSwitching = false;
+        }
+    }
+}

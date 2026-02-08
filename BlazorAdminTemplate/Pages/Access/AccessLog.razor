@@ -1,0 +1,175 @@
+﻿@page "/access-log"
+@using BlazorAdminTemplate.Components.DoorAccess
+@using MudBlazor
+@inject HttpClient Http
+@inject IDialogService DialogService
+
+<PageTitle>Door Access Log</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h3" GutterBottom="true">Door Access Log</MudText>
+    <MudText Typo="Typo.subtitle1" Class="mb-6">View and filter recent door access events</MudText>
+
+    <MudDataGrid T="AccessLogEntry"
+                 Items="@_entries"
+                 Dense="true"
+                 Bordered="true"
+                 Striped="true"
+                 Hover="true"
+                 Sortable="true"
+                 Filterable="true"
+                 QuickFilter="@_quickFilter"
+                 Loading="@_loading">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Access Events</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="_searchString" 
+                          Placeholder="Search" 
+                          Adornment="Adornment.Start" 
+                          Immediate="true"
+                          AdornmentIcon="@Icons.Material.Filled.Search" 
+                          IconSize="Size.Medium" 
+                          Class="mt-0" />
+        </ToolBarContent>
+        <Columns>
+            <PropertyColumn T="AccessLogEntry" TProperty="DateTime" Property="x => x.Timestamp" Title="Date & Time" Sortable="true">
+                <CellTemplate>
+                    <MudText>@context.Item.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn T="AccessLogEntry" TProperty="string" Property="x => x.UserName" Title="User" />
+            <PropertyColumn T="AccessLogEntry" TProperty="string" Property="x => x.DoorName" Title="Door" />
+            <PropertyColumn T="AccessLogEntry" TProperty="string" Property="x => x.Status" Title="Status">
+                <CellTemplate>
+                    <MudChip Size="Size.Small" 
+                             Color="@(context.Item.Status == "Granted" ? Color.Success : Color.Error)"
+                             Variant="Variant.Filled">
+                        @context.Item.Status
+                    </MudChip>
+                </CellTemplate>
+            </PropertyColumn>
+            <TemplateColumn T="AccessLogEntry" Title="Actions">
+                <CellTemplate>
+                    <MudButton Size="Size.Small" 
+                               Variant="Variant.Text" 
+                               Color="Color.Primary"
+                               OnClick="@(() => OpenDetailsDialog(context.Item))">
+                        Details
+                    </MudButton>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <PagerContent>
+            <MudDataGridPager T="AccessLogEntry" />
+        </PagerContent>
+    </MudDataGrid>
+</MudContainer>
+
+@code {
+    private List<AccessLogEntry>? _entries;
+    private bool _loading;
+    private string? _searchString;
+
+    // Quick filter for client-side if needed
+    private Func<AccessLogEntry, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+        return x.UserName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               x.DoorName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               x.Status.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        // For demo: load placeholder data directly (no real API call)
+        _entries = GeneratePlaceholderData(50);
+        _loading = false;
+    }
+
+    // Optional: Server-side pagination example (uncomment to use instead of placeholder)
+    // private async Task<GridData<AccessLogEntry>> LoadServerData(GridState<AccessLogEntry> state)
+    // {
+    //     _loading = true;
+    //     // Simulate API call delay
+    //     await Task.Delay(300);
+    //
+    //     var data = GeneratePlaceholderData(200); // Simulate larger dataset
+    //
+    //     // Apply sorting
+    //     if (state.SortDefinitions.Any())
+    //     {
+    //         var sort = state.SortDefinitions.First();
+    //         data = sort.Descending 
+    //             ? data.OrderByDescending(x => GetPropertyValue(x, sort.SortBy)).ToList()
+    //             : data.OrderBy(x => GetPropertyValue(x, sort.SortBy)).ToList();
+    //     }
+    //
+    //     // Apply filtering (simple)
+    //     if (!string.IsNullOrWhiteSpace(_searchString))
+    //     {
+    //         data = data.Where(_quickFilter).ToList();
+    //     }
+    //
+    //     var total = data.Count;
+    //     data = data.Skip(state.Page * state.PageSize).Take(state.PageSize).ToList();
+    //
+    //     _loading = false;
+    //     return new GridData<AccessLogEntry> { Items = data, TotalItems = total };
+    // }
+
+    private void OpenDetailsDialog(AccessLogEntry entry)
+    {
+        var parameters = new DialogParameters<AccessDetailsDialog>
+        {
+            { x => x.Entry, entry }
+        };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+        DialogService.Show<AccessDetailsDialog>("Access Details", parameters, options);
+    }
+
+    private List<AccessLogEntry> GeneratePlaceholderData(int count)
+    {
+        var random = new Random();
+        var users = new[] { "John Doe", "Jane Smith", "Mike Johnson", "Sarah Williams", "Tom Brown" };
+        var doors = new[] { "Main Entrance", "Back Door", "Server Room", "Office Floor 2", "Garage Gate" };
+        var statuses = new[] { "Granted", "Denied", "Granted", "Granted", "Denied" }; // More granted for realism
+
+        var entries = new List<AccessLogEntry>();
+
+        for (int i = 0; i < count; i++)
+        {
+            entries.Add(new AccessLogEntry
+            {
+                Id = i + 1,
+                Timestamp = DateTime.Now.AddHours(-random.Next(1, 720)).AddMinutes(-random.Next(0, 60)),
+                UserName = users[random.Next(users.Length)],
+                DoorName = doors[random.Next(doors.Length)],
+                Status = statuses[random.Next(statuses.Length)],
+                Reason = statuses[random.Next(statuses.Length)] == "Denied" ? "Invalid Credential" : null
+            });
+        }
+
+        return entries.OrderByDescending(x => x.Timestamp).ToList();
+    }
+
+    // Helper for sorting in server example
+    // private object GetPropertyValue(AccessLogEntry item, string propertyName)
+    // {
+    //     return item.GetType().GetProperty(propertyName)?.GetValue(item, null) ?? "";
+    // }
+
+    public class AccessLogEntry
+    {
+        public int Id { get; set; }
+        public DateTime Timestamp { get; set; }
+        public string UserName { get; set; } = "";
+        public string DoorName { get; set; } = "";
+        public string Status { get; set; } = "";
+        public string? Reason { get; set; }
+        public string? CardId { get; set; } = "1234-5678-9012";
+        public string? PhotoUrl { get; set; } // Could be used for image if real
+    }
+}

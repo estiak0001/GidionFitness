@@ -1,0 +1,772 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Authentication
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Application.Validators
+@using FluentValidation
+@using FluentValidation.Results
+@using Microsoft.AspNetCore.Components.Forms
+@using Blazored.FluentValidation
+@using System.Text.Json
+@using BlazorAdminTemplate.Domain.Entities
+@inject IRegisterService RegisterService
+@inject IOrganisationService OrganisationService
+@inject ILanguageService LanguageService
+@inject IPaymentGroupService PaymentGroupService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<MudDialog Class="register-member-dialog">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Class="mr-2" />
+            Registrer nyt medlem
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <div class="dialog-content-container">
+            @if (isLoading)
+            {
+                <div class="d-flex justify-center align-center pa-8">
+                    <MudProgressCircular Indeterminate="true" />
+                    <MudText Class="ml-3">Registrerer medlem...</MudText>
+                </div>
+            }
+            else
+            {
+                <EditForm Model="registerRequest" OnValidSubmit="HandlePrimaryAction">
+                    <FluentValidationValidator @ref="fluentValidationValidator" />
+
+                    <MudTabs @ref="mudTabs"
+                             @bind-ActivePanelIndex="activeTabIndex"
+                             Elevation="1"
+                             Rounded="true"
+                             PanelClass="pa-4">
+
+                        <!-- Personal Information Tab -->
+                        <MudTabPanel Text="Personlige oplysninger" Icon="@Icons.Material.Filled.Person" Disabled="false">
+                            <MudStack Spacing="3">
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12" sm="6">
+                                        <MudTextField @bind-Value="registerRequest.MemberFirstName"
+                                                      For="@(() => registerRequest.MemberFirstName)"
+                                                      Label="Fornavn *"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      Required="true" />
+                                    </MudItem>
+                                    <MudItem xs="12" sm="6">
+                                        <MudTextField @bind-Value="registerRequest.MemberLastName"
+                                                      For="@(() => registerRequest.MemberLastName)"
+                                                      Label="Efternavn *"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      Required="true" />
+                                    </MudItem>
+                                </MudGrid>
+
+                                <MudTextField @bind-Value="registerRequest.MemberEmail"
+                                              For="@(() => registerRequest.MemberEmail)"
+                                              Label="Email *"
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Required="true"
+                                              InputType="InputType.Email" />
+
+                                <MudTextField @bind-Value="registerRequest.MemberPassword"
+                                              For="@(() => registerRequest.MemberPassword)"
+                                              Label="Adgangskode *"
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Required="true"
+                                              InputType="@passwordInputType"
+                                              Adornment="Adornment.End"
+                                              AdornmentIcon="@passwordIcon"
+                                              OnAdornmentClick="TogglePasswordVisibility" />
+
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12" sm="6">
+                                        <MudTextField @bind-Value="registerRequest.MemberPhonePrivate"
+                                                      For="@(() => registerRequest.MemberPhonePrivate)"
+                                                      Label="Telefon (privat)"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense" />
+                                    </MudItem>
+                                    <MudItem xs="12" sm="6">
+                                        <MudTextField @bind-Value="registerRequest.MemberPhoneWork"
+                                                      For="@(() => registerRequest.MemberPhoneWork)"
+                                                      Label="Telefon (arbejde)"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense" />
+                                    </MudItem>
+                                </MudGrid>
+
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12" sm="6">
+                                        <MudDatePicker @bind-Date="registerRequest.Birthday"
+                                                       For="@(() => registerRequest.Birthday)"
+                                                       Label="Fødselsdato"
+                                                       Variant="Variant.Outlined"
+                                                       Margin="Margin.Dense"
+                                                       MaxDate="DateTime.Today" />
+                                    </MudItem>
+                                    <MudItem xs="12" sm="6">
+                                        <MudSelect @bind-Value="registerRequest.MemberSex"
+                                                   For="@(() => registerRequest.MemberSex)"
+                                                   Label="Køn"
+                                                   Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense">
+                                            <MudSelectItem Value="0">Ikke angivet</MudSelectItem>
+                                            <MudSelectItem Value="1">Mand</MudSelectItem>
+                                            <MudSelectItem Value="2">Kvinde</MudSelectItem>
+                                        </MudSelect>
+                                    </MudItem>
+                                </MudGrid>
+
+                                @if (fieldSettings.ShowMemberCPR == 1)
+                                {
+                                    <MudTextField @bind-Value="registerRequest.MemberCPR"
+                                                  For="@(() => registerRequest.MemberCPR)"
+                                                  Label="CPR-nummer"
+                                                  Variant="Variant.Outlined"
+                                                  Margin="Margin.Dense"
+                                                  Placeholder="DDMMYY-XXXX" />
+                                }
+                            </MudStack>
+                        </MudTabPanel>
+
+                        <!-- Address Information Tab -->
+                        <MudTabPanel Text="Adresse" Icon="@Icons.Material.Filled.Home" Disabled="@(!IsPersonalInfoTabValid())">
+                            <MudStack Spacing="3">
+                                <MudTextField @bind-Value="registerRequest.MemberAddress"
+                                              For="@(() => registerRequest.MemberAddress)"
+                                              Label="Adresse *"
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Required="true" />
+
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="8">
+                                        <MudTextField @bind-Value="registerRequest.MemberCity"
+                                                      For="@(() => registerRequest.MemberCity)"
+                                                      Label="By *"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      Required="true" />
+                                    </MudItem>
+                                    <MudItem xs="4">
+                                        <MudNumericField @bind-Value="registerRequest.MemberZipCode"
+                                                         For="@(() => registerRequest.MemberZipCode)"
+                                                         Label="Postnr. *"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         HideSpinButtons="true"
+                                                         Min="1000"
+                                                         Max="9999"
+                                                         Required="true" />
+                                    </MudItem>
+                                </MudGrid>
+                            </MudStack>
+                        </MudTabPanel>
+
+                        <!-- Work Information Tab -->
+                        <MudTabPanel Text="Arbejde" Icon="@Icons.Material.Filled.Work" Disabled="@(!IsPersonalInfoTabValid() || !IsAddressTabValid())">
+                            <MudStack Spacing="3">
+                                <MudTextField @bind-Value="registerRequest.MemberJobTitle"
+                                              For="@(() => registerRequest.MemberJobTitle)"
+                                              Label="Jobtitel"
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense" />
+
+                                @if (fieldSettings.ShowMemberHealthInsurance == 1)
+                                {
+                                    <MudSelect @bind-Value="registerRequest.MemberHealthInsurance"
+                                               For="@(() => registerRequest.MemberHealthInsurance)"
+                                               Label="Sundhedsforsikring"
+                                               Variant="Variant.Outlined"
+                                               Margin="Margin.Dense">
+                                        <MudSelectItem Value="(byte)0">Nej</MudSelectItem>
+                                        <MudSelectItem Value="(byte)1">Ja</MudSelectItem>
+                                    </MudSelect>
+                                }
+                            </MudStack>
+                        </MudTabPanel>
+
+                        <!-- Organization & Settings Tab -->
+                        <MudTabPanel Text="Organisation" Icon="@Icons.Material.Filled.Business" Disabled="@(!IsPersonalInfoTabValid() || !IsAddressTabValid())">
+                            <MudStack Spacing="3">
+                                <!-- Language Selection -->
+                                @if (availableLanguages?.Any() == true)
+                                {
+                                    <MudSelect @bind-Value="registerRequest.MemberLanguageGUID"
+                                               Label="Sprog *"
+                                               Variant="Variant.Outlined"
+                                               Margin="Margin.Dense"
+                                               Required="true"
+                                               For="@(() => registerRequest.MemberLanguageGUID)"
+                                               Adornment="Adornment.Start"
+                                               AdornmentIcon="Icons.Material.Filled.Language">
+                                        <MudSelectItem Value="@string.Empty">-- Vælg sprog --</MudSelectItem>
+                                        @foreach (var language in availableLanguages)
+                                        {
+                                            <MudSelectItem Value="@language.MemberLanguageGUID">
+                                                @language.MemberLanguage
+                                            </MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                }
+                                else
+                                {
+                                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="56px" />
+                                }
+
+                                <!-- Center/Location Selection -->
+                                @if (subOrganisations?.Any() == true)
+                                {
+                                    <MudSelect Value="@registerRequest.OrganisationSubGUID"
+                                               ValueChanged="@(async (string value) => await OnSubOrgSelectionChanged(value))"
+                                               Label="Center/lokation *"
+                                               Variant="Variant.Outlined"
+                                               Margin="Margin.Dense"
+                                               Required="true"
+                                               For="@(() => registerRequest.OrganisationSubGUID)"
+                                               Adornment="Adornment.Start"
+                                               AdornmentIcon="Icons.Material.Filled.Business">
+                                        <MudSelectItem Value="@string.Empty">-- Vælg center --</MudSelectItem>
+                                        @foreach (var subOrg in subOrganisations)
+                                        {
+                                            <MudSelectItem Value="@subOrg.OrganisationSubGUID">
+                                                @subOrg.OrganisationSubName
+                                            </MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                }
+                                else
+                                {
+                                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="56px" />
+                                }
+
+                                <!-- Payment Plan Selection -->
+                                @if (availablePaymentGroups?.Any() == true)
+                                {
+                                    <div>
+                                        <MudText Typo="Typo.subtitle2" Class="mb-2">Medlemsskab *</MudText>
+                                        <MudRadioGroup @bind-Value="registerRequest.MemberPaymentGroupGUID"
+                                                       For="@(() => registerRequest.MemberPaymentGroupGUID)">
+                                            @foreach (var paymentGroup in availablePaymentGroups)
+                                            {
+                                                <MudCard Elevation="1"
+                                                         Class="mb-2 pa-2"
+                                                         Style="@($"cursor: pointer; {(registerRequest.MemberPaymentGroupGUID == paymentGroup.MemberPaymentGroupGUID ? "border: 2px solid var(--mud-palette-primary)" : "border: 1px solid var(--mud-palette-divider)")}")"
+                                                         @onclick="@(() => SelectPaymentGroup(paymentGroup.MemberPaymentGroupGUID))">
+                                                    <div class="d-flex align-center" style="gap: 8px;">
+                                                        <MudRadio Value="@paymentGroup.MemberPaymentGroupGUID"
+                                                                  Color="Color.Primary"
+                                                                  Size="Size.Small" />
+                                                        <div class="flex-grow-1">
+                                                            <div class="d-flex justify-space-between align-center">
+                                                                <MudText Typo="Typo.body1" Class="font-weight-medium">
+                                                                    @paymentGroup.MemberPaymentGroupName
+                                                                </MudText>
+                                                                <MudText Typo="Typo.body1" Color="Color.Primary" Class="font-weight-bold">
+                                                                    @paymentGroup.MemberPaymentPrice.ToString("C", new System.Globalization.CultureInfo("da-DK"))
+                                                                </MudText>
+                                                            </div>
+                                                            @if (!string.IsNullOrEmpty(paymentGroup.MemberPaymentGroupDescription))
+                                                            {
+                                                                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                                                    @paymentGroup.MemberPaymentGroupDescription
+                                                                </MudText>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                </MudCard>
+                                            }
+                                        </MudRadioGroup>
+                                    </div>
+                                }
+                                else if (!string.IsNullOrEmpty(registerRequest.OrganisationSubGUID))
+                                {
+                                    <div>
+                                        <MudText Typo="Typo.subtitle2" Class="mb-2">Indlæser medlemsskaber...</MudText>
+                                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="60px" Class="mb-2" />
+                                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="60px" />
+                                    </div>
+                                }
+                            </MudStack>
+                        </MudTabPanel>
+
+                        <!-- Additional Information Tab -->
+                        <MudTabPanel Text="Øvrigt" Icon="@Icons.Material.Filled.Notes" Disabled="@(!IsPersonalInfoTabValid() || !IsAddressTabValid())">
+                            <MudTextField @bind-Value="registerRequest.MemberComment"
+                                          For="@(() => registerRequest.MemberComment)"
+                                          Label="Kommentarer"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Lines="4"
+                                          MaxLength="500" />
+                        </MudTabPanel>
+
+                    </MudTabs>
+
+                    <!-- Action Buttons with Next/Previous navigation -->
+                    <div class="d-flex justify-space-between align-center mt-4 pt-3" style="border-top: 1px solid var(--mud-palette-divider);">
+                        <!-- Left side - Previous button -->
+                        <div>
+                            @if (activeTabIndex > 0)
+                            {
+                                <MudButton Variant="Variant.Text"
+                                           StartIcon="@Icons.Material.Filled.ArrowBack"
+                                           OnClick="PreviousTab"
+                                           Disabled="@isLoading">
+                                    Forrige
+                                </MudButton>
+                            }
+                        </div>
+
+                        <!-- Right side - Cancel and Next/Register buttons -->
+                        <div class="d-flex gap-3">
+                            <MudButton Variant="Variant.Text"
+                                       OnClick="Cancel"
+                                       Disabled="@isLoading">
+                                Annuller
+                            </MudButton>
+
+                            @if (CanRegister())
+                            {
+                                <MudButton ButtonType="ButtonType.Submit"
+                                           Variant="Variant.Filled"
+                                           Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.PersonAdd"
+                                           OnClick="RegisterMember"
+                                           Disabled="@(isLoading || currentOrganisationDomain == null)">
+                                    @if (isLoading)
+                                    {
+                                        <MudProgressCircular Class="mr-2" Size="Size.Small" Indeterminate="true" />
+                                    }
+                                    Registrer medlem
+                                </MudButton>
+                            }
+                            else
+                            {
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Primary"
+                                           EndIcon="@Icons.Material.Filled.ArrowForward"
+                                           OnClick="NextTab"
+                                           Disabled="@(isLoading || IsLastTab() || !CanProceedFromCurrentTab())">
+                                    Næste
+                                </MudButton>
+                            }
+                        </div>
+                    </div>
+                </EditForm>
+            }
+        </div>
+    </DialogContent>
+</MudDialog>
+
+<style>
+    .register-member-dialog {
+        /* Override MudDialog's default sizing */
+        max-width: 800px !important;
+        width: 800px !important;
+    }
+
+        .register-member-dialog .mud-dialog-container {
+            max-width: 800px !important;
+            width: 800px !important;
+        }
+
+    .dialog-content-container {
+        width: 100%;
+        max-width: 100%;
+        padding: 0;
+        margin: 0;
+        box-sizing: border-box;
+    }
+
+    .mud-tabs-panels {
+        min-height: 400px;
+    }
+
+    .font-weight-medium {
+        font-weight: 500 !important;
+    }
+
+    .font-weight-bold {
+        font-weight: 700 !important;
+    }
+
+    /* Style for disabled tabs */
+    .mud-tab.mud-disabled {
+        opacity: 0.5;
+        cursor: not-allowed !important;
+    }
+
+        .mud-tab.mud-disabled .mud-tab-label {
+            color: var(--mud-palette-text-disabled) !important;
+        }
+
+    /* Style for completed tabs */
+    .mud-tab.tab-completed {
+        color: var(--mud-palette-success) !important;
+    }
+
+        .mud-tab.tab-completed .mud-icon-root {
+            color: var(--mud-palette-success) !important;
+        }
+</style>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public EventCallback OnMemberRegistered { get; set; }
+
+    private RegisterRequestDTO registerRequest = new();
+    private FluentValidationValidator? fluentValidationValidator;
+    private bool isLoading = false;
+
+    // Tab navigation
+    private MudTabs mudTabs = default!;
+    private int activeTabIndex = 0;
+    private const int TotalTabs = 5;
+
+    // Organization and related data
+    private OrganisationDomain? currentOrganisationDomain;
+    private List<SubOrganisation>? subOrganisations;
+    private List<Language>? availableLanguages;
+    private List<PaymentGroup>? availablePaymentGroups;
+    private OrganisationFieldSettings fieldSettings = new();
+
+    // Password visibility toggle
+    private bool showPassword = false;
+    private InputType passwordInputType => showPassword ? InputType.Text : InputType.Password;
+    private string passwordIcon => showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility;
+
+    protected override async Task OnInitializedAsync()
+    {
+        
+        var uri = new Uri(Navigation.Uri);
+        var host = uri.Host;
+
+       
+
+        await Task.WhenAll(LoadOrganisationInfo(host), LoadAvailableLanguages());
+    }
+
+    private void TogglePasswordVisibility()
+    {
+        showPassword = !showPassword;
+    }
+
+    // Tab navigation methods
+    private void NextTab()
+    {
+        if (activeTabIndex < TotalTabs - 1)
+        {
+            activeTabIndex++;
+            StateHasChanged();
+        }
+    }
+
+    private void PreviousTab()
+    {
+        if (activeTabIndex > 0)
+        {
+            activeTabIndex--;
+            StateHasChanged();
+        }
+    }
+
+    private bool IsLastTab()
+    {
+        return activeTabIndex >= TotalTabs - 1;
+    }
+
+    private bool CanRegister()
+    {
+        // Check if all required fields are filled
+        return !string.IsNullOrWhiteSpace(registerRequest.MemberFirstName) &&
+               !string.IsNullOrWhiteSpace(registerRequest.MemberLastName) &&
+               !string.IsNullOrWhiteSpace(registerRequest.MemberEmail) &&
+               !string.IsNullOrWhiteSpace(registerRequest.MemberPassword) &&
+               !string.IsNullOrWhiteSpace(registerRequest.MemberAddress) &&
+               !string.IsNullOrWhiteSpace(registerRequest.MemberCity) &&
+               registerRequest.MemberZipCode > 0 &&
+               !string.IsNullOrWhiteSpace(registerRequest.MemberLanguageGUID) &&
+               !string.IsNullOrWhiteSpace(registerRequest.OrganisationSubGUID) &&
+               !string.IsNullOrWhiteSpace(registerRequest.MemberPaymentGroupGUID);
+    }
+
+    private bool CanProceedFromCurrentTab()
+    {
+        return activeTabIndex switch
+        {
+            0 => IsPersonalInfoTabValid(), // Personal Information
+            1 => IsAddressTabValid(), // Address - now has required fields
+            2 => true, // Work - no required fields
+            3 => IsOrganisationTabValid(), // Organization
+            4 => true, // Additional Information - no required fields
+            _ => false
+        };
+    }
+
+    private bool IsPersonalInfoTabValid()
+    {
+        return !string.IsNullOrWhiteSpace(registerRequest.MemberFirstName) &&
+               !string.IsNullOrWhiteSpace(registerRequest.MemberLastName) &&
+               !string.IsNullOrWhiteSpace(registerRequest.MemberEmail) &&
+               !string.IsNullOrWhiteSpace(registerRequest.MemberPassword);
+    }
+
+    private bool IsAddressTabValid()
+    {
+        return !string.IsNullOrWhiteSpace(registerRequest.MemberAddress) &&
+               !string.IsNullOrWhiteSpace(registerRequest.MemberCity) &&
+               registerRequest.MemberZipCode > 0;
+    }
+
+    private bool IsOrganisationTabValid()
+    {
+        return !string.IsNullOrWhiteSpace(registerRequest.MemberLanguageGUID) &&
+               !string.IsNullOrWhiteSpace(registerRequest.OrganisationSubGUID) &&
+               !string.IsNullOrWhiteSpace(registerRequest.MemberPaymentGroupGUID);
+    }
+
+     private bool IsTabAccessible(int tabIndex)
+    {
+        return tabIndex switch
+        {
+            0 => true, // Personal info always accessible
+            1 => IsPersonalInfoTabValid(), // Address tab
+            2 => IsPersonalInfoTabValid() && IsAddressTabValid(), // Work tab
+            3 => IsPersonalInfoTabValid() && IsAddressTabValid(), // Organization tab
+            4 => IsPersonalInfoTabValid() && IsAddressTabValid() && IsOrganisationTabValid(), // Additional info tab
+            _ => false
+        };
+    }
+
+    private async Task HandlePrimaryAction()
+    {
+        if (CanRegister())
+        {
+            await RegisterMember();
+        }
+        else
+        {
+            NextTab();
+        }
+    }
+
+    private async Task LoadOrganisationInfo(string host)
+    {
+        try
+        {
+            currentOrganisationDomain = await OrganisationService.GetOrganisationByDomainAsync(host);
+            if (currentOrganisationDomain != null)
+            {
+                
+
+                var currentOrganisationMainGUID = OrganisationService.GetCurrentMainOrganisationGUID();
+                
+
+                
+                registerRequest.OrganisationMainGUID = currentOrganisationDomain.OrganisationSite.OrganisationMainGUID;
+
+                ParseFieldSettings(currentOrganisationDomain.OrganisationSite.OrganisationSubJsonData);
+
+                // Load available sub-organisations
+                var subOrgResponse = await OrganisationService.GetSubOrganisationsAsync(currentOrganisationMainGUID);
+                subOrganisations = subOrgResponse.OrganisationSubs;
+
+                
+            }
+            else
+            {
+                Console.WriteLine($"No organisation found for domain: {host}");
+            }
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading organisation info: {ex.Message}");
+            StateHasChanged();
+        }
+    }
+
+    private void ParseFieldSettings(string jsonData)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(jsonData))
+            {
+                Console.WriteLine("No field settings data provided.");
+                return;
+            }
+
+            var settingsArray = JsonSerializer.Deserialize<OrganisationFieldSettings[]>(jsonData);
+            if (settingsArray != null && settingsArray.Length > 0)
+            {
+                fieldSettings = settingsArray[0];
+                Console.WriteLine($"Parsed field settings - ShowMemberCPR: {fieldSettings.ShowMemberCPR}, ShowMemberSex: {fieldSettings.ShowMemberSex}, ShowMemberHealthInsurance: {fieldSettings.ShowMemberHealthInsurance}");
+            }
+            else
+            {
+                fieldSettings = new OrganisationFieldSettings();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error parsing field settings JSON: {ex.Message}");
+            fieldSettings = new OrganisationFieldSettings();
+        }
+    }
+
+    private async Task LoadAvailableLanguages()
+    {
+        try
+        {
+            var languageResponse = await LanguageService.GetAllLanguagesAsync();
+            availableLanguages = languageResponse.languages;
+
+            Console.WriteLine($"Found {availableLanguages?.Count ?? 0} available languages");
+
+            if (availableLanguages?.Any() == true)
+            {
+                // Set default language
+                var defaultLanguage = availableLanguages.FirstOrDefault(l => l.MemberLanguage.ToLower().Contains("dansk") || l.MemberLanguage.ToLower().Contains("danish"));
+                if (defaultLanguage != null)
+                {
+                    registerRequest.MemberLanguageGUID = defaultLanguage.MemberLanguageGUID;
+                    Console.WriteLine($"Set default language to: {defaultLanguage.MemberLanguage}");
+                }
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading available languages: {ex.Message}");
+        }
+    }
+
+    private async Task OnSubOrgSelectionChanged(string selectedValue)
+    {
+        
+        registerRequest.OrganisationSubGUID = selectedValue;
+
+        // Clear payment group selection when changing sub-org
+        registerRequest.MemberPaymentGroupGUID = string.Empty;
+        availablePaymentGroups = null;
+
+        // Load payment groups for the selected sub-organisation
+        if (!string.IsNullOrEmpty(selectedValue) && !string.IsNullOrEmpty(registerRequest.OrganisationMainGUID))
+        {
+            await LoadPaymentGroups(registerRequest.OrganisationMainGUID, selectedValue);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task LoadPaymentGroups(string mainOrgGuid, string subOrgGuid)
+    {
+        try
+        {
+            
+
+            var paymentGroupResponse = await PaymentGroupService.GetPaymentGroupAsync(mainOrgGuid, subOrgGuid);
+            availablePaymentGroups = paymentGroupResponse.PaymentGroups;
+
+            
+
+            if (availablePaymentGroups?.Any() == true)
+            {
+                // Optionally set default payment group (first one or cheapest)
+                var defaultPaymentGroup = availablePaymentGroups.OrderBy(p => p.MemberPaymentPrice).FirstOrDefault();
+                if (defaultPaymentGroup != null)
+                {
+                    registerRequest.MemberPaymentGroupGUID = defaultPaymentGroup.MemberPaymentGroupGUID;
+                    Console.WriteLine($"Set default payment group to: {defaultPaymentGroup.MemberPaymentGroupName}");
+                }
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading payment groups: {ex.Message}");
+            StateHasChanged();
+        }
+    }
+
+    private void SelectPaymentGroup(string paymentGroupGUID)
+    {
+        registerRequest.MemberPaymentGroupGUID = paymentGroupGUID;
+        
+        StateHasChanged();
+    }
+
+    private async Task RegisterMember()
+    {
+        try
+        {
+            // Validate the form using FluentValidationValidator
+            if (fluentValidationValidator != null)
+            {
+                var isValid = fluentValidationValidator.Validate(options => options.IncludeAllRuleSets());
+                if (!isValid)
+                {
+                    Snackbar.Add("Ret venligst fejlene i formularen", MudBlazor.Severity.Warning);
+                    return;
+                }
+            }
+
+            if (currentOrganisationDomain == null)
+            {
+                Snackbar.Add("Organisationsoplysninger er påkrævede. Prøv at genindlæse siden.", MudBlazor.Severity.Error);
+                return;
+            }
+
+            isLoading = true;
+            StateHasChanged();
+
+            
+
+            // Call the staff register API endpoint
+            var response = await RegisterService.StaffRegisterAsync(registerRequest);
+
+            if (response != null && !string.IsNullOrEmpty(response.MemberGUID))
+            {
+                
+
+                Snackbar.Add($"Medlem {response.MemberName} blev registreret succesfuldt", MudBlazor.Severity.Success);
+
+                // Notify parent component about successful registration
+                if (OnMemberRegistered.HasDelegate)
+                {
+                    await OnMemberRegistered.InvokeAsync();
+                }
+
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Console.WriteLine("Registration failed - no response or empty GUID");
+                Snackbar.Add("Registrering fejlede. Prøv igen.", MudBlazor.Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error during registration: {ex.Message}");
+            Snackbar.Add($"Fejl under registrering: {ex.Message}", MudBlazor.Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

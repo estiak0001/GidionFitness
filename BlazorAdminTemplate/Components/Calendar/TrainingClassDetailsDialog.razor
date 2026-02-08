@@ -1,0 +1,244 @@
+﻿@using BlazorAdminTemplate.Domain.Entities
+@inject ITrainingClassesService TrainingClassService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.FitnessCenter" Class="mr-3" />
+            @TrainingClass.TrainingClassClassesName
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudContainer Style="padding: 0;">
+            <MudStack Spacing="4">
+                <!-- Enrollment Status Banner -->
+                @if (IsBooked)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" />
+                            Du er tilmeldt dette hold
+                        </div>
+                    </MudAlert>
+                }
+
+                <!-- Training Type with Availability Chip -->
+                <div class="d-flex justify-space-between align-center">
+                    <MudText Typo="Typo.subtitle1" Color="Color.Primary">
+                        @TrainingClass.TrainingClassTypesName
+                    </MudText>
+                    <MudChip T="string"
+                             Color="@GetAvailabilityColor()"
+                             Size="Size.Small"
+                             Variant="Variant.Filled">
+                        @GetAvailabilityText()
+                    </MudChip>
+                </div>
+
+                <!-- Time Information -->
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Medium" Class="mr-3" Color="Color.Primary" />
+                    <div>
+                        <MudText Typo="Typo.body1">
+                            @TrainingClass.TrainingClassClassesStartDateTime.ToString("dd/MM/yyyy HH:mm") -
+                            @TrainingClass.TrainingClassClassesEndDateTime.ToString("HH:mm")
+                        </MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            Varighed: @TrainingClass.TrainingClassClassesDuration minutter
+                        </MudText>
+                    </div>
+                </div>
+
+                <!-- Trainer Information -->
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Medium" Class="mr-3" Color="Color.Primary" />
+                    <div>
+                        <MudText Typo="Typo.body1">@TrainingClass.TrainingClassClassesTrainerName</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Instruktør</MudText>
+                    </div>
+                </div>
+
+                <!-- Location Information -->
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Medium" Class="mr-3" Color="Color.Primary" />
+                    <div>
+                        <MudText Typo="Typo.body1">@TrainingClass.OrganisationSubName</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Lokation</MudText>
+                    </div>
+                </div>
+
+                <!-- Participation Information -->
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Groups" Size="Size.Medium" Class="mr-3" Color="Color.Primary" />
+                    <div>
+                        <MudText Typo="Typo.body1">
+                            @TrainingClass.TrainingClassClassesCurrentEnrollment/@TrainingClass.TrainingClassClassesMax deltagere
+                        </MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            @TrainingClass.TrainingClassClassesAvailableSlots ledige pladser
+                        </MudText>
+                    </div>
+                </div>
+
+                <!-- Description -->
+                @if (!string.IsNullOrEmpty(TrainingClass.TrainingClassClassesDescription))
+                {
+                    <MudDivider />
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Beskrivelse</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                            @TrainingClass.TrainingClassClassesDescription
+                        </MudText>
+                    </div>
+                }
+
+                <!-- Requirements -->
+                <MudDivider />
+                <div>
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Holdoplysninger</MudText>
+                    <div class="d-flex">
+                        <div class="flex-grow-1">
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">Minimum deltagere</MudText>
+                            <MudText Typo="Typo.body2">@TrainingClass.TrainingClassClassesMin</MudText>
+                        </div>
+                        <div class="flex-grow-1">
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">Maximum deltagere</MudText>
+                            <MudText Typo="Typo.body2">@TrainingClass.TrainingClassClassesMax</MudText>
+                        </div>
+                    </div>
+                </div>
+            </MudStack>
+        </MudContainer>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">
+            Luk
+        </MudButton>
+
+        @if (IsBooked)
+        {
+            <MudButton OnClick="HandleCancelClick"
+                       Variant="Variant.Filled"
+                       Color="Color.Warning"
+                       StartIcon="@Icons.Material.Filled.Cancel"
+                       Disabled="@isProcessing">
+                @if (isProcessing)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <text>Afmelder...</text>
+                }
+                else
+                {
+                    <text>Afmeld dig</text>
+                }
+            </MudButton>
+        }
+        else
+        {
+            <MudButton OnClick="HandleBookClick"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Disabled="@(TrainingClass.TrainingClassClassesAvailableSlots == 0 || isProcessing)"
+                       StartIcon="@Icons.Material.Filled.PersonAdd">
+                @if (isProcessing)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <text>Tilmelder...</text>
+                }
+                else if (TrainingClass.TrainingClassClassesAvailableSlots == 0)
+                {
+                    <text>Fuldt booket</text>
+                }
+                else
+                {
+                    <text>Tilmeld dig</text>
+                }
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public TrainingClasses TrainingClass { get; set; } = new();
+    [Parameter] public EventCallback<string> OnResult { get; set; }
+    [Parameter] public bool IsBooked { get; set; } = false;
+
+    private bool isProcessing = false;
+
+    private async Task Cancel()
+    {
+        await OnResult.InvokeAsync("cancel_dialog");
+    }
+
+    private async Task HandleBookClick()
+    {
+        try
+        {
+            isProcessing = true;
+            StateHasChanged();
+
+            var response = await TrainingClassService.PostMemberClassBookingAsync(TrainingClass.TrainingClassClassesGUID);
+
+            Console.WriteLine($"Booking response: Message={response.Message}");
+
+            // Notify parent component of successful booking
+            await OnResult.InvokeAsync("book");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error booking class: {ex.Message}");
+            
+        }
+        finally
+        {
+            isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleCancelClick()
+    {
+        try
+        {
+            isProcessing = true;
+            StateHasChanged();
+
+            var response = await TrainingClassService.PostMemberClassCancelAsync(TrainingClass.TrainingClassClassesGUID);
+
+            Console.WriteLine($"Cancel response: Message={response.Message}");
+
+            // Notify parent component of successful cancellation
+            await OnResult.InvokeAsync("cancel");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error canceling class: {ex.Message}");
+          
+        }
+        finally
+        {
+            isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private Color GetAvailabilityColor()
+    {
+        if (TrainingClass.TrainingClassClassesAvailableSlots == 0)
+            return Color.Error;
+        else if (TrainingClass.TrainingClassClassesAvailableSlots <= 2)
+            return Color.Warning;
+        else
+            return Color.Success;
+    }
+
+    private string GetAvailabilityText()
+    {
+        if (TrainingClass.TrainingClassClassesAvailableSlots == 0)
+            return "Fuldt";
+        else if (TrainingClass.TrainingClassClassesAvailableSlots <= 2)
+            return $"{TrainingClass.TrainingClassClassesAvailableSlots} ledige";
+        else
+            return "Ledige pladser";
+    }
+}

@@ -1,0 +1,841 @@
+﻿@page "/"
+@using BlazorAdminTemplate.Application.DTOs.Classes
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Application.DTOs.Payment
+@using BlazorAdminTemplate.Application.DTOs.Authentication
+@using BlazorAdminTemplate.Application.DTOs.NewsDTO
+@using BlazorAdminTemplate.Application.DTOs.Pagination
+@using BlazorAdminTemplate.Components.Calendar
+@using BlazorAdminTemplate.Components.Contract
+@using BlazorAdminTemplate.Components.News
+@using BlazorAdminTemplate.Components.Dashboard
+@using BlazorAdminTemplate.Domain.Entities
+@using TrainingClassEntity = BlazorAdminTemplate.Domain.Entities.TrainingClasses
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject ITrainingClassesService TrainingClassesService
+@inject IMemberCardService MemberCardService
+@inject IProfileService ProfileService
+@inject IContractService ContractService
+@inject ILoginService LoginService
+@inject INewsService NewsService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+@inject IDialogService DialogService
+
+<PageTitle>Dashboard</PageTitle>
+
+<link href="css/dashboard.css" rel="stylesheet" />
+<link href="css/dashboard-mobile.css" rel="stylesheet" />
+<HeadContent>
+    <script src="js/signaturePad.js"></script>
+</HeadContent>
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+@if (isMobile)
+{
+    <!-- Mobile View -->
+    <DashboardMobile DisplayName="@displayName"
+                     ShowNoCardWarning="@showNoCardWarning"
+                     ShowUnsignedContractWarning="@showUnsignedContractWarning"
+                     OnNavigateToBilling="NavigateToBilling"
+                     OnOpenContractPreview="OpenContractPreview"
+                     ClassesLoading="@classesLoading"
+                     TodayClasses="@todayClasses"
+                     BookedClassGuids="@bookedClassGuids"
+                     OnClassClicked="OnClassItemClick"
+                     OnNavigateToClasses="NavigateToClasses"
+                     NewsLoading="@newsLoading"
+                     NewsItems="@newsItems"
+                     NewsPagination="@newsPagination"
+                     OnNewsItemClicked="OnNewsItemClick"
+                     OnLoadNews="LoadNewsAsync"
+                     CampaignsLoading="@campaignsLoading"
+                     Campaigns="@GetCampaignItems()"
+                     OnCampaignClicked="HandleCampaignAction"
+                     AppointmentsLoading="@appointmentsLoading"
+                     Appointments="@GetAppointmentItems()"
+                     OnAppointmentAction="HandleAppointmentAction" />
+}
+else
+{
+    <!-- Desktop View -->
+    <!-- Hero banner with welcome and optional alerts -->
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-1">
+        <div class="hero-banner">
+            <div class="hero-content">
+                <div class="hero-left">
+                    <MudIcon Icon="@Icons.Material.Filled.WavingHand" Size="Size.Large" />
+                    <div>
+                        <MudText Typo="Typo.h5">Velkommen, @displayName</MudText>
+                        <MudText Typo="Typo.body2" Class="hero-subtle">Her er din oversigt for i dag</MudText>
+                    </div>
+                </div>
+            </div>
+
+            @if (!cardCheckLoading && showNoCardWarning)
+            {
+                <div class="mt-3">
+                    <MudAlert Severity="Severity.Warning"
+                              Elevation="1"
+                              Dense="true"
+                              Variant="Variant.Filled"
+                              NoIcon="true"
+                              Class="dashboard-warning px-3 py-2">
+                        <div class="warning-content">
+                            <div class="warning-left">
+                                <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Color="Color.Inherit" />
+                                <div>
+                                    <MudText Typo="Typo.subtitle2">Advarsel</MudText>
+                                    <MudText Typo="Typo.body2">
+                                        Du har ikke tilføjet et betalingskort endnu. Klik på knappen for at tilføje et.
+                                    </MudText>
+                                </div>
+                            </div>
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Inherit"
+                                       StartIcon="@Icons.Material.Filled.Payment"
+                                       OnClick="NavigateToBilling">
+                                Tilføj kort
+                            </MudButton>
+                        </div>
+                    </MudAlert>
+                </div>
+            }
+
+            @if (!contractCheckLoading && showUnsignedContractWarning)
+            {
+                <div class="mt-2">
+                    <MudAlert Severity="Severity.Warning"
+                              Elevation="1"
+                              Dense="true"
+                              Variant="Variant.Filled"
+                              NoIcon="true"
+                              Class="dashboard-warning px-3 py-2">
+                        <div class="warning-content">
+                            <div class="warning-left">
+                                <MudIcon Icon="@Icons.Material.Filled.Description" Color="Color.Inherit" />
+                                <div>
+                                    <MudText Typo="Typo.subtitle2">Kontrakt venter på underskrift</MudText>
+                                    <MudText Typo="Typo.body2">
+                                        Du har en kontrakt, der afventer underskrift. Klik for at gennemse.
+                                    </MudText>
+                                </div>
+                            </div>
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Inherit"
+                                       StartIcon="@Icons.Material.Filled.Visibility"
+                                       OnClick="OpenContractPreview">
+                                Gennemse kontrakt
+                            </MudButton>
+                        </div>
+                    </MudAlert>
+                </div>
+            }
+        </div>
+    </MudContainer>
+
+    <!-- Wider layout: columns fill the container and move toward the sides -->
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+        <MudGrid Class="dashboard-grid" Spacing="2" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Stretch">
+            <!-- LEFT COLUMN -->
+            <MudItem xs="12" md="6">
+                <MudStack Spacing="2">
+                    <!-- News -->
+                    <MudCard Elevation="2">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">
+                                    <MudIcon Icon="@Icons.Material.Filled.Campaign" Class="mr-2" />
+                                    Nyheder
+                                </MudText>
+                            </CardHeaderContent>
+                            <CardHeaderActions>
+                                <AuthorizeView Policy="StaffOnly">
+                                    <Authorized>
+                                        <MudButton Variant="Variant.Text"
+                                                   Color="Color.Primary"
+                                                   StartIcon="@Icons.Material.Filled.Add"
+                                                   OnClick="@OpenCreateNewsDialog"
+                                                   Size="Size.Small">
+                                            Opret
+                                        </MudButton>
+                                    </Authorized>
+                                </AuthorizeView>
+                            </CardHeaderActions>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            @if (newsLoading)
+                            {
+                                <div class="d-flex align-center">
+                                    <MudProgressCircular Indeterminate="true" />
+                                    <MudText Class="ml-2">Indlæser nyheder…</MudText>
+                                </div>
+                            }
+                            else if (newsItems.Count == 0)
+                            {
+                                <MudAlert Severity="Severity.Info" Dense="true">
+                                    Ingen nyheder
+                                </MudAlert>
+                            }
+                            else
+                            {
+                                <!-- Show paginated news -->
+                                <MudList T="string" Dense="true">
+                                    @foreach (var newsItem in newsItems)
+                                    {
+                                        <MudListItem Clickable="true" OnClick="@(() => OnNewsItemClick(newsItem))">
+                                            <MudIcon Icon="@Icons.Material.Filled.Article" Class="mr-2" />
+                                            <div>
+                                                <MudText Typo="Typo.subtitle2">@newsItem.MemberNewsSubject</MudText>
+                                                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                                    @newsItem.MemberNewsDate.ToString("MMM dd, yyyy")
+                                                </MudText>
+                                            </div>
+                                        </MudListItem>
+                                    }
+                                </MudList>
+
+                                <!-- Pagination controls -->
+                                @if (newsPagination.TotalPages > 1)
+                                {
+                                    <div class="d-flex justify-center align-center mt-3 gap-2">
+                                        <MudButton Variant="Variant.Text"
+                                                   StartIcon="@Icons.Material.Filled.ChevronLeft"
+                                                   Disabled="@(!newsPagination.HasPreviousPage)"
+                                                   OnClick="@(() => LoadNewsAsync(newsPagination.CurrentPage - 1))">
+                                            Forrige
+                                        </MudButton>
+
+                                        <MudText Typo="Typo.caption" Class="mx-2">
+                                            Side @newsPagination.CurrentPage af @newsPagination.TotalPages
+                                        </MudText>
+
+                                        <MudButton Variant="Variant.Text"
+                                                   EndIcon="@Icons.Material.Filled.ChevronRight"
+                                                   Disabled="@(!newsPagination.HasNextPage)"
+                                                   OnClick="@(() => LoadNewsAsync(newsPagination.CurrentPage + 1))">
+                                            Næste
+                                        </MudButton>
+                                    </div>
+                                }
+                            }
+                        </MudCardContent>
+                    </MudCard>
+
+                    <!-- Campaigns -->
+                    <MudCard Elevation="2">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">
+                                    <MudIcon Icon="@Icons.Material.Filled.LocalOffer" Class="mr-2" />
+                                    Kampagner
+                                </MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            @if (campaignsLoading)
+                            {
+                                <div class="d-flex align-center">
+                                    <MudProgressCircular Indeterminate="true" />
+                                    <MudText Class="ml-2">Indlæser kampagner…</MudText>
+                                </div>
+                            }
+                            else if (campaigns.Count == 0)
+                            {
+                                <MudAlert Severity="Severity.Info" Dense="true">
+                                    Ingen kampagner lige nu.
+                                </MudAlert>
+                            }
+                            else
+                            {
+                                <MudList T="string" Dense="true">
+                                    @foreach (var c in campaigns)
+                                    {
+                                        <MudListItem>
+                                            <MudText Typo="Typo.subtitle2">@c.Title</MudText>
+                                            <MudText Typo="Typo.caption" Class="mud-text-secondary">@c.Description</MudText>
+                                            @if (!string.IsNullOrWhiteSpace(c.ActionText))
+                                            {
+                                                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => OpenCampaign(c))">
+                                                    @c.ActionText
+                                                </MudButton>
+                                            }
+                                        </MudListItem>
+                                    }
+                                </MudList>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudStack>
+            </MudItem>
+
+            <!-- RIGHT COLUMN -->
+            <MudItem xs="12" md="6">
+                <MudStack Spacing="2">
+                    <!-- Today's Classes -->
+                    <MudCard Elevation="2">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">
+                                    <MudIcon Icon="@Icons.Material.Filled.FitnessCenter" Class="mr-2" />
+                                    Hold i dag
+                                </MudText>
+                            </CardHeaderContent>
+                            <CardHeaderActions>
+                                <MudButton Variant="Variant.Text"
+                                           Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.CalendarMonth"
+                                           OnClick="@NavigateToClasses">
+                                    Se alle
+                                </MudButton>
+                            </CardHeaderActions>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            @if (classesLoading)
+                            {
+                                <div class="d-flex align-center">
+                                    <MudProgressCircular Indeterminate="true" />
+                                    <MudText Class="ml-2">Indlæser hold…</MudText>
+                                </div>
+                            }
+                            else if (todayClasses.Count == 0)
+                            {
+                                <MudAlert Severity="Severity.Info" Dense="true">
+                                    Ingen hold i dag.
+                                </MudAlert>
+                            }
+                            else
+                            {
+                                <MudList T="string" Dense="true">
+                                    @foreach (var c in todayClasses)
+                                    {
+                                        var booked = bookedClassGuids.Contains(c.TrainingClassClassesGUID);
+                                        <MudListItem Clickable="true" OnClick="@(() => OnClassItemClick(c))">
+                                            <MudIcon Icon="@(booked? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Circle)"
+                                                     Color="@(booked ? Color.Primary : GetAvailabilityColor(c))"
+                                                     Class="mr-2" />
+                                            <div class="d-flex justify-space-between align-center" style="width:100%;">
+                                                <div class="mr-2">
+                                                    <MudText Typo="Typo.subtitle2">@c.TrainingClassClassesName</MudText>
+                                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                                        @c.TrainingClassClassesStartDateTime.ToString("HH:mm") - @c.TrainingClassClassesEndDateTime.ToString("HH:mm")
+                                                        • @c.TrainingClassClassesTrainerName
+                                                        • @c.OrganisationSubName
+                                                    </MudText>
+                                                </div>
+                                                <div class="d-flex align-center">
+                                                    @if (booked)
+                                                    {
+                                                        <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Filled">
+                                                            Tilmeldt
+                                                        </MudChip>
+                                                    }
+                                                    else
+                                                    {
+                                                        <MudChip T="string" Color="@GetAvailabilityColor(c)" Size="Size.Small" Variant="Variant.Outlined">
+                                                            @((c.TrainingClassClassesAvailableSlots > 0)
+                                                                                                        ? $"{c.TrainingClassClassesAvailableSlots} Ledige"
+                                                                                                        : "Fuld")
+                                        </MudChip>
+                                                                                }
+                                                </div>
+                                            </div>
+                                        </MudListItem>
+                                    }
+                                </MudList>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+
+                    <!-- Appointments -->
+                    <MudCard Elevation="2">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">
+                                    <MudIcon Icon="@Icons.Material.Filled.EventAvailable" Class="mr-2" />
+                                    Aftaler (næste 7 dage)
+                                </MudText>
+                            </CardHeaderContent>
+                            <CardHeaderActions>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary">Anmod om aftale</MudButton>
+                            </CardHeaderActions>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            @if (appointmentsLoading)
+                            {
+                                <div class="d-flex align-center">
+                                    <MudProgressCircular Indeterminate="true" />
+                                    <MudText Class="ml-2">Indlæser aftaler…</MudText>
+                                </div>
+                            }
+                            else if (appointments.Count == 0)
+                            {
+                                <MudAlert Severity="Severity.Info" Dense="true">
+                                    Ingen kommende aftaler.
+                                </MudAlert>
+                            }
+                            else
+                            {
+                                <MudList T="string" Dense="true">
+                                    @foreach (var a in appointments)
+                                    {
+                                        <MudListItem>
+                                            <MudIcon Icon="@Icons.Material.Filled.Schedule" class="mr-2" />
+                                            <MudText Typo="Typo.subtitle2">@a.Title</MudText>
+                                            <MudText Typo="Typo.caption" Class="mud-text-secondary ml-2">
+                                                @a.Start.ToString("dd/MM/yyyy HH:mm") - @a.End.ToString("HH:mm")
+                                                @(string.IsNullOrWhiteSpace(a.Location) ? "" : $" • {a.Location}")
+                                            </MudText>
+                                            @if (!string.IsNullOrWhiteSpace(a.ActionText))
+                                            {
+                                                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => OpenAppointment(a))" class="ml-auto">
+                                                    @a.ActionText
+                                                </MudButton>
+                                            }
+                                        </MudListItem>
+                                    }
+                                </MudList>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudStack>
+            </MudItem>
+        </MudGrid>
+    </MudContainer>
+}
+
+@code {
+    // Mobile detection - following the same pattern as TrainingClasses
+    private bool isMobile = false;
+
+    // Welcome/hero
+    private string displayName = "Bruger";
+
+    // Warnings
+    private bool cardCheckLoading = true;
+    private bool showNoCardWarning = false;
+
+    private bool contractCheckLoading = true;
+    private bool showUnsignedContractWarning = false;
+    private string contractHtml = string.Empty;
+
+    // News - Simplified to always use paginated news
+    private bool newsLoading = true;
+    private List<News> newsItems = new();
+    private PaginationResponseDTO newsPagination = new();
+    private int currentNewsPage = 1;
+    private const int newsPageSize = 5;
+
+    // Campaigns
+    private bool campaignsLoading = true;
+    private List<CampaignItem> campaigns = new();
+
+    // Classes (today)
+    private bool classesLoading = true;
+    private List<TrainingClassEntity> todayClasses = new();
+    private HashSet<string> bookedClassGuids = new();
+
+    // Appointments (separate source)
+    private bool appointmentsLoading = true;
+    private List<AppointmentItem> appointments = new();
+
+    private string contractGuid = string.Empty;
+
+    // Mobile detection handler - same pattern as TrainingClasses
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        isMobile = breakpoint <= Breakpoint.Sm;
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await LoginService.IsAuthenticatedAsync())
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        var member = await LoginService.GetCurrentMemberAsync();
+        if (member != null)
+        {
+            var first = string.IsNullOrWhiteSpace(member.MemberFirstName) ? "" : member.MemberFirstName.Trim();
+            var last = string.IsNullOrWhiteSpace(member.MemberLastName) ? "" : member.MemberLastName.Trim();
+            var full = $"{first} {last}".Trim();
+            displayName = string.IsNullOrWhiteSpace(full) ? (member.MemberEmail ?? "Bruger") : full;
+        }
+
+        var cardTask = CheckPaymentCardAsync();
+        var contractTask = CheckUnsignedContractAsync();
+        var loadNewsTask = LoadNewsAsync(); // Load paginated news from start
+        var loadCampaignsTask = LoadCampaignsAsync();
+        var loadClassesTask = LoadTodayClassesAsync();
+        var loadAppointmentsTask = LoadAppointmentsAsync();
+
+        await Task.WhenAll(cardTask, contractTask, loadNewsTask, loadCampaignsTask, loadClassesTask, loadAppointmentsTask);
+    }
+
+    private async Task OpenCreateNewsDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            ["OnNewsCreated"] = EventCallback.Factory.Create(this, OnNewsCreated)
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true,
+            Position = DialogPosition.Center
+        };
+
+        await DialogService.ShowAsync<Components.News.StaffCreateNewsDialog>("Opret Nyhed", parameters, options);
+    }
+
+    private async Task OnNewsCreated()
+    {
+        // Reload news when a new news item is created
+        await LoadNewsAsync(1);
+        StateHasChanged();
+    }
+
+
+
+    private async Task CheckPaymentCardAsync()
+    {
+        try
+        {
+            cardCheckLoading = true;
+            var cardInfo = await ProfileService.GetProfileAsync();
+            if(cardInfo.Notifications.Any(n => n.MemberNotificationType == 2))
+            {
+                showNoCardWarning = true;
+            }
+            else
+            {
+                showNoCardWarning = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Payment card check failed: {ex.Message}");
+            showNoCardWarning = false;
+        }
+        finally
+        {
+            cardCheckLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CheckUnsignedContractAsync()
+    {
+        try
+        {
+            contractCheckLoading = true;
+            var resp = await ContractService.GetMemberContractBeforeSigningAsync();
+
+            showUnsignedContractWarning = resp?.HasUnsignedContract == true;
+
+            // Use the nested ContractData fields only (DTO does not expose flat fields)
+            contractHtml = resp?.ContractData?.MemberContractData ?? string.Empty;
+            contractGuid = resp?.ContractData?.MemberContractDataGUID ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Contract check failed: {ex.Message}");
+            showUnsignedContractWarning = false;
+        }
+        finally
+        {
+            contractCheckLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenContractPreview()
+    {
+        if (string.IsNullOrWhiteSpace(contractHtml) || string.IsNullOrWhiteSpace(contractGuid))
+        {
+            Snackbar.Add("Kunne ikke hente kontraktindhold.", Severity.Error);
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            ["Html"] = contractHtml,
+            ["Title"] = "Kontrakt til underskrift",
+            ["ContractGuid"] = contractGuid,
+            ["OnSigned"] = EventCallback.Factory.Create(this, OnContractSigned),
+            // Optional: override consent labels (otherwise dialog uses defaults)
+            ["ConsentLabels"] = new[]
+            {
+                "Jeg har læst og accepteret kontrakten.",
+                "Jeg accepterer behandlingen af mine persondata i henhold til privatlivspolitikken."
+            }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true,
+            Position = DialogPosition.Center
+        };
+
+        await DialogService.ShowAsync<ContractSignDialog>(string.Empty, parameters, options);
+    }
+
+    private async Task OnContractSigned()
+    {
+        // Hide the banner and optionally refresh contract state
+        showUnsignedContractWarning = false;
+        Snackbar.Add("Tak. Din kontrakt er underskrevet.", Severity.Success);
+        await Task.CompletedTask;
+    }
+
+    private async Task LoadNewsAsync(int page = 1)
+    {
+        try
+        {
+            newsLoading = true;
+            currentNewsPage = page;
+
+            // Always use paginated news API
+            var newsResponse = await NewsService.GetMemberNewsShowListAsync(page, newsPageSize);
+
+
+            newsItems = newsResponse?.News ?? new List<News>();
+            newsPagination = newsResponse?.Pagination ?? new PaginationResponseDTO();
+
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Kunne ikke indlæse nyheder: {ex.Message}", Severity.Error);
+            Console.WriteLine($"Error loading news: {ex.Message}");
+        }
+        finally
+        {
+            newsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadCampaignsAsync()
+    {
+        try
+        {
+            campaignsLoading = true;
+            campaigns = new List<CampaignItem>();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Kunne inte indlæse kampagner: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            campaignsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadTodayClassesAsync()
+    {
+        try
+        {
+            classesLoading = true;
+
+            var today = DateTime.Today;
+            var availableTask = TrainingClassesService.GetMemberClassesListAsync(
+                startDate: today, endDate: today);
+            var bookedTask = TrainingClassesService.GetMyClassesListAsync(
+                startDate: today, endDate: today);
+
+            await Task.WhenAll(availableTask, bookedTask);
+
+            var available = await availableTask;
+            var booked = await bookedTask;
+
+            bookedClassGuids = (booked?.Classes ?? new List<BookedClasses>())
+                .Select(b => b.ClassGUID)
+                .Where(g => !string.IsNullOrWhiteSpace(g))
+                .ToHashSet();
+
+            todayClasses = (available?.AvailableClasses ?? new List<TrainingClassEntity>())
+                .Where(c => c.TrainingClassClassesStartDateTime.Date == today)
+                .OrderBy(c => c.TrainingClassClassesStartDateTime)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Kunne ikke indlæse hold: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            classesLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadAppointmentsAsync()
+    {
+        try
+        {
+            appointmentsLoading = true;
+            appointments = new List<AppointmentItem>();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Kunne ikke indlæse aftaler: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            appointmentsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private Color GetAvailabilityColor(TrainingClassEntity c)
+    {
+        if (c.TrainingClassClassesAvailableSlots <= 0) return Color.Error;
+        if (c.TrainingClassClassesAvailableSlots <= 2) return Color.Warning;
+        return Color.Success;
+    }
+
+    private void NavigateToClasses() => Navigation.NavigateTo("/training-classes");
+
+    private async Task NavigateToBilling()
+    {
+        try
+        {
+            var paymentResponse = await MemberCardService.AddNewPaymentCardAsync();
+
+            if (!string.IsNullOrWhiteSpace(paymentResponse.PaymentWindowLink))
+            {
+                await JSRuntime.InvokeVoidAsync("open", paymentResponse.PaymentWindowLink, "_blank");
+            }
+            else
+            {
+                Snackbar.Add("Kunne ikke åbne betalingsvindue. Prøv igen senere.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fejl ved åbning af betalingsvindue: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OpenCampaign(CampaignItem c)
+    {
+        if (!string.IsNullOrWhiteSpace(c.ActionHref))
+            Navigation.NavigateTo(c.ActionHref);
+    }
+
+    private void OpenAppointment(AppointmentItem a)
+    {
+        if (!string.IsNullOrWhiteSpace(a.ActionHref))
+            Navigation.NavigateTo(a.ActionHref);
+    }
+
+    private async Task OnNewsItemClick(News newsItem)
+    {
+        try
+        {
+            var parameters = new DialogParameters
+            {
+                ["News"] = newsItem,
+                ["OnNewsUpdated"] = EventCallback.Factory.Create(this, OnNewsUpdatedFromDialog)
+            };
+
+            var options = new DialogOptions
+            {
+                MaxWidth = MaxWidth.Medium,
+                FullWidth = true,
+                CloseButton = true,
+                Position = DialogPosition.Center
+            };
+
+            await DialogService.ShowAsync<NewsDetailsDialog>(string.Empty, parameters, options);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Kunne ikke åbne nyhed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OnNewsUpdatedFromDialog()
+    {
+        // Reload news when news is updated or deleted
+        await LoadNewsAsync(currentNewsPage);
+        StateHasChanged();
+    }
+
+    private async Task OnClassItemClick(TrainingClassEntity trainingClass)
+    {
+        var isBooked = bookedClassGuids.Contains(trainingClass.TrainingClassClassesGUID);
+
+        var parameters = new DialogParameters
+        {
+            ["TrainingClass"] = trainingClass,
+            ["OnResult"] = EventCallback.Factory.Create<string>(this, HandleClassDialogResult),
+            ["IsBooked"] = isBooked
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseButton = true,
+            Position = DialogPosition.Center
+        };
+
+        await DialogService.ShowAsync<TrainingClassDetailsDialog>(string.Empty, parameters, options);
+    }
+
+    private async Task HandleClassDialogResult(string result)
+    {
+        if (result == "book" || result == "cancel")
+        {
+            await LoadTodayClassesAsync();
+            Snackbar.Add(result == "book" ? "Tilmelding gennemført!" : "Afmelding gennemført!", Severity.Success);
+        }
+    }
+
+    // Helper methods for mobile component
+    private IEnumerable<DashboardMobile.AppointmentItem> GetAppointmentItems()
+    {
+        return appointments.Select(a => new DashboardMobile.AppointmentItem(
+            a.Title, a.Start, a.End, a.Location, a.ActionText, a.ActionHref));
+    }
+
+    private async Task HandleAppointmentAction(DashboardMobile.AppointmentItem appointment)
+    {
+        if (!string.IsNullOrWhiteSpace(appointment.ActionHref))
+        {
+            Navigation.NavigateTo(appointment.ActionHref);
+        }
+        await Task.CompletedTask;
+    }
+
+    private IEnumerable<DashboardMobile.CampaignItem> GetCampaignItems()
+    {
+        return campaigns.Select(c => new DashboardMobile.CampaignItem(
+            c.Title, c.Description, c.ActionText, c.ActionHref));
+    }
+
+    private async Task HandleCampaignAction(DashboardMobile.CampaignItem campaign)
+    {
+        if (!string.IsNullOrWhiteSpace(campaign.ActionHref))
+        {
+            Navigation.NavigateTo(campaign.ActionHref);
+        }
+        await Task.CompletedTask;
+    }
+
+    private record CampaignItem(string Title, string Description, string? ActionText, string? ActionHref);
+    private record AppointmentItem(string Title, DateTime Start, DateTime End, string? Location, string? ActionText, string? ActionHref);
+}

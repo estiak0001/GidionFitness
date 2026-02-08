@@ -1,0 +1,280 @@
+﻿@using BlazorAdminTemplate.Domain.Entities
+@using BlazorAdminTemplate.Application.DTOs.Classes
+@using BlazorAdminTemplate.Domain.Enums
+@inject IDialogService DialogService
+
+<!-- Top Header -->
+<div class="mobile-header">
+    <MudText Typo="Typo.h5" Class="mobile-title">Hold træninger</MudText>
+    <MudButton Variant="Variant.Outlined"
+               Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.FilterList"
+               OnClick="OpenFiltersDialog"
+               Class="mobile-filter-btn">
+        Filtre
+    </MudButton>
+</div>
+
+<!-- Active Filters Preview (Only show if there are active filters) -->
+@if (HasActiveFilters)
+{
+    <div class="mobile-filters-preview">
+        <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap" Class="mb-3">
+           
+
+            @foreach (var filter in SelectedFilters.Where(f => f.Type == FilterType.ClassType))
+            {
+                <MudChip T="string"
+                         Text="@($"Type: {filter.Name}")"
+                         Color="Color.Primary"
+                         Size="Size.Small"
+                         OnClose="@(() => RemoveFilter(filter))"
+                         CloseIcon="@Icons.Material.Filled.Close" />
+            }
+
+            @foreach (var filter in SelectedFilters.Where(f => f.Type == FilterType.Organization))
+            {
+                <MudChip T="string"
+                         Text="@($"Center: {filter.Name}")"
+                         Color="Color.Secondary"
+                         Size="Size.Small"
+                         OnClose="@(() => RemoveFilter(filter))"
+                         CloseIcon="@Icons.Material.Filled.Close" />
+            }
+        </MudStack>
+    </div>
+}
+
+<!-- Date Picker Button and Week Navigation Strip -->
+<div class="mobile-date-navigation">
+    <!-- Week Navigation Strip with integrated calendar button -->
+    <div class="mobile-week-strip">
+        <!-- Calendar Icon Button -->
+        <MudIconButton Icon="@Icons.Material.Filled.CalendarMonth"
+                       Color="Color.Surface"
+                       OnClick="OpenDatePickerDialog"
+                       Class="calendar-picker-btn"
+                       Size="Size.Medium"
+                       Title="Vælg dato" />
+
+        <div class="week-days-container">
+            @foreach (var day in WeekDays)
+            {
+                var isToday = day.Date == Today;
+                var isSelected = day.Date == SelectedDateInternal?.Date;
+                var dayClasses = GetClassesForDay(day);
+
+                <div class="day-pill @(isSelected ? "selected" : "") @(isToday ? "today" : "")"
+                     @onclick="@(() => SelectDate(day))">
+                    <div class="day-number">@day.Day.ToString("00")</div>
+                    <div class="day-name">@day.ToString("ddd", new System.Globalization.CultureInfo("da-DK"))</div>
+                    @if (isToday)
+                    {
+                        <div class="today-indicator">Today</div>
+                    }
+                    @if (dayClasses.Any())
+                    {
+                        <div class="class-count">@dayClasses.Count()</div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Classes List for Selected Day -->
+<div class="mobile-classes-list">
+    @if (DayClasses.Any())
+    {
+        @foreach (var trainingClass in DayClasses)
+        {
+            var isBooked = BookedClassGuids.Contains(trainingClass.TrainingClassClassesGUID);
+            var (chipColor, _) = GetAvailability(trainingClass, isBooked);
+
+            <MudCard Class="class-card" Elevation="2" @onclick="@(() => OnClassClicked.InvokeAsync(trainingClass))">
+                <MudCardContent Class="class-card-content">
+                    <div class="class-image-placeholder">
+                        <!-- Placeholder for class image -->
+                        <MudIcon Icon="@Icons.Material.Filled.FitnessCenter" Size="Size.Large" />
+                    </div>
+                    <div class="class-details">
+                        <MudText Typo="Typo.h6" Class="class-name">@trainingClass.TrainingClassClassesName</MudText>
+                        <MudText Typo="Typo.body2" Class="class-info">
+                            @FormatDuration(trainingClass.TrainingClassClassesDuration) •
+                            @trainingClass.TrainingClassClassesTrainerName •
+                            @trainingClass.OrganisationSubName
+                        </MudText>
+                    </div>
+                    <div class="class-time-chip">
+                        <MudChip T="string" Color="@chipColor"
+                                 Variant="Variant.Filled"
+                                 Size="Size.Medium"
+                                 Class="time-chip">
+                           Kl @trainingClass.TrainingClassClassesStartDateTime.ToString("H:mm", new System.Globalization.CultureInfo("da-DK"))
+                        </MudChip>
+                        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" />
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        }
+    }
+    else
+    {
+        <div class="no-classes">
+            <MudIcon Icon="@Icons.Material.Filled.EventBusy" Size="Size.Large" Class="mb-2" />
+            <MudText Typo="Typo.body1">Ingen hold på den valgte dag</MudText>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public IEnumerable<TrainingClasses> Classes { get; set; } = Enumerable.Empty<TrainingClasses>();
+    [Parameter] public HashSet<string> BookedClassGuids { get; set; } = new();
+
+    [Parameter] public DateTime? SelectedDate { get; set; }
+    [Parameter] public EventCallback<DateTime> SelectedDateChanged { get; set; }
+
+    [Parameter] public IEnumerable<ClassTypes>? AvailableClassTypes { get; set; }
+    [Parameter] public IEnumerable<GuestTrainingClasses>? AvailableOrganizations { get; set; }
+
+    [Parameter] public IReadOnlyCollection<FilterItem> SelectedFilters { get; set; } = new HashSet<FilterItem>();
+    [Parameter] public EventCallback<IReadOnlyCollection<FilterItem>> OnSelectedFiltersChanged { get; set; }
+
+    [Parameter] public EventCallback<FilterItem> OnRemoveFilter { get; set; }
+    [Parameter] public EventCallback OnClearAll { get; set; }
+
+    [Parameter] public EventCallback<TrainingClasses> OnClassClicked { get; set; }
+
+    [Parameter] public string DateNavigationText { get; set; } = string.Empty;
+
+    private DateTime Today => DateTime.Today;
+    private DateTime? SelectedDateInternal => SelectedDate ?? Today;
+
+    // Helper property to check if there are active filters
+    private bool HasActiveFilters =>
+        SelectedDate.HasValue ||
+        (SelectedFilters?.Any(f => f.Type == FilterType.ClassType || f.Type == FilterType.Organization) ?? false);
+
+    private IEnumerable<DateTime> WeekDays
+    {
+        get
+        {
+            var start = GetWeekStart(SelectedDateInternal ?? Today);
+            return Enumerable.Range(0, 7).Select(i => start.AddDays(i));
+        }
+    }
+
+    private IEnumerable<TrainingClasses> DayClasses =>
+        Classes.Where(c => c.TrainingClassClassesStartDateTime.Date == (SelectedDateInternal ?? Today).Date)
+               .OrderBy(c => c.TrainingClassClassesStartDateTime);
+
+    private IEnumerable<TrainingClasses> GetClassesForDay(DateTime date) =>
+        Classes.Where(c => c.TrainingClassClassesStartDateTime.Date == date.Date);
+
+    private async Task SelectDate(DateTime d) => await SelectedDateChanged.InvokeAsync(d.Date);
+
+    //Open Filters Dialog Method
+    private async Task OpenFiltersDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            ["AvailableClassTypes"] = AvailableClassTypes?.ToList(),
+            ["AvailableOrganizations"] = AvailableOrganizations?.ToList(),
+            ["SelectedDate"] = SelectedDate,
+            ["SelectedFilters"] = SelectedFilters
+        };
+
+        var options = new DialogOptions()
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseButton = true,
+            Position = DialogPosition.Center
+        };
+
+        var dialog = await DialogService.ShowAsync<FiltersDialog>("", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is FilterDialogResult filterResult)
+        {
+            // Apply the selected filters
+            if (filterResult.SelectedDate != SelectedDate)
+            {
+                if (filterResult.SelectedDate.HasValue)
+                {
+                    await SelectedDateChanged.InvokeAsync(filterResult.SelectedDate.Value);
+                }
+                else
+                {
+                    // Clear date selection - use today as default
+                    await SelectedDateChanged.InvokeAsync(Today);
+                }
+            }
+
+            // Update filters
+            await OnSelectedFiltersChanged.InvokeAsync(filterResult.SelectedFilters);
+
+            StateHasChanged();
+        }
+    }
+
+    //Individual filter removal methods
+    private async Task RemoveFilter(FilterItem filter)
+    {
+        await OnRemoveFilter.InvokeAsync(filter);
+    }
+
+    private async Task ClearDateFilter()
+    {
+        await SelectedDateChanged.InvokeAsync(Today);
+    }
+
+    // Date picker methods using IDialogService
+    private async Task OpenDatePickerDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            ["SelectedDate"] = SelectedDateInternal ?? Today
+        };
+
+        var options = new DialogOptions()
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseButton = true,
+            Position = DialogPosition.Center
+        };
+
+        var dialog = await DialogService.ShowAsync<DatePickerDialog>("Vælg dato", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is DateTime selectedDate)
+        {
+            await SelectDate(selectedDate);
+        }
+    }
+
+    private static DateTime GetWeekStart(DateTime date)
+    {
+        var culture = new System.Globalization.CultureInfo("da-DK");
+        var first = culture.DateTimeFormat.FirstDayOfWeek; // Monday
+        int diff = (7 + (date.DayOfWeek - first)) % 7;
+        return date.AddDays(-diff).Date;
+    }
+
+    private static string FormatDuration(int minutes)
+    {
+        if (minutes <= 0) return string.Empty;
+        var h = minutes / 60;
+        var m = minutes % 60;
+        return h > 0 ? (m > 0 ? $"{h}t {m}m" : $"{h}t") : $"{m}m";
+    }
+
+    private static (Color color, string text) GetAvailability(TrainingClasses c, bool isBooked)
+    {
+        if (isBooked) return (Color.Primary, "Tilmeldt");
+        if (c.TrainingClassClassesAvailableSlots == 0) return (Color.Error, "Fuldt");
+        if (c.TrainingClassClassesAvailableSlots <= 2) return (Color.Warning, "Næsten fuldt");
+        return (Color.Success, "Ledigt");
+    }
+}

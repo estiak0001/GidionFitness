@@ -1,0 +1,50 @@
+﻿@typeparam TItem
+@using BlazorAdminTemplate.Application.Interfaces
+
+<MudTable Items="Items" Hover="true" Bordered="true" Class="centered-table">
+    <HeaderContent>
+        @if (HeaderTemplate != null)
+        {
+            @HeaderTemplate
+        }
+    </HeaderContent>
+    <RowTemplate>
+        @if (RowTemplate != null)
+        {
+            @RowTemplate(context)
+        }
+    </RowTemplate>
+</MudTable>
+
+<div class="d-flex justify-center align-center my-3 gap-3">
+    <MudButton Disabled="@(!Pagination.HasPreviousPage)"
+               OnClick="@(() => OnPageChanged.InvokeAsync(Pagination.CurrentPage - 1))"
+               Variant="Variant.Text">
+        Previous
+    </MudButton>
+    <MudText Typo="Typo.body2" Class="pagination-text">
+        Page @Pagination.CurrentPage of @Pagination.TotalPages
+    </MudText>
+    <MudButton Disabled="@(!Pagination.HasNextPage)"
+               OnClick="@(() => OnPageChanged.InvokeAsync(Pagination.CurrentPage + 1))"
+               Variant="Variant.Text">
+        Next
+    </MudButton>
+</div>
+
+<style>
+    .pagination-text {
+        margin: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        white-space: nowrap !important;
+    }
+</style>
+
+@code {
+    [Parameter] public List<TItem> Items { get; set; } = new List<TItem>();
+    [Parameter] public IPagination Pagination { get; set; } = default!;
+    [Parameter] public EventCallback<int> OnPageChanged { get; set; }
+    [Parameter] public RenderFragment? HeaderTemplate { get; set; }
+    [Parameter] public RenderFragment<TItem>? RowTemplate { get; set; }
+}

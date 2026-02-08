@@ -1,0 +1,95 @@
+@page "/analytics"
+
+<PageTitle>Analytics</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Analytics Dashboard</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Sales Overview</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudChart ChartType="ChartType.Line" ChartSeries="@Series" @bind-SelectedIndex="Index" XAxisLabels="@XAxisLabels" Width="100%" Height="350px"></MudChart>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Category Distribution</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudChart ChartType="ChartType.Pie" InputData="@data" InputLabels="@labels" Width="300px" Height="300px" />
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<MudGrid Class="mt-4">
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2" Class="pa-4">
+            <MudCardContent>
+                <div class="d-flex align-center">
+                    <MudIcon Icon="Icons.Material.Filled.TrendingUp" Color="Color.Success" Size="Size.Large" Class="mr-3" />
+                    <div>
+                        <MudText Typo="Typo.h6">Growth Rate</MudText>
+                        <MudText Typo="Typo.h4" Color="Color.Success">+12.5%</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">vs last month</MudText>
+                    </div>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2" Class="pa-4">
+            <MudCardContent>
+                <div class="d-flex align-center">
+                    <MudIcon Icon="Icons.Material.Filled.Visibility" Color="Color.Info" Size="Size.Large" Class="mr-3" />
+                    <div>
+                        <MudText Typo="Typo.h6">Page Views</MudText>
+                        <MudText Typo="Typo.h4" Color="Color.Info">45,678</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">this month</MudText>
+                    </div>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2" Class="pa-4">
+            <MudCardContent>
+                <div class="d-flex align-center">
+                    <MudIcon Icon="Icons.Material.Filled.Schedule" Color="Color.Warning" Size="Size.Large" Class="mr-3" />
+                    <div>
+                        <MudText Typo="Typo.h6">Avg. Session</MudText>
+                        <MudText Typo="Typo.h4" Color="Color.Warning">4m 32s</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">duration</MudText>
+                    </div>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private int Index = -1; //default value cannot be 0 -> first selectedindex is 0.
+
+    public List<ChartSeries> Series = new List<ChartSeries>()
+    {
+        new ChartSeries() { Name = "Sales", Data = new double[] { 90, 79, 72, 69, 62, 62, 55, 65, 70, 75, 85, 90 } },
+        new ChartSeries() { Name = "Revenue", Data = new double[] { 35, 41, 35, 51, 49, 62, 69, 91, 148, 120, 110, 95 } }
+    };
+
+    public string[] XAxisLabels = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
+    public double[] data = { 77, 25, 20, 5 };
+    public string[] labels = { "Electronics", "Furniture", "Clothing", "Books" };
+}

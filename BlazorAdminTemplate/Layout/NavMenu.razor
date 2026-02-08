@@ -1,0 +1,282 @@
+﻿@implements IDisposable
+@using Vizor.Icons.Tabler
+
+<MudNavMenu>
+    <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="/"
+                        Match="NavLinkMatch.All"
+                        Icon="ti ti-dashboard"
+                        IconColor="Color.Inherit"
+            >
+                        Dashboard
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+
+    @* <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="/users"
+                        Match="NavLinkMatch.Prefix"
+                        Icon="ti ti-users"
+                        IconColor="Color.Inherit"
+                        OnClick="@HandleNavClick">
+                        Users
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView> *@
+
+    <!-- Staff-only Members link -->
+    <AuthorizeView Policy="StaffOnly">
+        <Authorized>
+            <MudNavLink Href="/members"
+                        Match="NavLinkMatch.Prefix"
+                        Icon="ti ti-users"
+                        IconColor="Color.Inherit"
+                        OnClick="@HandleNavClick">
+                        Medlemmer
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+
+    <!-- Staff-only Memberships link -->
+    <AuthorizeView Policy="StaffOnly">
+        <Authorized>
+            <MudNavLink Href="/staff/memberships"
+                        Match="NavLinkMatch.Prefix"
+                        Icon="ti ti-credit-card"
+                        IconColor="Color.Inherit"
+                        OnClick="@HandleNavClick">
+                        Medlemskaber
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+
+    @* <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="/products"
+                        Match="NavLinkMatch.Prefix"
+                        Icon="ti ti-dashboard"
+                        IconColor="Color.Inherit"
+                        OnClick="@HandleNavClick">
+                        Products
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+
+    <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="/orders"
+                        Match="NavLinkMatch.Prefix"
+                        Icon="ti ti-dashboard"
+                        IconColor="Color.Inherit"
+                        OnClick="@HandleNavClick">
+                        Orders
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView> *@
+
+    <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="/training-classes"
+                        Match="NavLinkMatch.Prefix"
+                        Icon="ti ti-barbell"
+                        IconColor="Color.Inherit"
+                        OnClick="@HandleNavClick">
+                        Hold træninger
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+
+    @* <AuthorizeView Policy="StaffOnly">
+        <Authorized>
+            <MudNavLink Href="/analytics"
+                        Match="NavLinkMatch.Prefix"
+                        Icon="ti ti-chart-infographic"
+                        IconColor="Color.Inherit"
+                        OnClick="@HandleNavClick">
+                        Analytics
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView> *@
+    <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="/payment-list"
+                        Match="NavLinkMatch.Prefix"
+                        Icon="ti ti-cash-register"
+                        IconColor="Color.Inherit"
+                        OnClick="@HandleNavClick">
+                Payments
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="/templates"
+                        Match="NavLinkMatch.Prefix"
+                        Icon="ti ti-template"
+                        IconColor="Color.Inherit"
+                        OnClick="@HandleNavClick">
+                Templates
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="/access-log"
+                        Match="NavLinkMatch.Prefix"
+                        Icon="ti ti-door-enter"
+                        IconColor="Color.Inherit"
+                        OnClick="@HandleNavClick">
+                Door Access Logs
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="/access-controller-groups/list"
+                        Match="NavLinkMatch.Prefix"
+                        Icon="ti ti-door-enter"
+                        IconColor="Color.Inherit"
+                        OnClick="@HandleNavClick">
+                Access Controller Groups
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView>
+        <Authorized>
+            <MudNavGroup Title="Classes"
+                         Icon="ti ti-barbell"
+                         IconColor="Color.Inherit" Expanded=false>
+
+                @* <MudNavLink Href="/classes/list"
+                            Match="NavLinkMatch.Prefix">
+                    All Classes
+                </MudNavLink> *@
+
+                <MudNavLink Href="/classes/locations"
+                            Icon="ti ti-map-pin"
+                            IconColor="Color.Inherit"
+                            Match="NavLinkMatch.Prefix">
+                    Location
+                </MudNavLink>
+
+                <MudNavLink Href="/classes/types"
+                            Icon="ti ti-category-plus"
+                            IconColor="Color.Inherit"
+                            Match="NavLinkMatch.Prefix">
+                    Type
+                </MudNavLink>
+
+                <MudNavLink Href="/classes/create-single"
+                            Icon="ti ti-plus"
+                            IconColor="Color.Inherit"
+                            Match="NavLinkMatch.Prefix">
+                    Create Single Class
+                </MudNavLink>
+                <MudNavLink Href="/classes/create-multiple"
+                            Icon="ti ti-plus"
+                            IconColor="Color.Inherit"
+                            Match="NavLinkMatch.Prefix">
+                    Create Multiple Classes
+                </MudNavLink>
+                <MudNavLink Href="/classes/planned"
+                            Icon="ti ti-calendar"
+                            IconColor="Color.Inherit"
+                            Match="NavLinkMatch.Prefix">
+                    Planned Classes
+                </MudNavLink>
+            </MudNavGroup>
+        </Authorized>
+    </AuthorizeView>
+
+    <AuthorizeView>
+        <NotAuthorized>
+            <MudNavLink Href="/login"
+                        Match="NavLinkMatch.Prefix"
+                        Icon="ti ti-dashboard"
+                        IconColor="Color.Inherit" OnClick="@HandleNavClick">
+                        Login
+            </MudNavLink>
+        </NotAuthorized>
+    </AuthorizeView>
+
+
+
+    <!-- Staff-only Team link -->
+    <AuthorizeView Policy="StaffOnly">
+        <Authorized>
+            @* <MudNavGroup Title="Hold" Expanded="false">
+
+                <MudNavLink Href="/TeamLocation"
+                            Match="NavLinkMatch.Prefix"
+                            Icon="Icons.Material.Filled.Group"
+                            OnClick="@HandleNavClick">
+                            Lokation
+                </MudNavLink>
+                <MudNavLink Href="/TeamType"
+                            Match="NavLinkMatch.Prefix"
+                            Icon="Icons.Material.Filled.Group"
+                            OnClick="@HandleNavClick">
+                            Type
+                </MudNavLink>
+                <MudNavLink Href="/TeamTeam"
+                            Match="NavLinkMatch.Prefix"
+                            Icon="Icons.Material.Filled.Group"
+                            OnClick="@HandleNavClick">
+                            Hold
+                </MudNavLink>
+            </MudNavGroup>
+
+
+            <MudNavLink Href="/StaffNews" Match="NavLinkMatch.Prefix" Icon="Icons.Material.Filled.Group" OnClick="@HandleNavClick">
+                        Nyheder
+            </MudNavLink> *@
+
+
+        </Authorized>
+    </AuthorizeView>
+
+
+
+
+</MudNavMenu>
+
+@code {
+    [Parameter] public EventCallback OnNavigation { get; set; }
+
+    private bool _isDisposed = false;
+
+    private async Task HandleNavClick()
+    {
+        if (_isDisposed) return;
+
+        try
+        {
+            Console.WriteLine("NavMenu HandleNavClick called!");
+
+            // Small delay for visual feedback before closing drawer
+            await Task.Delay(50);
+
+            // Notify parent to close drawer on mobile
+            if (!_isDisposed && OnNavigation.HasDelegate)
+            {
+                Console.WriteLine("Calling OnNavigation.InvokeAsync()");
+                await OnNavigation.InvokeAsync();
+                Console.WriteLine("OnNavigation.InvokeAsync() completed");
+            }
+        }
+        catch (Exception ex)
+        {
+            if (!_isDisposed)
+            {
+                Console.WriteLine($"Error in HandleNavClick: {ex.Message}");
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        _isDisposed = true;
+    }
+}

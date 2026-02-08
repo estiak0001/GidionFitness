@@ -1,0 +1,132 @@
+﻿@using MudBlazor
+@using BlazorAdminTemplate.Domain.Enums
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.PauseCircle" Class="mr-3" Color="Color.Warning" />
+            Pause Membership
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <MudAlert Severity="Severity.Warning" Class="mb-4">
+            Pausing a membership will temporarily suspend all benefits and billing.
+            The member will not be charged during the pause period.
+        </MudAlert>
+
+        <MudDatePicker @bind-Date="PauseStartDate"
+                       Label="Pause Start Date"
+                       Required="true"
+                       MinDate="DateTime.Today"
+                       Variant="Variant.Outlined"
+                       Class="mb-4"
+                       HelperText="Membership will be paused starting from this date (inclusive)" />
+
+        <MudDatePicker @bind-Date="ResumeDate"
+                       Label="Resume Date"
+                       Required="true"
+                       MinDate="PauseStartDate?.AddDays(1)"
+                       Variant="Variant.Outlined"
+                       Class="mb-4"
+                       HelperText="Membership automatically resumes on this date (inclusive)" />
+
+        @if (ResumeDate.HasValue && PauseStartDate.HasValue)
+        {
+            var pauseDays = (ResumeDate.Value - PauseStartDate.Value).Days;
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+                Membership will be paused for <strong>@pauseDays day@(pauseDays == 1 ? "" : "s")</strong>
+                (@PauseStartDate.Value:dd MMM yyyy → @ResumeDate.Value:dd MMM yyyy)
+            </MudAlert>
+        }
+
+        <MudTextField @bind-Value="Notes"
+                      Label="Reason / Internal notes (optional)"
+                      Variant="Variant.Outlined"
+                      Lines="3"
+                      Placeholder="e.g. Medical leave, traveling abroad, temporary financial hardship, etc." />
+
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-4">@ErrorMessage</MudAlert>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="CloseDialog">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Warning"
+                   OnClick="ConfirmPause"
+                   Disabled="@(!IsValid || IsProcessing)">
+            @if (IsProcessing)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Pause Membership
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public int MemberId { get; set; }
+    [Parameter] public int ActiveMembershipId { get; set; }
+
+    [Inject] private IMemberMembershipService MemberMembershipService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    private DateTime? PauseStartDate { get; set; } = DateTime.Today;
+    private DateTime? ResumeDate { get; set; }
+    private string Notes { get; set; } = string.Empty;
+    private string? ErrorMessage { get; set; }
+    private bool IsProcessing { get; set; }
+
+    // Validation
+    private bool IsValid => PauseStartDate.HasValue &&
+                            ResumeDate.HasValue &&
+                            ResumeDate.Value > PauseStartDate.Value;
+
+    private async Task ConfirmPause()
+    {
+        // if (!IsValid) return;
+
+        // IsProcessing = true;
+        // ErrorMessage = null;
+
+        // try
+        // {
+        //     var request = new PauseMembershipRequest
+        //     {
+        //         MemberId = MemberId,
+        //         MembershipId = ActiveMembershipId,
+        //         PauseFrom = PauseStartDate!.Value.Date,
+        //         ResumeOn = ResumeDate!.Value.Date,
+        //         ReasonNotes = Notes,
+        //         RequestedAt = DateTime.UtcNow
+        //     };
+
+        //     var result = await MemberMembershipService.PauseMembershipAsync(request);
+
+        //     if (result.Success)
+        //     {
+        //         Snackbar.Add($"Membership paused until {ResumeDate:dd MMM yyyy}.", Severity.Success);
+        //         MudDialog.Close(DialogResult.Ok(true));
+        //     }
+        //     else
+        //     {
+        //         ErrorMessage = result.ErrorMessage ?? "Failed to pause membership.";
+        //     }
+        // }
+        // catch (Exception ex)
+        // {
+        //     ErrorMessage = "An unexpected error occurred. Please try again.";
+        // }
+        // finally
+        // {
+        //     IsProcessing = false;
+        // }
+    }
+
+    private void CloseDialog() => MudDialog.Close(DialogResult.Cancel());
+}

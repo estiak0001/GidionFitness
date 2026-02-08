@@ -1,0 +1,94 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Location
+@inject IStaffManagementService StaffService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@Title</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="Location.TrainingClassLocationName" 
+                      Label="Location Name" Required="true" 
+                      Class="mt-3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@loading">
+            Save
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string Title { get; set; } = "Location";
+    [Parameter] public StaffTrainingClassLocationDTO Location { get; set; } = new();
+    [Parameter] public bool IsEdit { get; set; }
+
+    private bool loading = false;
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(Location.TrainingClassLocationName))
+        {
+            Snackbar.Add("Location name is required", Severity.Warning);
+            return;
+        }
+
+        loading = true;
+
+        try
+        {
+            if (IsEdit)
+            {
+                var response = await StaffService.StaffUpdateClassLocationAsync(Location);
+                if (!string.IsNullOrEmpty(response.Message))
+                {
+                    if (response.Message.Contains("Error"))
+                    {
+                        Snackbar.Add(response.Message, Severity.Error);
+                        loading = false;
+                        return;
+                    }
+                    MudDialog.Close(DialogResult.Ok(response.Message));
+                }
+                else
+                {
+                    MudDialog.Close(DialogResult.Ok("Location updated successfully"));
+                }
+            }
+            else
+            {
+                var addDto = new AddNewLocationDTO
+                {
+                    TrainingClassLocationName = Location.TrainingClassLocationName
+                };
+                var response = await StaffService.StaffAddClassLocationAsync(addDto);
+                if (!string.IsNullOrEmpty(response.Message))
+                {
+                    if (response.Message.Contains("Error"))
+                    {
+                        Snackbar.Add(response.Message, Severity.Error);
+                        loading = false;
+                        return;
+                    }
+                    MudDialog.Close(DialogResult.Ok(response.Message));
+                }
+                else
+                {
+                    MudDialog.Close(DialogResult.Ok("Location added successfully"));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

@@ -1,0 +1,213 @@
+﻿@inject IAccessLogsService AccessLogService
+
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+@if (isMobile)
+{
+    <!-- Mobile Layout - Single Column Stack -->
+    <MudStack Spacing="3">
+        <!-- Training Statistics Card -->
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@Icons.Material.Filled.FitnessCenter" Class="mr-2" />
+                        Træningsstatistik
+                    </MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <div class="text-center">
+                    @if (isLoading)
+                    {
+                        <MudProgressCircular Indeterminate="true" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h4" Color="Color.Primary" Class="mb-1">@totalAccessLogs</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Info">
+                            I alt <strong>@totalAccessLogs</strong> træningssessioner gennemført
+                        </MudText>
+                    }
+                </div>
+            </MudCardContent>
+        </MudCard>
+
+        <!-- Profile Information Card -->
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@Icons.Material.Filled.Person" Class="mr-2" />
+                        Om
+                    </MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudStack Spacing="2">
+                    <!-- Basic Information -->
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Primary">Fulde navn</MudText>
+                        <MudText Typo="Typo.body2">@GetDisplayName()</MudText>
+                    </div>
+
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Primary">Email adresse</MudText>
+                        <MudText Typo="Typo.body2">@GetDisplayValue(Profile?.MemberEmail)</MudText>
+                    </div>
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Primary">Addresse</MudText>
+                        <MudText Typo="Typo.body2">@GetDisplayValue(Profile?.MemberAddress)</MudText>
+                    </div>
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Primary">Fødselsdag</MudText>
+                        <MudText Typo="Typo.body2">@GetDisplayValue(Profile?.MemberBirthdate)</MudText>
+                    </div>
+
+                    <!-- Organization Status -->
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Primary">Medlemsskab</MudText>
+                        <MudText Typo="Typo.body2">@GetOrganizationStatus()</MudText>
+                    </div>
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+
+        <!-- Mobile Additional Content Card -->
+        <MudCard Elevation="1" Style="background: var(--mud-palette-background-grey);">
+            <MudCardContent Class="text-center pa-4">
+                <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Large" />
+                <MudText Typo="Typo.h6" Class="mt-3">Mere indhold</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                    Bliver tilføjet efter møde med anden virksomhed
+                </MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudStack>
+   
+}
+else
+{
+    <!-- Desktop Layout - Original Grid Layout -->
+    <MudGrid>
+        <!-- Left Side Cards -->
+        <MudItem xs="12" md="4">
+            <MudStack Spacing="3">
+                <!-- Training Statistics Card -->
+                <MudCard Elevation="2">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">
+                                <MudIcon Icon="@Icons.Material.Filled.FitnessCenter" Class="mr-2" />
+                                Træningsstatistik
+                            </MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <div class="text-center">
+                            @if (isLoading)
+                            {
+                                <MudProgressCircular Indeterminate="true" />
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.h5" Color="Color.Primary" Class="mb-1">@totalAccessLogs</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Info">
+                                    I alt <strong>@totalAccessLogs</strong> træningssessioner gennemført
+                                </MudText>
+                            }
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+
+                <!-- Profile Information Card -->
+                <MudCard Elevation="2">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">
+                                <MudIcon Icon="@Icons.Material.Filled.Person" Class="mr-2" />
+                                Om
+                            </MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudStack Spacing="3">
+                            <!-- Basic Information -->
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Primary">Fulde navn</MudText>
+                                <MudText Typo="Typo.body2">@GetDisplayName()</MudText>
+                            </div>
+
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Primary">Email adresse</MudText>
+                                <MudText Typo="Typo.body2">@GetDisplayValue(Profile?.MemberEmail)</MudText>
+                            </div>
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Primary">Addresse</MudText>
+                                <MudText Typo="Typo.body2">@GetDisplayValue(Profile?.MemberAddress)</MudText>
+                            </div>
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Primary">Fødselsdag</MudText>
+                                <MudText Typo="Typo.body2">@GetDisplayValue(Profile?.MemberBirthdate)</MudText>
+                            </div>
+
+                            <!-- Organization Status -->
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Primary">Medlemsskab</MudText>
+                                <MudText Typo="Typo.body2">@GetOrganizationStatus()</MudText>
+                            </div>
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </MudStack>
+        </MudItem>
+
+        <!-- Right Side Content Area -->
+        <MudItem xs="12" md="8">
+            <MudCard Elevation="1" Style="background: var(--mud-palette-background-grey); min-height: 400px;">
+                <MudCardContent Class="text-center py-16">
+                    <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-4">Mere indhold</MudText>
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                        Bliver tilføjet efter møde med anden virksomhed
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+    
+}
+
+@code {
+    [Parameter] public ProfileResponseDTO? Profile { get; set; }
+    [Parameter] public Func<string>? GetDisplayName { get; set; }
+    [Parameter] public Func<string?, string>? GetDisplayValue { get; set; }
+    [Parameter] public Func<string>? GetOrganizationStatus { get; set; }
+
+    private int totalAccessLogs = 0;
+    private bool isLoading = true;
+    private bool isMobile = false;
+
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        isMobile = breakpoint <= Breakpoint.Sm;
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTotalAccessLogs();
+    }
+
+    private async Task LoadTotalAccessLogs()
+    {
+        isLoading = true;
+        var result = await AccessLogService.GetTotalAccessLogsAsync();
+        totalAccessLogs = result?.MemberAccessLogsTotal ?? 0;
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    
+}

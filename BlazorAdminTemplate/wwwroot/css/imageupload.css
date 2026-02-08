@@ -1,0 +1,516 @@
+﻿/* Image Upload Component Styles */
+.image-upload-container {
+    width: 100%;
+}
+
+/* Custom Camera Modal Styles - No MudDialog dependency */
+.camera-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.camera-modal-content {
+    background: var(--mud-palette-surface, #ffffff);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow: hidden;
+    animation: modalSlideIn 0.3s ease-out;
+    position: relative;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.camera-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--mud-palette-divider, #e0e0e0);
+    background: var(--mud-palette-surface, #ffffff);
+}
+
+.camera-modal-title {
+    display: flex;
+    align-items: center;
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: var(--mud-palette-text-primary, #000000);
+    margin: 0;
+}
+
+    .camera-modal-title .mud-icon {
+        margin-right: 12px;
+    }
+
+.camera-modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--mud-palette-text-secondary, #666666);
+    transition: all 0.2s ease;
+}
+
+    .camera-modal-close:hover {
+        background-color: var(--mud-palette-action-hover, rgba(0, 0, 0, 0.04));
+        color: var(--mud-palette-text-primary, #000000);
+    }
+
+.camera-modal-body {
+    padding: 20px;
+}
+
+.camera-video-container {
+    position: relative;
+    height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px auto;
+    max-width: 400px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.camera-placeholder {
+    border: 2px solid var(--mud-palette-primary, #594ae2);
+    border-radius: 8px;
+    width: 400px;
+    height: 300px;
+    max-width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--mud-palette-background-grey, #f5f5f5);
+    color: var(--mud-palette-text-secondary, #666666);
+}
+
+.camera-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--mud-palette-surface, #ffffff);
+    border: 2px solid var(--mud-palette-divider, #e0e0e0);
+    border-radius: 8px;
+    z-index: 10;
+    gap: 16px;
+}
+
+.camera-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+/* Video element styling when moved to modal */
+#camera-dialog-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+/* FIXED: Proper overlay crop modal styles */
+.crop-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s ease-out;
+}
+
+.crop-modal-content {
+    background: var(--mud-palette-surface, #ffffff);
+    border-radius: 12px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+    width: 95vw;
+    height: 95vh;
+    max-width: 1000px;
+    max-height: 800px;
+    overflow: hidden;
+    animation: modalSlideIn 0.3s ease-out;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.crop-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--mud-palette-divider, #e0e0e0);
+    background: var(--mud-palette-surface, #ffffff);
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.crop-modal-title {
+    display: flex;
+    align-items: center;
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: var(--mud-palette-text-primary, #000000);
+    margin: 0;
+}
+
+    .crop-modal-title .mud-icon {
+        margin-right: 12px;
+    }
+
+.crop-modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--mud-palette-text-secondary, #666666);
+    transition: all 0.2s ease;
+}
+
+    .crop-modal-close:hover {
+        background-color: var(--mud-palette-action-hover, rgba(0, 0, 0, 0.04));
+        color: var(--mud-palette-text-primary, #000000);
+    }
+
+.crop-modal-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+
+/* FIXED: Crop area - single image with overlay cropper */
+.crop-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    border-bottom: 1px solid var(--mud-palette-divider, #e0e0e0);
+    min-height: 400px;
+}
+
+    /* FIXED: Single image that gets the cropper overlay */
+    .crop-area img {
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        display: block;
+        object-fit: contain;
+    }
+
+    /* FIXED: Ensure Cropper.js container overlays properly */
+    .crop-area .cropper-container {
+        position: absolute !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        max-width: 90% !important;
+        max-height: 90% !important;
+    }
+
+/* FIXED: Fixed controls at bottom */
+.crop-controls {
+    background: var(--mud-palette-surface, #ffffff);
+    padding: 20px 24px;
+    border-top: 1px solid var(--mud-palette-divider, #e0e0e0);
+    flex-shrink: 0;
+}
+
+.crop-actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--mud-palette-divider, #e0e0e0);
+}
+
+/* FIXED: Proper Cropper.js overlay styling */
+.cropper-container {
+    direction: ltr;
+    font-size: 0;
+    line-height: 0;
+    position: relative;
+    -ms-touch-action: none;
+    touch-action: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+    .cropper-container img {
+        display: block;
+        width: 100%;
+        min-width: 0 !important;
+        max-width: none !important;
+        height: 100%;
+        min-height: 0 !important;
+        max-height: none !important;
+        image-orientation: 0deg;
+    }
+
+/* FIXED: Crop area overlay */
+.cropper-modal {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* FIXED: Better crop box styling */
+.cropper-crop-box {
+    position: absolute;
+}
+
+/* FIXED: Crop box outline */
+.cropper-view-box {
+    outline: 1px solid var(--mud-palette-primary, #594ae2);
+    outline-color: rgba(89, 74, 226, 0.8);
+}
+
+/* FIXED: Hide any preview elements that might cause dual images */
+.cropper-preview {
+    display: none !important;
+}
+
+/* FIXED: Dashed lines for grid */
+.cropper-dashed {
+    border: 0 dashed #eee;
+    display: block;
+    opacity: 0.5;
+}
+
+    .cropper-dashed.dashed-h {
+        border-bottom-width: 1px;
+        height: calc(100% / 3);
+        left: 0;
+        top: calc(100% / 3);
+        width: 100%;
+    }
+
+    .cropper-dashed.dashed-v {
+        border-right-width: 1px;
+        height: 100%;
+        left: calc(100% / 3);
+        top: 0;
+        width: calc(100% / 3);
+    }
+
+/* FIXED: Control points */
+.cropper-point {
+    background-color: var(--mud-palette-primary, #594ae2);
+    border-radius: 50%;
+    opacity: 0.8;
+    width: 10px;
+    height: 10px;
+}
+
+    .cropper-point:hover {
+        background-color: var(--mud-palette-primary, #594ae2);
+        opacity: 1;
+    }
+
+/* Dark theme support */
+.mud-theme-dark .camera-modal-content,
+.mud-theme-dark .crop-modal-content {
+    background: var(--mud-palette-dark, #424242);
+}
+
+.mud-theme-dark .camera-modal-header,
+.mud-theme-dark .crop-modal-header {
+    background: var(--mud-palette-dark, #424242);
+    border-bottom-color: var(--mud-palette-divider-dark, #555555);
+}
+
+.mud-theme-dark .camera-placeholder {
+    background: var(--mud-palette-dark, #424242);
+    border-color: var(--mud-palette-primary, #594ae2);
+    color: var(--mud-palette-text-secondary-dark, #aaaaaa);
+}
+
+.mud-theme-dark .camera-loading-overlay {
+    background: var(--mud-palette-dark, #424242);
+    border-color: var(--mud-palette-divider-dark, #555555);
+}
+
+.mud-theme-dark .camera-modal-close:hover,
+.mud-theme-dark .crop-modal-close:hover {
+    background-color: var(--mud-palette-action-hover-dark, rgba(255, 255, 255, 0.08));
+}
+
+.mud-theme-dark .crop-controls {
+    background: var(--mud-palette-dark, #424242);
+    border-top-color: var(--mud-palette-divider-dark, #555555);
+}
+
+.mud-theme-dark .crop-area {
+    background: var(--mud-palette-dark, #424242);
+    border-bottom-color: var(--mud-palette-divider-dark, #555555);
+}
+
+.mud-theme-dark .crop-actions {
+    border-top-color: var(--mud-palette-divider-dark, #555555);
+}
+
+/* FIXED: Responsive design with proper overlay */
+@media (max-width: 768px) {
+    .crop-modal-content {
+        width: 100vw;
+        height: 100vh;
+        max-width: none;
+        max-height: none;
+        border-radius: 0;
+    }
+
+    .crop-controls {
+        padding: 16px;
+    }
+
+        .crop-controls > div:first-child {
+            grid-template-columns: 1fr !important;
+            gap: 1rem !important;
+        }
+
+    .crop-actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+}
+
+@media (max-width: 600px) {
+    .camera-modal-content {
+        width: 95%;
+        margin: 0 10px;
+    }
+
+    .camera-modal-body {
+        padding: 16px;
+    }
+
+    .camera-video-container {
+        height: 250px;
+    }
+
+    .camera-placeholder {
+        height: 250px;
+    }
+
+    .camera-actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+}
+
+/* Ensure video element is always visible when moved */
+.camera-video-container video {
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+}
+
+/* Profile image specific styles */
+.profile-image-preview {
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid var(--mud-palette-primary);
+}
+
+.profile-image-fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--mud-palette-secondary);
+    color: white;
+    font-weight: 600;
+}
+
+/* Loading animation for profile images */
+.profile-image-loading {
+    position: relative;
+    overflow: hidden;
+}
+
+    .profile-image-loading::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+        animation: shimmer 1.5s infinite;
+    }
+
+@keyframes shimmer {
+    0% {
+        left: -100%;
+    }
+
+    100% {
+        left: 100%;
+    }
+}

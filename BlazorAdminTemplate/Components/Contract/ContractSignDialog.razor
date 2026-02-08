@@ -1,0 +1,182 @@
+﻿@using Microsoft.AspNetCore.Components
+@using MudBlazor
+@using BlazorAdminTemplate.Application.DTOs.Contracts
+@using BlazorAdminTemplate.Application.Interfaces
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Description" Class="mr-2" />
+            @Title
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudPaper Class="pa-2">
+                <div style="max-height: 45vh; overflow: auto;">
+                    @((MarkupString)Html)
+                </div>
+            </MudPaper>
+
+            <MudDivider Class="my-2" />
+
+            <MudText Typo="Typo.subtitle2">Bekræftelser</MudText>
+            <MudStack Spacing="1">
+                @foreach (var item in _consentItems)
+                {
+                    <MudCheckBox T="bool" @bind-Value="item.Checked" Label="@item.Text" />
+                }
+            </MudStack>
+
+            @if (!AllConsentsChecked)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true">
+                    Markér venligst alle afkrydsningsfelter før underskrift.
+                </MudAlert>
+            }
+
+            <MudDivider Class="my-2" />
+
+            <MudText Typo="Typo.subtitle2">Skriv din underskrift her:</MudText>
+            
+
+            <div class="mud-width-full signature-canvas-container">
+                <canvas id="@_canvasId" width="0" height="0" style="width: 100%; height: 200px; touch-action: none;"></canvas>
+            </div>
+            <div class="d-flex align-center mb-1">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="ClearSignature" StartIcon="@Icons.Material.Filled.Clear">
+                    Ryd
+                </MudButton>
+            </div>
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Disabled="@_isSubmitting" OnClick="Close">Luk</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Draw"
+                   Disabled="@(_isSubmitting || !AllConsentsChecked)"
+                   OnClick="SubmitAsync">
+            @if (_isSubmitting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Sender…</span>
+            }
+            else
+            {
+                <span>Underskriv & send</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance MudDialog { get; set; } = default!;
+    [Inject] public IJSRuntime JS { get; set; } = default!;
+    [Inject] public IContractService ContractService { get; set; } = default!;
+    [Inject] public ISnackbar Snackbar { get; set; } = default!;
+
+    [Parameter] public string Html { get; set; } = string.Empty;
+    [Parameter] public string Title { get; set; } = "Kontrakt";
+    [Parameter] public string ContractGuid { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnSigned { get; set; }
+    [Parameter] public IEnumerable<string>? ConsentLabels { get; set; }
+
+    private string _canvasId = $"sigpad_{Guid.NewGuid():N}";
+    private bool _initialized;
+    private bool _isSubmitting;
+    private string _error = string.Empty;
+
+    private sealed class ConsentItem
+    {
+        public required string Text { get; init; }
+        public bool Checked { get; set; }
+    }
+
+    private List<ConsentItem> _consentItems = new();
+
+    private bool AllConsentsChecked => _consentItems.All(i => i.Checked);
+
+    protected override void OnInitialized()
+    {
+        var labels = ConsentLabels ?? DefaultConsents;
+        _consentItems = labels.Select(l => new ConsentItem { Text = l, Checked = false }).ToList();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            _initialized = true;
+            await JS.InvokeVoidAsync("signaturePad.ensure");
+            await JS.InvokeVoidAsync("signaturePad.init", _canvasId);
+        }
+    }
+
+    private async Task ClearSignature() => await JS.InvokeVoidAsync("signaturePad.clear", _canvasId);
+
+    private async Task SubmitAsync()
+    {
+        try
+        {
+            _error = string.Empty;
+
+            if (!AllConsentsChecked)
+            {
+                _error = "Du skal acceptere alle betingelser for at kunne underskrive.";
+                return;
+            }
+
+            _isSubmitting = true;
+            StateHasChanged();
+
+            var dataUrl = await JS.InvokeAsync<string>("signaturePad.getDataUrl", _canvasId);
+            var isEmpty = await JS.InvokeAsync<bool>("signaturePad.isEmpty", _canvasId);
+
+            if (isEmpty || string.IsNullOrWhiteSpace(dataUrl))
+            {
+                _error = "Tegn din underskrift i feltet ovenfor.";
+                return;
+            }
+
+            var base64 = dataUrl.Contains(",") ? dataUrl.Split(',', 2)[1] : dataUrl;
+
+            var req = new MemberContractSigningRequestDTO
+            {
+                MemberContractDataGUID = ContractGuid,
+                Signature = base64
+            };
+
+            var resp = await ContractService.PostMemberContractSigningAsync(req);
+
+            Snackbar.Add("Kontrakt underskrevet.", Severity.Success);
+            if (OnSigned.HasDelegate)
+                await OnSigned.InvokeAsync();
+
+            MudDialog.Close();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Der opstod en fejl: {ex.Message}";
+        }
+        finally
+        {
+            _isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Close() => MudDialog.Close();
+
+    private static readonly string[] DefaultConsents =
+    {
+        "Jeg har læst og accepterer kontrakten.",
+        "Jeg accepterer behandling af mine persondata i henhold til privatlivspolitikken."
+    };
+}

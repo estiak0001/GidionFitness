@@ -1,0 +1,247 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Payment
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Domain.Entities
+@inject IStaffManagementService StaffManagementService
+@inject ISnackbar Snackbar
+
+<MudCard Elevation="0">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.CardMembership" Class="mr-2" />
+                Medlemskabsoplysninger
+            </MudText>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center align-center pa-4">
+                <MudProgressCircular Indeterminate="true" />
+                <MudText Class="ml-3">Indlæser medlemskabsoplysninger...</MudText>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">
+                @errorMessage
+            </MudAlert>
+        }
+        else if (membershipInfo != null && membershipInfo.PaymentInfo != null)
+        {
+            <!-- Membership Overview Card -->
+            <MudCard Elevation="1" Class="mb-4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" />
+                            Medlemskabsdetaljer
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <MudText Typo="Typo.subtitle2" Class="mb-2 font-weight-bold">Medlemskabstype</MudText>
+                            <MudText Typo="Typo.body1" Class="mb-3">
+                                @if (!string.IsNullOrEmpty(membershipInfo.PaymentInfo.MemberPaymentGroupName))
+                                {
+                                    @membershipInfo.PaymentInfo.MemberPaymentGroupName
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Ikke angivet</span>
+                                }
+                            </MudText>
+
+                            <MudText Typo="Typo.subtitle2" Class="mb-2 font-weight-bold">Beskrivelse</MudText>
+                            <MudText Typo="Typo.body1" Class="mb-3">
+                                @if (!string.IsNullOrEmpty(membershipInfo.PaymentInfo.MemberPaymentGroupDescription))
+                                {
+                                    @membershipInfo.PaymentInfo.MemberPaymentGroupDescription
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Ingen beskrivelse tilgængelig</span>
+                                }
+                            </MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            <!-- Pricing Information Card -->
+            <MudCard Elevation="1" Class="mb-4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Class="mr-2" />
+                            Prisoplysninger
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" sm="6">
+                            <MudCard Elevation="2" Class="pa-4 pricing-card">
+                                <div class="d-flex align-center">
+                                    <MudIcon Icon="@Icons.Material.Filled.Payment" Color="Color.Primary" Size="Size.Large" Class="mr-3" />
+                                    <div class="card-text-content">
+                                        <MudText Typo="Typo.h5" Class="card-number text-primary">
+                                            @membershipInfo.PaymentInfo.MemberPaymentPrice.ToString("C", new System.Globalization.CultureInfo("da-DK"))
+                                        </MudText>
+                                        <MudText Typo="Typo.caption" Class="card-label">Månedlig pris</MudText>
+                                    </div>
+                                </div>
+                            </MudCard>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudCard Elevation="2" Class="pa-4 pricing-card">
+                                <div class="d-flex align-center">
+                                    <MudIcon Icon="@Icons.Material.Filled.Pause" Color="Color.Secondary" Size="Size.Large" Class="mr-3" />
+                                    <div class="card-text-content">
+                                        <MudText Typo="Typo.h5" Class="card-number text-secondary">
+                                            @if (membershipInfo.PaymentInfo.MemberPaymentPausePrice.HasValue)
+                                            {
+                                                @membershipInfo.PaymentInfo.MemberPaymentPausePrice.Value.ToString("C", new System.Globalization.CultureInfo("da-DK"))
+                                            }
+                                            else
+                                            {
+                                                <span>N/A</span>
+                                            }
+                                        </MudText>
+                                        <MudText Typo="Typo.caption" Class="card-label">Pausepris</MudText>
+                                    </div>
+                                </div>
+                            </MudCard>
+                        </MudItem>
+                    </MudGrid>
+
+                    @if (membershipInfo.PaymentInfo.MemberPaymentPausePrice.HasValue)
+                    {
+                        <MudAlert Severity="Severity.Info" Class="mt-4">
+                            <MudText Typo="Typo.body2">
+                                <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="mr-1" />
+                                Dette medlemskab har en pausemulighed til @membershipInfo.PaymentInfo.MemberPaymentPausePrice.Value.ToString("C", new System.Globalization.CultureInfo("da-DK")) pr. måned.
+                            </MudText>
+                        </MudAlert>
+                    }
+                </MudCardContent>
+            </MudCard>
+        }
+        else
+        {
+            <div class="text-center pa-8">
+                <MudIcon Icon="@Icons.Material.Filled.CardMembership" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+                <MudText Typo="Typo.body1">Ingen medlemskabsoplysninger fundet</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Default">Der er ikke registreret medlemskabsoplysninger for dette medlem</MudText>
+            </div>
+        }
+    </MudCardContent>
+</MudCard>
+
+<style>
+    .pricing-card {
+        height: 88px !important;
+        display: flex !important;
+        align-items: center !important;
+        overflow: hidden !important;
+    }
+
+        .pricing-card .mud-card-content {
+            padding: 16px !important;
+            height: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+            width: 100% !important;
+            overflow: hidden !important;
+        }
+
+    .card-text-content {
+        flex: 1 !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .card-number {
+        font-size: 1.5rem !important;
+        font-weight: 600 !important;
+        line-height: 1.2 !important;
+        margin-bottom: 2px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .card-label {
+        font-size: 0.75rem !important;
+        line-height: 1.1 !important;
+        margin: 0 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .text-primary {
+        color: var(--mud-palette-primary) !important;
+    }
+
+    .text-secondary {
+        color: var(--mud-palette-secondary) !important;
+    }
+
+    .text-muted {
+        color: var(--mud-palette-text-secondary) !important;
+    }
+
+    .font-weight-bold {
+        font-weight: 600 !important;
+    }
+
+    .font-family-monospace {
+        font-family: 'Courier New', monospace !important;
+    }
+</style>
+
+@code {
+    [Parameter] public string MemberGuid { get; set; } = string.Empty;
+
+    private MemberPaymentMembershipInfoResponseDTO? membershipInfo;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(MemberGuid))
+        {
+            await LoadMembershipInfo();
+        }
+    }
+
+    private async Task LoadMembershipInfo()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            StateHasChanged();
+
+            
+
+            membershipInfo = await StaffManagementService.StaffGetMembershipInfo(MemberGuid);
+
+            
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading membership info: {ex.Message}");
+            errorMessage = $"Fejl ved indlæsning af medlemskabsoplysninger: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+}

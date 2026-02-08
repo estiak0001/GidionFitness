@@ -1,0 +1,158 @@
+﻿@page "/payment-list"
+@using BlazorAdminTemplate.Components.Payment
+@using MudBlazor
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudPaper Class="pa-4 ma-4" Elevation="3">
+    <MudToolBar>
+        <MudText Typo="Typo.h5">Payments History</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Download"
+                   OnClick="DownloadPdf">
+            Download as PDF
+        </MudButton>
+    </MudToolBar>
+
+    <MudTable Hover="true"
+              Dense="true"
+              Bordered="true"
+              Striped="true"
+              Items="@payments"
+              Class="mt-4">
+        <HeaderContent>
+            <MudTh>Member</MudTh>
+            <MudTh>Date</MudTh>
+            <MudTh>Amount</MudTh>
+            <MudTh>Type</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Card</MudTh>
+            <MudTh Style="text-align:center">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Member">@context.MemberName</MudTd>
+            <MudTd DataLabel="Date">@context.Date.ToString("dd MMM yyyy HH:mm")</MudTd>
+            <MudTd DataLabel="Amount">
+                <MudText Color="@(context.Type == "Credit" ? Color.Success : Color.Error)">
+                    <strong>@(context.Type == "Credit" ? "+" : "-") $@context.Amount</strong>
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Type">
+                <MudChip T="string" Color="@(context.Type == "Credit" ? Color.Success : Color.Error)" Size="Size.Small">
+                    @context.Type
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small">
+                    @context.Status
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Card">**** **** **** @context.CardLast4</MudTd>
+            <MudTd DataLabel="Actions">
+                <MudButton Size="Size.Small" Color="Color.Primary" OnClick="@(() => ShowPaymentDetails(context))">
+                    View Details
+                </MudButton>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+
+    @if (!payments.Any())
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-6">No payments found.</MudAlert>
+    }
+</MudPaper>
+
+@code {
+    private List<PaymentDummy> payments = new();
+
+    protected override void OnInitialized()
+    {
+        payments = GeneratePlaceholderPayments();
+    }
+
+    private async Task ShowPaymentDetails(PaymentDummy payment)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Payment", payment }
+        };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+       await DialogService.ShowAsync<PaymentDetailsDialog>("Payment Details", parameters, options);
+    }
+
+    private async Task DownloadPdf()
+    {
+        Snackbar.Add("Generating PDF... (Implement your PDF export here)", Severity.Info);
+        // Your PDF logic here later
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Completed" => Color.Success,
+        "Pending" => Color.Warning,
+        "Failed" => Color.Error,
+        "Refunded" => Color.Info,
+        _ => Color.Default
+    };
+
+    private List<PaymentDummy> GeneratePlaceholderPayments() => new()
+    {
+        new PaymentDummy
+        {
+            TransactionId = "txn_1P9kLmN2ABC123XYZ",
+            MemberName = "John Doe",
+            MemberEmail = "john@example.com",
+            Date = DateTime.Now.AddDays(-2),
+            Amount = 49.99m,
+            Type = "Debit",
+            Status = "Completed",
+            CardLast4 = "4242",
+            CardBrand = "Visa",
+            Description = "Premium Membership - Monthly"
+        },
+        new PaymentDummy
+        {
+            TransactionId = "txn_1P8jKpM3DEF456UVW",
+            MemberName = "Alice Smith",
+            MemberEmail = "alice.smith@gmail.com",
+            Date = DateTime.Now.AddDays(-5),
+            Amount = 299.00m,
+            Type = "Debit",
+            Status = "Completed",
+            CardLast4 = "8888",
+            CardBrand = "Mastercard",
+            Description = "Annual Subscription"
+        },
+        new PaymentDummy
+        {
+            TransactionId = "re_1P7hIjL4GHI789RST",
+            MemberName = "John Doe",
+            MemberEmail = "john@example.com",
+            Date = DateTime.Now.AddDays(-10),
+            Amount = 49.99m,
+            Type = "Credit",
+            Status = "Refunded",
+            CardLast4 = "4242",
+            CardBrand = "Visa",
+            Description = "Refund for cancelled membership"
+        },
+        new PaymentDummy
+        {
+            TransactionId = "txn_1P6gHiK5JKL012QWE",
+            MemberName = "Bob Johnson",
+            MemberEmail = "bob.j@company.com",
+            Date = DateTime.Now.AddHours(-3),
+            Amount = 99.99m,
+            Type = "Debit",
+            Status = "Pending",
+            CardLast4 = "5555",
+            CardBrand = "American Express",
+            Description = "One-time workshop fee"
+        }
+    };
+
+}

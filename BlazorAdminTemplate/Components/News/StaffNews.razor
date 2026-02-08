@@ -1,0 +1,258 @@
+﻿@page "/StaffNews"
+@inject INewsService NewsService
+@inject IDialogService dialogService
+@inject ISnackbar Snackbar
+
+@using BlazorAdminTemplate.Components.Teams
+@using BlazorAdminTemplate.Application.DTOs.NewsDTO
+@using BlazorAdminTemplate.Application.DTOs
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Components.PaginationComponents
+@using BlazorAdminTemplate.Domain.Enums
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+<AuthorizeView Policy="StaffOnly">
+    <Authorized>
+
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+
+            <MudButton @onclick="NewNews" Variant="Variant.Filled" Color="Color.Primary">
+                Ny Nyhed
+            </MudButton>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudSelect T="int" Label="Nyheder per side" Variant="Variant.Outlined" Value="pageSize" ValueChanged="OnPageSizeChanged"
+                           Dense="true" Style="width:120px" Immediate="true" Flex="0">
+                    @foreach (var size in pageSizeOptions)
+                    {
+                        <MudSelectItem Value="@size">@size</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudStack>
+        </MudStack>
+
+            
+
+
+
+    </Authorized>
+</AuthorizeView>
+
+@if (currentView == ViewType.Cards)
+{
+    //Mobil
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (staffNewsList?.Data?.Count > 0)
+    {
+        <MudGrid>
+            @foreach (var item in staffNewsList.Data)
+            {
+                <MudItem xs="12" sm="6">
+                    <MudCard>
+                        <MudCardHeader>
+                            <MudTh Typo="Typo.h6">Emne</MudTh>
+                            
+                            <MudTh>Til Dato</MudTh>
+                            <MudTh>Handlinger</MudTh>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudTd>@item.MemberNewsSubject</MudTd>
+                            <MudTd>@item.MemberNewsDate?.ToString("dd/MM/yyyy")</MudTd>
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Info" Size="Size.Small" OnClick="@(() => EditNews(item))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteNews(item))" />
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else
+    {
+        <MudText>No locations found.</MudText>
+    }
+
+}
+else
+{
+    //Desktop
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (staffNewsList != null && staffNewsList?.Data?.Count > 0)
+    {
+        <PaginatedList TItem="StaffNewsDTO"
+                       Items="staffNewsList.Data"
+                       Pagination="staffNewsList.Pagination"
+                       OnPageChanged="LoadNews">
+
+
+            <HeaderTemplate>
+                <MudTh>Emne</MudTh>
+                
+                <MudTh>Til Dato</MudTh>
+                <MudTh>Handlinger</MudTh>
+            </HeaderTemplate>
+
+            <RowTemplate>
+                <MudTd>@context.MemberNewsSubject</MudTd>
+                @* <MudTd>@((MarkupString)context.MemberNewsText)</MudTd> *@
+
+                <MudTd>@context.MemberNewsDate?.ToString("dd/MM/yyyy")</MudTd>
+
+    <MudTd DataLabel="Handlinger">
+        <AuthorizeView Policy="StaffOnly">
+             <Authorized Context="authContext">
+                <MudStack Row="true" Spacing="1">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   OnClick="@(() => DeleteNews(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Color="Color.Info"
+                                   Size="Size.Small"
+                                   OnClick="@(() => EditNews(context))" />
+                </MudStack>
+            </Authorized>
+        </AuthorizeView>
+    </MudTd>
+</RowTemplate>
+
+
+
+        </PaginatedList>
+    }
+}
+
+
+
+@code {
+    private ResponseDTO<List<StaffNewsDTO>> staffNewsList = new ResponseDTO<List<StaffNewsDTO>>();
+    private bool isLoading = true;
+    private int currentPage = 1;
+    private ViewType currentView = ViewType.Table;
+
+    private int pageSize = 15; // default page size
+    private readonly int[] pageSizeOptions = new int[] { 5, 10, 15, 20, 50, 100 };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadNews(currentPage);
+    }
+
+    private async Task NewNews()
+    {
+        StaffNewsDTO newsDTO = new StaffNewsDTO();
+        newsDTO.MemberNewsCreated = DateTime.Now;
+        newsDTO.MemberNewsDate = DateTime.Now;
+
+        DialogParameters parameters = new DialogParameters
+        {
+            { "news", newsDTO } // Pass the selected location to the dialog
+        };
+
+        DialogOptions options = new DialogOptions { CloseOnEscapeKey = true };
+        IDialogReference dialog = await dialogService.ShowAsync<EditNewsDialog>("Opret Nyhed", parameters, options);
+
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            newsDTO = (StaffNewsDTO)result.Data;
+            Snackbar.Add($"{newsDTO.MemberNewsSubject} Opretted", Severity.Success);
+
+            // Update the location in your backend/service
+            await NewsService.CreateStaffNewAsync(newsDTO);
+
+            // Reload the table
+            await LoadNews(currentPage);
+        }
+
+    }
+
+
+    private async Task LoadNews(int page)
+    {
+        isLoading = true;
+
+        var response = await NewsService.GetStaffNewsAsync(page, pageSize); 
+        if (response != null)
+        {
+            staffNewsList = response;
+        }
+
+        currentPage = page;
+        isLoading = false;
+        StateHasChanged();
+    }
+
+
+    private async Task EditNews(StaffNewsDTO newsDTO)
+    {
+        DialogParameters parameters = new DialogParameters
+        {
+            { "news", newsDTO } // Pass the selected location to the dialog
+        };
+
+        DialogOptions options = new DialogOptions { CloseOnEscapeKey = true };
+        IDialogReference dialog = await dialogService.ShowAsync<EditNewsDialog>("Rediger Nyhed", parameters, options);
+
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            newsDTO = (StaffNewsDTO)result.Data;
+            Snackbar.Add($"{newsDTO.MemberNewsSubject} updatered", Severity.Success);
+
+            // Update the location in your backend/service
+            await NewsService.UpdateStaffNewAsync(newsDTO);
+
+            // Reload the table
+            await LoadNews(currentPage);
+        }
+
+
+    }
+
+
+    private async Task DeleteNews(StaffNewsDTO newsDTO)
+    {
+        DialogParameters parameters = new DialogParameters
+        {
+            { "ContentText", $"Are you sure you want to delete '{newsDTO.MemberNewsSubject}'?" },
+            { "ButtonText", "Ja" },
+            { "Color", Color.Error }
+        };
+        
+        DialogOptions options = new DialogOptions { CloseOnEscapeKey = true };
+        IDialogReference dialog = await dialogService.ShowAsync<ConfirmDialog>("Slet Nyhed", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await NewsService.DeleteStaffNewAsync(newsDTO);
+            await LoadNews(currentPage);
+        }
+    }
+
+    private async Task OnPageSizeChanged(int newSize)
+    {
+        pageSize = newSize;
+        await LoadNews(1); // reload from first page with new page size
+    }
+
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        currentView = breakpoint <= Breakpoint.Sm ? ViewType.Cards : ViewType.Table;
+        StateHasChanged();
+    }
+
+
+
+
+}

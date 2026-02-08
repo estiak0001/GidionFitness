@@ -1,0 +1,193 @@
+﻿@page "/classes/locations"
+@using BlazorAdminTemplate.Application.DTOs.Location
+@using BlazorAdminTemplate.Components.Locations
+@inject IStaffManagementService StaffService
+@inject IDialogService Dialog
+@inject ISnackbar Snackbar
+
+<PageTitle>Training Class Locations</PageTitle>
+
+@* <MudText Typo="Typo.h4" GutterBottom="true">Training Class Locations</MudText> *@
+
+<MudButton Variant="Variant.Filled"
+           Color="Color.Primary"
+           StartIcon="ti ti-plus"
+           OnClick="OpenAddDialog"
+           Class="mb-4">
+    Add New Location
+</MudButton>
+
+<MudPaper Class="pa-4" Elevation="2">
+    @if (loading)
+    {
+        <MudProgressCircular Indeterminate="true" Class="mx-auto" />
+        <MudText Align="Align.Center">Loading locations...</MudText>
+    }
+    else if (locations == null || !locations.Any())
+    {
+        <MudAlert Severity="Severity.Info">No training class locations found.</MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@locations" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm">
+            <HeaderContent>
+                <MudTh>Location Name</MudTh>
+                <MudTh style="width:200px;">Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Name">
+                    <strong>@context.TrainingClassLocationName</strong>
+                </MudTd>
+                <MudTd DataLabel="Actions">
+                    <MudButtonGroup Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
+                        <MudButton 
+                                   StartIcon="ti ti-edit"
+                                   OnClick="@(() => EditLocation(context))">
+                            Edit
+                        </MudButton>
+                        <MudButton 
+                                   StartIcon="ti ti-trash"
+                                   
+                                   OnClick="@(() => DeleteLocation(context))">
+                            Delete
+                        </MudButton>
+                    </MudButtonGroup>
+
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+
+        <MudPagination Count="@totalPages"
+                       BoundaryCount="2"
+                       MiddleCount="3"
+                       SelectedChanged="PageChanged"
+                       Class="mt-4" />
+    }
+</MudPaper>
+
+@code {
+    private List<StaffTrainingClassLocationDTO> locations = new();
+    private int currentPage = 1;
+    private int pageSize = 15;
+    private int totalPages = 1;
+    private bool loading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var response = await StaffService.StaffGetClassLocationsAsync(currentPage, pageSize);
+
+            if (!string.IsNullOrEmpty(response.Message))
+            {
+                // Show API message only if it's an error
+                if (response.Message.Contains("Error") || response.Message.Contains("error") || response.Message.Contains("failed"))
+                {
+                    Snackbar.Add(response.Message, Severity.Error);
+                }
+            }
+
+            locations = response.StaffTrainingClassLocations ?? new();
+            totalPages = response.Pagination?.TotalPages ?? 1;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading locations: {ex.Message}", Severity.Error);
+            locations = new();
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task PageChanged(int page)
+    {
+        currentPage = page;
+        await LoadData();
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters<EditLocationDialog>
+        {
+            { x => x.Location, new StaffTrainingClassLocationDTO() },
+            { x => x.IsEdit, false }
+        };
+
+        var dialog = await Dialog.ShowAsync<EditLocationDialog>("Add New Location", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data != null)
+        {
+            var message = result.Data.ToString();
+            Snackbar.Add(message ?? "Location added successfully!", Severity.Success);
+            await LoadData();
+        }
+    }
+
+    private async Task EditLocation(StaffTrainingClassLocationDTO location)
+    {
+        var parameters = new DialogParameters<EditLocationDialog>
+        {
+            { x => x.Location, new StaffTrainingClassLocationDTO(location) },
+            { x => x.IsEdit, true }
+        };
+
+        var dialog = await Dialog.ShowAsync<EditLocationDialog>("Edit Location", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data != null)
+        {
+            var message = result.Data.ToString();
+            Snackbar.Add(message ?? "Location updated successfully!", Severity.Success);
+            await LoadData();
+        }
+    }
+
+    private async Task DeleteLocation(StaffTrainingClassLocationDTO location)
+    {
+        bool? confirmed = await Dialog.ShowMessageBox(
+            "Confirm Delete",
+            $"Are you sure you want to delete \"{location.TrainingClassLocationName}\"?",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirmed == true)
+        {
+            try
+            {
+                var response = await StaffService.StaffDeleteClassLocationAsync(location.TrainingClassLocationGUID);
+                
+                if (!string.IsNullOrEmpty(response.Message))
+                {
+                    if (response.Message.Contains("Error") || response.Message.Contains("error") || response.Message.Contains("failed"))
+                    {
+                        Snackbar.Add(response.Message, Severity.Error);
+                    }
+                    else
+                    {
+                        Snackbar.Add(response.Message, Severity.Success);
+                        await LoadData();
+                    }
+                }
+                else
+                {
+                    Snackbar.Add("Location deleted successfully", Severity.Success);
+                    await LoadData();
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting location: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

@@ -1,0 +1,762 @@
+﻿@page "/hold-traeninger"
+@page "/training-classes"
+@using BlazorAdminTemplate.Application.DTOs.Classes
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Components.Calendar
+@using BlazorAdminTemplate.Domain.Enums
+@using BlazorAdminTemplate.Domain.Entities
+@using TrainingClassEntity = BlazorAdminTemplate.Domain.Entities.TrainingClasses
+@inject ITrainingClassesService TrainingClassesService
+@inject ILoginService LoginService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Hold træninger</PageTitle>
+
+<link href="css/trainingclasses.css" rel="stylesheet" />
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    @if (!isMobile)
+    {
+        <MudText Typo="Typo.h4" GutterBottom="true">
+            <MudIcon Icon="@Icons.Material.Filled.FitnessCenter" Class="mr-2" />
+            Hold træninger
+        </MudText>
+    }
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-center my-8">
+            <MudProgressCircular Indeterminate="true" />
+            <MudText Class="ml-3">Indlæser træningshold...</MudText>
+        </div>
+    }
+    else
+    {
+        @if (isMobile)
+        {
+            <!-- Mobile Layout -->
+            <TrainingClassesMobile Classes="_filteredTrainingClasses"
+                                   BookedClassGuids="_bookedClassGuids"
+                                   SelectedDate="selectedDate"
+                                   SelectedDateChanged="NavigateToDateFromMobile"
+                                   AvailableClassTypes="availableClassTypes"
+                                   AvailableOrganizations="availableOrganizations"
+                                   SelectedFilters="selectedFilters"
+                                   OnSelectedFiltersChanged="OnSelectedFiltersChanged"
+                                   OnRemoveFilter="RemoveFilter"
+                                   OnClearAll="ClearAllFilters"
+                                   OnClassClicked="OnMobileClassClicked"
+                                   DateNavigationText="@GetDateNavigationText()" />
+        }
+        else
+        {
+            <!-- Desktop Layout: Filters (left) + Calendar (right) -->
+            <MudGrid>
+                <MudItem xs="12" md="4" lg="3">
+                    <ClassFiltersPanel AvailableClassTypes="availableClassTypes"
+                                       AvailableOrganizations="availableOrganizations"
+                                       SelectedDate="selectedDate"
+                                       DateChanged="OnDateChangedFromFilter"
+                                       DateAfterChanged="OnDateChanged"
+                                       SelectedFilters="selectedFilters"
+                                       OnSelectedFiltersChanged="OnSelectedFiltersChanged"
+                                       OnRemoveFilter="RemoveFilter"
+                                       OnClearAll="ClearAllFilters"
+                                       DateNavigationText="@GetDateNavigationText()"
+                                       ShowLegend="true"
+                                       ShowDatePicker="true" />
+                </MudItem>
+
+                <MudItem xs="12" md="8" lg="9">
+                    <MudCard Elevation="2">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">
+                                    <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Class="mr-2" />
+                                    Kalender
+                                </MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudCalendar @ref="calendarRef"
+                                         @key="calendarComponentKey"
+                                         T="CalendarItem"
+                                         Items="_events"
+                                         CurrentDay="@DateTime.Today"
+                                         View="CalendarView.Month"
+                                         DateRangeChanged="OnCalendarNavigationChanged"
+                                         ItemClicked="OnCalendarItemClicked"
+                                         CellClicked="OnCalendarCellClicked"
+                                         AdditionalDateTimeClassesFunc="@GetDateCssClasses"
+                                         ShowDatePicker="false"
+                                         ShowPrevNextButtons="false">
+                                <MonthTemplate>
+                                    <div class="d-flex gap-1 align-center">
+                                        <MudIcon Icon="@GetEventIcon(context)"
+                                                 Color="@GetEventColor(context)"
+                                                 Size="Size.Small" />
+                                        <div style="font-size: 0.75rem;">@context.Text</div>
+                                    </div>
+                                </MonthTemplate>
+                            </MudCalendar>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+        }
+    }
+</MudContainer>
+
+@code {
+    private MudCalendar<CalendarItem>? calendarRef;
+    private List<CalendarItem> _events = new();
+    private List<TrainingClassEntity> _allTrainingClasses = new(); // All loaded classes from API
+    private List<TrainingClassEntity> _filteredTrainingClasses = new(); // Filtered classes for display
+    private List<BookedClasses> _bookedClasses = new();
+    private HashSet<string> _bookedClassGuids = new();
+    private bool isLoading = true;
+    private MemberClassesListAvailableClassesResponseDTO? lastResponse;
+    private MemberBookedClassesResponseDTO? bookedResponse;
+
+    // Filter components and state
+    private List<ClassTypes>? availableClassTypes;
+    private List<GuestTrainingClasses>? availableOrganizations;
+
+    // Calendar state
+    private DateTime? selectedDate = null;
+    private DateTime calendarDate = DateTime.Today;            
+    private CalendarView currentCalendarView = CalendarView.Month;
+    private DateRange currentViewRange = new();
+    private IReadOnlyCollection<FilterItem> selectedFilters = new HashSet<FilterItem>();
+    private bool isDatePickerNavigation = false; // Flag to distinguish DatePicker navigation
+    private DateTime? datePickerNavigationTarget = null; // Store the target date for navigation
+    private bool isInitialized = false;
+
+    // Root filter items (not selectable)
+    private FilterItem classTypesRootFilter = new() { Type = FilterType.Root, Guid = "class-types-root", Name = "Hold Typer" };
+    private FilterItem organizationsRootFilter = new() { Type = FilterType.Root, Guid = "organizations-root", Name = "Centre" };
+
+    private static readonly System.Globalization.CultureInfo WeekCulture = new("da-DK");
+
+    private string calendarComponentKey => $"calendar-{DateTime.Today:yyyyMM}";
+
+
+    // Current viewing period
+    private DateTime currentCalendarMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+
+
+    // Helper properties
+    private IEnumerable<FilterItem> SelectedClassTypeFilters => selectedFilters?.Where(f => f.Type == FilterType.ClassType) ?? Enumerable.Empty<FilterItem>();
+    private IEnumerable<FilterItem> SelectedOrganizationFilters => selectedFilters?.Where(f => f.Type == FilterType.Organization) ?? Enumerable.Empty<FilterItem>();
+    private bool HasTreeViewFilters => SelectedClassTypeFilters.Any() || SelectedOrganizationFilters.Any();
+    private bool HasActiveFilters => selectedDate.HasValue || HasTreeViewFilters;
+
+    private bool isMobile = false; // Add this field
+
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        isMobile = breakpoint <= Breakpoint.Sm;
+        StateHasChanged();
+    }
+
+  
+    private async Task NavigateToDateFromMobile(DateTime date)
+    {
+        selectedDate = date;
+        await OnDateChanged();
+    }
+
+    private async Task OnDateChangedFromFilter(DateTime? date)
+    {
+        selectedDate = date;
+    }
+
+    private async Task OnMobileClassClicked(TrainingClassEntity trainingClass)
+    {
+        await OnCalendarItemClicked(new CalendarItem
+        {
+            Text = trainingClass.TrainingClassClassesName,
+            Start = trainingClass.TrainingClassClassesStartDateTime,
+            End = trainingClass.TrainingClassClassesEndDateTime
+        });
+    }
+
+
+
+    // Function to return CSS classes for specific dates
+    private string GetDateCssClasses(DateTime date, CalendarView view)
+    {
+        // Store current view - but don't override if we're navigating via DatePicker
+        if (!isDatePickerNavigation)
+        {
+            currentCalendarView = view;
+        }
+
+        // Only highlight for the selected date
+        if (selectedDate.HasValue && date.Date == selectedDate.Value.Date)
+        {
+            return "selected-date-highlight";
+        }
+
+        return string.Empty;
+    }
+
+    // Helper methods for display text
+    private string GetDateNavigationText()
+    {
+        if (!selectedDate.HasValue) return "";
+
+        return currentCalendarView switch
+        {
+            CalendarView.Week => $"Uge {GetWeekNumber(selectedDate.Value)}: {selectedDate.Value:dd/MM/yyyy}",
+            CalendarView.Month => $"Fremhævet: {selectedDate.Value:dd/MM/yyyy}",
+            _ => $"Valgt: {selectedDate.Value:dd/MM/yyyy}"
+        };
+    }
+
+    private string GetCurrentDateRangeText()
+    {
+        if (!selectedDate.HasValue) return "";
+
+        return currentCalendarView switch
+        {
+            CalendarView.Week => $"Uge {GetWeekNumber(selectedDate.Value)} ({GetWeekStartDate(selectedDate.Value):dd/MM} - {GetWeekEndDate(selectedDate.Value):dd/MM/yyyy})",
+            CalendarView.Month => selectedDate.Value.ToString("MMMM yyyy", new System.Globalization.CultureInfo("da-DK")),
+            _ => selectedDate.Value.ToString("dd/MM/yyyy")
+        };
+    }
+
+    // Week calculation methods
+    private static int GetWeekNumber(DateTime date)
+    {
+        var culture = WeekCulture;
+        return culture.Calendar.GetWeekOfYear(date, culture.DateTimeFormat.CalendarWeekRule, culture.DateTimeFormat.FirstDayOfWeek);
+    }
+
+    private static DateTime GetWeekStartDate(DateTime date)
+    {
+        var first = WeekCulture.DateTimeFormat.FirstDayOfWeek; // Monday in da-DK
+        int diff = (7 + (date.DayOfWeek - first)) % 7;
+        return date.AddDays(-diff).Date;
+    }
+
+    private static DateTime GetWeekEndDate(DateTime date) => GetWeekStartDate(date).AddDays(6);
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check authentication
+        if (!await LoginService.IsAuthenticatedAsync())
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        // Force calendar to current month - be very explicit
+        var today = DateTime.Today;
+        var firstOfMonth = new DateTime(today.Year, today.Month, 1);
+
+        calendarDate = today;
+        currentCalendarMonth = firstOfMonth;
+        currentCalendarView = CalendarView.Month;
+
+        // Set current view range explicitly to current month
+        currentViewRange = new DateRange(
+            firstOfMonth,
+            firstOfMonth.AddMonths(1).AddDays(-1)
+        );
+
+      
+
+        // Load initial data
+        await LoadInitialData();
+
+        isInitialized = true;
+    }
+
+    
+
+    private async Task LoadInitialData()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            // Load data for the current month to get available class types and organizations
+            var initialResponse = await TrainingClassesService.GetMemberClassesListAsync(
+                startDate: new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1),
+                endDate: new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(1).AddDays(-1)
+            );
+
+            if (initialResponse != null)
+            {
+                // Populate available filter options from API response
+                availableClassTypes = initialResponse.AvailableClassTypes ?? new();
+                availableOrganizations = initialResponse.AllowedGuestOrganisations ?? new();
+
+                // Add current user organization if available
+                if (initialResponse.CurrentUserOrganisation != null)
+                {
+                    var currentUserOrg = new GuestTrainingClasses
+                    {
+                        OrganisationSubGUID = initialResponse.CurrentUserOrganisation.OrganisationSubGUID,
+                        OrganisationSubName = initialResponse.CurrentUserOrganisation.OrganisationSubName
+                    };
+
+                    if (!availableOrganizations.Any(o => o.OrganisationSubGUID == currentUserOrg.OrganisationSubGUID))
+                    {
+                        availableOrganizations.Insert(0, currentUserOrg);
+                    }
+                }
+
+
+            }
+
+            // Load events
+            await LoadEvents();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading initial data: {ex.Message}");
+            Snackbar.Add($"Fejl ved indlæsning: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadEvents()
+    {
+        try
+        {
+            DateTime startDate, endDate;
+
+            // Determine date range based on current view and selected date
+            if (currentCalendarView == CalendarView.Week && selectedDate.HasValue)
+            {
+                // Load the week containing the selected date
+                startDate = GetWeekStartDate(selectedDate.Value);
+                endDate = GetWeekEndDate(selectedDate.Value);
+                Console.WriteLine($"🔍 Loading events for selected week: {startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}");
+            }
+            else if (currentViewRange.Start.HasValue && currentViewRange.End.HasValue)
+            {
+                // Use current calendar view range
+                startDate = currentViewRange.Start.Value;
+                endDate = currentViewRange.End.Value;
+                Console.WriteLine($"🔍 Loading events for calendar view range: {startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}");
+            }
+            else
+            {
+                // Fallback to current month
+                startDate = new DateTime(currentCalendarMonth.Year, currentCalendarMonth.Month, 1);
+                endDate = startDate.AddMonths(1).AddDays(-1);
+                Console.WriteLine($"🔍 Loading events for fallback month: {startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}");
+            }
+
+            // Load all available classes
+            var availableTask = TrainingClassesService.GetMemberClassesListAsync(
+                startDate: startDate,
+                endDate: endDate
+            );
+
+            var bookedTask = TrainingClassesService.GetMyClassesListAsync(
+                startDate: startDate,
+                endDate: endDate
+            );
+
+            await Task.WhenAll(availableTask, bookedTask);
+
+            lastResponse = availableTask.Result;
+            bookedResponse = bookedTask.Result;
+
+
+            // Reset collections
+            _allTrainingClasses.Clear();
+            _filteredTrainingClasses.Clear();
+            _bookedClasses.Clear();
+            _bookedClassGuids.Clear();
+            _events.Clear();
+
+            // Process available classes
+            if (lastResponse?.AvailableClasses != null && lastResponse.AvailableClasses.Count > 0)
+            {
+                _allTrainingClasses = lastResponse.AvailableClasses;
+                Console.WriteLine($"✅ Loaded {_allTrainingClasses.Count} total classes");
+            }
+
+            // Process booked classes
+            if (bookedResponse?.Classes != null && bookedResponse.Classes.Count > 0)
+            {
+                _bookedClasses = bookedResponse.Classes;
+                _bookedClassGuids = _bookedClasses.Select(bc => bc.ClassGUID).ToHashSet();
+                Console.WriteLine($"✅ Loaded {_bookedClasses.Count} booked classes");
+            }
+
+            // Apply only tree view filters (no date filtering)
+            ApplyClientSideFilters();
+
+            // Convert filtered classes to calendar events
+            _events = ConvertToCalendarItems(_filteredTrainingClasses);
+
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading events: {ex.Message}");
+            Snackbar.Add($"Fejl ved indlæsning: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void ApplyClientSideFilters()
+    {
+        // Start with all classes - NO DATE FILTERING
+        _filteredTrainingClasses = _allTrainingClasses.ToList();
+
+        var selectedClassTypeGuids = SelectedClassTypeFilters.Select(f => f.Guid).ToHashSet();
+        var selectedOrganizationGuids = SelectedOrganizationFilters.Select(f => f.Guid).ToHashSet();
+
+
+
+        // Apply class type filters (multi-selection)
+        if (selectedClassTypeGuids.Any())
+        {
+            _filteredTrainingClasses = _filteredTrainingClasses
+                .Where(tc => selectedClassTypeGuids.Contains(tc.TrainingClassTypesGUID))
+                .ToList();
+
+        }
+
+        // Apply organization filters (multi-selection)
+        if (selectedOrganizationGuids.Any())
+        {
+            _filteredTrainingClasses = _filteredTrainingClasses
+                .Where(tc => selectedOrganizationGuids.Contains(tc.OrganisationSubGUID))
+                .ToList();
+
+        }
+
+    }
+
+    // Date picker changed - Navigate to selected date without changing view
+    private async Task OnDateChanged()
+    {
+        if (!selectedDate.HasValue) return;
+
+        isDatePickerNavigation = true;
+        datePickerNavigationTarget = selectedDate.Value;
+
+        if (currentCalendarView == CalendarView.Day)
+        {
+            // Navigate to the selected day
+            var day = selectedDate.Value.Date;
+
+            currentCalendarView = CalendarView.Day;
+            calendarDate = day;
+            currentViewRange = new DateRange(day, day);
+
+
+            await LoadEvents();
+        }
+        else if (currentCalendarView == CalendarView.Week)
+        {
+            // Navigate to the selected date's week
+            var weekStartDate = GetWeekStartDate(selectedDate.Value);
+
+            currentCalendarView = CalendarView.Week;
+            calendarDate = selectedDate.Value; // any date in that week
+            currentViewRange = new DateRange(weekStartDate, weekStartDate.AddDays(6));
+
+
+            await LoadEvents();
+        }
+        else // Month
+        {
+            var monthStartDate = new DateTime(selectedDate.Value.Year, selectedDate.Value.Month, 1);
+
+            currentCalendarView = CalendarView.Month;
+            calendarDate = selectedDate.Value; // drives visible month
+            currentCalendarMonth = monthStartDate;
+            currentViewRange = new DateRange(monthStartDate, monthStartDate.AddMonths(1).AddDays(-1));
+
+
+            await LoadEvents();
+        }
+
+        StateHasChanged();
+
+        isDatePickerNavigation = false;
+        datePickerNavigationTarget = null;
+    }
+
+    // Calendar cell clicked
+    private void OnCalendarCellClicked(DateTime clickedDate)
+    {
+        selectedDate = clickedDate;
+
+        StateHasChanged();
+    }
+
+    private async Task OnCalendarNavigationChanged(DateRange dateRange)
+    {
+
+        if (isDatePickerNavigation)
+        {
+            Console.WriteLine("🔄 Skipping navigation change handling - triggered by DatePicker");
+            return;
+        }
+
+        currentViewRange = dateRange;
+
+        if (!dateRange.Start.HasValue)
+            return;
+
+        var previousView = currentCalendarView;
+        var totalDays = dateRange.End.HasValue
+            ? (dateRange.End.Value.Date - dateRange.Start.Value.Date).Days + 1
+            : 0;
+
+        var newView = totalDays <= 1
+            ? CalendarView.Day
+            : totalDays <= 7
+                ? CalendarView.Week
+                : CalendarView.Month;
+
+        // If we just switched to Day, anchor to selected date, otherwise to TODAY
+        if (previousView != newView && newView == CalendarView.Day)
+        {
+            var anchor = selectedDate?.Date ?? DateTime.Today.Date;
+
+            isDatePickerNavigation = true;
+
+            currentCalendarView = CalendarView.Day;
+            // Only keep selectedDate if it was set already (avoid creating a chip/highlight unintentionally)
+            if (selectedDate.HasValue)
+                selectedDate = anchor;
+
+            calendarDate = anchor;
+            currentViewRange = new DateRange(anchor, anchor);
+
+            await LoadEvents();
+
+            isDatePickerNavigation = false;
+            StateHasChanged();
+            return;
+        }
+
+        // If we just switched to Week, anchor to selected date, otherwise to TODAY
+        if (previousView != newView && newView == CalendarView.Week)
+        {
+            var anchor = selectedDate?.Date ?? DateTime.Today.Date;
+            var weekStart = GetWeekStartDate(anchor);
+
+
+            isDatePickerNavigation = true;
+
+            currentCalendarView = CalendarView.Week;
+            if (selectedDate.HasValue)
+                selectedDate = anchor;
+
+            calendarDate = anchor;
+            currentViewRange = new DateRange(weekStart, weekStart.AddDays(6));
+
+            await LoadEvents();
+
+            isDatePickerNavigation = false;
+            StateHasChanged();
+            return;
+        }
+
+        // Normal path (Month or staying in the same view)
+        currentCalendarView = newView;
+        calendarDate = dateRange.Start.Value;
+
+        if (newView == CalendarView.Month)
+        {
+            var viewingMonth = new DateTime(dateRange.Start.Value.Year, dateRange.Start.Value.Month, 1);
+            if (viewingMonth != currentCalendarMonth)
+            {
+                currentCalendarMonth = viewingMonth;
+                Console.WriteLine($"📅 Month changed to: {currentCalendarMonth:yyyy-MM}");
+            }
+        }
+
+        
+        await LoadEvents();
+    }
+
+    // Tree view filter changes
+    private void OnSelectedFiltersChanged(IReadOnlyCollection<FilterItem> newSelectedFilters)
+    {
+
+        selectedFilters = newSelectedFilters ?? new HashSet<FilterItem>();
+
+        
+
+        // Apply tree view filters immediately
+        ApplyClientSideFilters();
+
+        // Update calendar events
+        _events = ConvertToCalendarItems(_filteredTrainingClasses);
+
+        StateHasChanged();
+    }
+
+    private void RemoveFilter(FilterItem filterToRemove)
+    {
+        var modifiableFilters = selectedFilters?.ToHashSet() ?? new HashSet<FilterItem>();
+        modifiableFilters.Remove(filterToRemove);
+        selectedFilters = modifiableFilters;
+
+        ApplyClientSideFilters();
+        _events = ConvertToCalendarItems(_filteredTrainingClasses);
+        StateHasChanged();
+    }
+
+    // Clear date highlighting
+    private void ClearDateHighlight()
+    {
+        selectedDate = null;
+
+        StateHasChanged();
+    }
+
+    private void ClearAllFilters()
+    {
+        selectedDate = null;
+        selectedFilters = new HashSet<FilterItem>();
+
+        // Reapply filters (which will show all classes)
+        ApplyClientSideFilters();
+        _events = ConvertToCalendarItems(_filteredTrainingClasses);
+
+        StateHasChanged();
+    }
+
+    private List<CalendarItem> ConvertToCalendarItems(List<TrainingClassEntity> trainingClasses)
+    {
+        var items = new List<CalendarItem>();
+
+        foreach (var trainingClass in trainingClasses)
+        {
+            try
+            {
+                var item = new CalendarItem
+                {
+                    Text = trainingClass.TrainingClassClassesName,
+                    Start = trainingClass.TrainingClassClassesStartDateTime,
+                    End = trainingClass.TrainingClassClassesEndDateTime,
+                };
+
+                items.Add(item);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error converting training class {trainingClass.TrainingClassClassesName}: {ex.Message}");
+            }
+        }
+
+        return items;
+    }
+
+    private bool IsClassBooked(string classGuid)
+    {
+        return _bookedClassGuids.Contains(classGuid);
+    }
+
+    private TrainingClassEntity? GetTrainingClassFromCalendarItem(CalendarItem item)
+    {
+        return _filteredTrainingClasses.FirstOrDefault(tc =>
+            tc.TrainingClassClassesStartDateTime == item.Start &&
+            tc.TrainingClassClassesName == item.Text);
+    }
+
+    private Color GetEventColor(CalendarItem item)
+    {
+        var trainingClass = GetTrainingClassFromCalendarItem(item);
+        if (trainingClass == null) return Color.Default;
+
+        var classGuid = trainingClass.TrainingClassClassesGUID;
+
+        // If user is enrolled, show as primary color
+        if (IsClassBooked(classGuid))
+            return Color.Primary;
+
+        // Otherwise, color based on availability
+        if (trainingClass.TrainingClassClassesAvailableSlots == 0)
+            return Color.Error; // Red - Full
+        else if (trainingClass.TrainingClassClassesAvailableSlots <= 2)
+            return Color.Warning; // Orange - Almost full
+        else
+            return Color.Success; // Green - Available
+    }
+
+    private string GetEventIcon(CalendarItem item)
+    {
+        var trainingClass = GetTrainingClassFromCalendarItem(item);
+        if (trainingClass == null) return Icons.Material.Filled.Circle;
+
+        var classGuid = trainingClass.TrainingClassClassesGUID;
+
+        // Different icon if user is enrolled
+        if (IsClassBooked(classGuid))
+            return Icons.Material.Filled.CheckCircle;
+
+        return Icons.Material.Filled.Circle;
+    }
+
+    private async Task OnCalendarItemClicked(CalendarItem calendarItem)
+    {
+        var trainingClass = GetTrainingClassFromCalendarItem(calendarItem);
+
+        if (trainingClass != null)
+        {
+
+            var isBooked = IsClassBooked(trainingClass.TrainingClassClassesGUID);
+
+            var parameters = new DialogParameters
+            {
+                ["TrainingClass"] = trainingClass,
+                ["OnResult"] = EventCallback.Factory.Create<string>(this, HandleDialogResult),
+                ["IsBooked"] = isBooked
+            };
+
+            var options = new DialogOptions()
+            {
+                MaxWidth = MaxWidth.Small,
+                FullWidth = true,
+                CloseButton = true,
+                Position = DialogPosition.Center
+            };
+
+            await DialogService.ShowAsync<TrainingClassDetailsDialog>(
+                string.Empty,
+                parameters,
+                options);
+        }
+        else
+        {
+            Snackbar.Add("Kunne ikke finde holddetaljer", Severity.Warning);
+        }
+    }
+
+    private async Task HandleDialogResult(string result)
+    {
+        if (result == "book")
+        {
+            await LoadEvents();
+            Snackbar.Add("Tilmelding gennemført!", Severity.Success);
+        }
+        else if (result == "cancel")
+        {
+            await LoadEvents();
+            Snackbar.Add("Afmelding gennemført!", Severity.Success);
+        }
+    }
+}

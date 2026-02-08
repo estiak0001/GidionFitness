@@ -1,0 +1,144 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Contracts
+@inject IStaffManagementService StaffManagementService
+@inject IJSRuntime JS
+
+<h3>MemberUpdateContractTab</h3>
+
+<MudGrid>
+    <MudItem xs="12">
+        <MudCard>
+            <MudCardContent>
+                <MudTable @ref="table"
+                          T="ContractsPdf"
+                          ServerData="ServerData"
+                          Loading="@isLoading"
+                          Dense="true"
+                          Hover="true"
+                          Bordered="true"
+                          TotalItems="contracts.Pagination.TotalRecords"
+                          CurrentPage="contracts.Pagination.CurrentPage">
+                    <HeaderContent>
+                        <MudTh>Date Signed</MudTh>
+                        <MudTh>Contract PDF</MudTh>
+                        <MudTh>Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Date Signed">
+                            @if (context.MemberContractDataSignageDate != null)
+                            {
+                                @context.MemberContractDataSignageDate.ToString("yyyy-MM-dd")
+                            }
+                            else
+                            {
+                                <span class="text-muted">Not signed</span>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Contract PDF">
+                            <MudChip T="string" Color="Color.Primary" Size="Size.Small">
+                                @context.MemberContractPDFFile
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Actions">
+                            @if (!string.IsNullOrEmpty(context.PdfDownloadUrl))
+                            {
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           OnClick="@(() => DownloadFile(context.PdfDownloadUrl))">
+                                    <MudIcon Icon="@Icons.Material.Filled.Download" />
+                                    Download
+                                </MudButton>
+                            }
+                            else
+                            {
+                                <span class="text-muted">No download link</span>
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+                    </PagerContent>
+                    <NoRecordsContent>
+                        <MudAlert Severity="Severity.Info" Class="mx-4 my-4">
+                            No signed contracts found for this member.
+                        </MudAlert>
+                    </NoRecordsContent>
+                </MudTable>
+
+                @if (error != null)
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-4">
+                        @error
+                    </MudAlert>
+                }
+
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter] public string MemberGuid { get; set; } = string.Empty;
+
+    private MudTable<ContractsPdf> table = default!;
+    private StaffShowSignedMemberContractResponseDTO contracts = new();
+    private bool isLoading = false;
+    private string error = null!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Reload when MemberGuid changes
+        if (!string.IsNullOrEmpty(MemberGuid))
+        {
+            error = null!;
+            await table.ReloadServerData();
+        }
+        else
+        {
+            error = "Member GUID is required";
+            contracts = new();
+        }
+    }
+
+    private async Task<TableData<ContractsPdf>> ServerData(TableState state, CancellationToken cancellationToken)
+    {
+
+        try
+        {
+            // Assuming your service has a method like this:
+            // GetSignedContractsAsync(string memberGuid, int page, int pageSize)
+            var response = await StaffManagementService.StaffGetSignedMemberContracts(
+                MemberGuid,
+                state.Page + 1,      // MudTable uses 0-based paging
+                state.PageSize);
+
+            contracts = response ?? new();
+
+            error = null!;
+
+            return new TableData<ContractsPdf>
+            {
+                Items = contracts.SignedContracts ?? Enumerable.Empty<ContractsPdf>(),
+                TotalItems = contracts.Pagination?.TotalRecords ?? 0
+            };
+        }
+        catch (Exception ex)
+        {
+            error = $"Error loading contracts: {ex.Message}";
+            return new TableData<ContractsPdf>
+            {
+                Items = Enumerable.Empty<ContractsPdf>(),
+                TotalItems = 0
+            };
+        }
+
+    }
+
+    private async void DownloadFile(string url)
+    {
+        if (!string.IsNullOrEmpty(url))
+        {
+            await JS.InvokeVoidAsync("window.open", url, "_blank");
+        }
+    }
+}

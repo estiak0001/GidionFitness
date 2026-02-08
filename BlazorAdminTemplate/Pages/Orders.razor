@@ -1,0 +1,134 @@
+@page "/orders"
+
+<PageTitle>Orders</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Order Management</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">Recent Orders</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.Add">
+                New Order
+            </MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@orders" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@loading" LoadingProgressColor="Color.Info">
+            <HeaderContent>
+                <MudTh>Order ID</MudTh>
+                <MudTh>Customer</MudTh>
+                <MudTh>Date</MudTh>
+                <MudTh>Total</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Order ID">#@context.Id</MudTd>
+                <MudTd DataLabel="Customer">@context.CustomerName</MudTd>
+                <MudTd DataLabel="Date">@context.OrderDate.ToString("MMM dd, yyyy")</MudTd>
+                <MudTd DataLabel="Total">@context.Total.ToString("C")</MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small">@context.Status</MudChip>
+                </MudTd>
+                <MudTd DataLabel="Actions">
+                    <MudIconButton Icon="Icons.Material.Filled.Visibility" Color="Color.Primary" Size="Size.Small" />
+                    <MudIconButton Icon="Icons.Material.Filled.Edit" Color="Color.Info" Size="Size.Small" />
+                    <MudIconButton Icon="Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+<MudGrid Class="mt-4">
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2" Class="pa-4">
+            <MudCardContent>
+                <div class="d-flex align-center">
+                    <MudIcon Icon="Icons.Material.Filled.ShoppingCart" Color="Color.Primary" Size="Size.Large" Class="mr-3" />
+                    <div>
+                        <MudText Typo="Typo.h6">Total Orders</MudText>
+                        <MudText Typo="Typo.h4" Color="Color.Primary">@orders.Count</MudText>
+                    </div>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2" Class="pa-4">
+            <MudCardContent>
+                <div class="d-flex align-center">
+                    <MudIcon Icon="Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" Class="mr-3" />
+                    <div>
+                        <MudText Typo="Typo.h6">Completed</MudText>
+                        <MudText Typo="Typo.h4" Color="Color.Success">@orders.Count(o => o.Status == "Completed")</MudText>
+                    </div>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2" Class="pa-4">
+            <MudCardContent>
+                <div class="d-flex align-center">
+                    <MudIcon Icon="Icons.Material.Filled.Schedule" Color="Color.Warning" Size="Size.Large" Class="mr-3" />
+                    <div>
+                        <MudText Typo="Typo.h6">Pending</MudText>
+                        <MudText Typo="Typo.h4" Color="Color.Warning">@orders.Count(o => o.Status == "Pending")</MudText>
+                    </div>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private bool loading = true;
+    private List<Order> orders = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrders();
+    }
+
+    private async Task LoadOrders()
+    {
+        loading = true;
+        await Task.Delay(1000); // Simulate API call
+        
+        orders = new List<Order>
+        {
+            new Order { Id = 1001, CustomerName = "John Doe", OrderDate = DateTime.Now.AddDays(-1), Total = 299.99m, Status = "Completed" },
+            new Order { Id = 1002, CustomerName = "Jane Smith", OrderDate = DateTime.Now.AddDays(-2), Total = 149.50m, Status = "Pending" },
+            new Order { Id = 1003, CustomerName = "Bob Johnson", OrderDate = DateTime.Now.AddDays(-3), Total = 89.99m, Status = "Shipped" },
+            new Order { Id = 1004, CustomerName = "Alice Brown", OrderDate = DateTime.Now.AddDays(-4), Total = 199.99m, Status = "Processing" },
+            new Order { Id = 1005, CustomerName = "Charlie Wilson", OrderDate = DateTime.Now.AddDays(-5), Total = 349.99m, Status = "Completed" },
+        };
+        
+        loading = false;
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Completed" => Color.Success,
+        "Pending" => Color.Warning,
+        "Shipped" => Color.Info,
+        "Processing" => Color.Primary,
+        "Cancelled" => Color.Error,
+        _ => Color.Default
+    };
+
+    public class Order
+    {
+        public int Id { get; set; }
+        public string CustomerName { get; set; } = string.Empty;
+        public DateTime OrderDate { get; set; }
+        public decimal Total { get; set; }
+        public string Status { get; set; } = string.Empty;
+    }
+}

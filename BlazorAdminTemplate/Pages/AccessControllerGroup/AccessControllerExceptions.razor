@@ -1,0 +1,269 @@
+﻿@page "/access-controller-groups/exceptions/{AccessGroupId}"
+@using BlazorAdminTemplate.Application.DTOs.Access
+@using BlazorAdminTemplate.Components.AccessControllerGroup
+@inject IStaffManagementService StaffService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-6">
+    <MudText Typo="Typo.h5" GutterBottom="true">
+        Schedule Exceptions
+    </MudText>
+    <MudText Typo="Typo.subtitle1" Color="Color.Secondary" Class="mb-6">
+        Access Group: @AccessGroupName
+    </MudText>
+
+    <MudCard Elevation="2">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Exceptions</MudText>
+            </CardHeaderContent>
+            <CardHeaderActions>
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary" 
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="OpenCreateDialog">
+                    New Exception
+                </MudButton>
+            </CardHeaderActions>
+        </MudCardHeader>
+
+        <MudCardContent>
+            @if (loading)
+            {
+                <div class="text-center py-8">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                </div>
+            }
+            else if (exceptions == null || exceptions.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Class="mt-4" Elevation="1">
+                    No schedule exceptions defined for this access group yet.
+                </MudAlert>
+            }
+            else
+            {
+                <MudTable Items="@exceptions" 
+                          Hover="true" 
+                          Breakpoint="Breakpoint.Sm" 
+                          Dense="true"
+                          Elevation="1">
+                    <HeaderContent>
+                        <MudTh>Name</MudTh>
+                        <MudTh>Period</MudTh>
+                        <MudTh>Status</MudTh>
+                        <MudTh>Enabled</MudTh>
+                        <MudTh>Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Name">
+                            <div class="font-medium">@context.AccessControllerScheduleExceptionName</div>
+                            @if (!string.IsNullOrWhiteSpace(context.AccessControllerScheduleExceptionDescription))
+                            {
+                                <div class="text-caption text-muted">@context.AccessControllerScheduleExceptionDescription</div>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Period">
+                            @context.AccessControllerScheduleExceptionFromDateTime.ToString("dd MMM yyyy HH:mm")
+                            <br/>
+                            <span class="text-caption">→</span>
+                            @context.AccessControllerScheduleExceptionToDateTime.ToString("dd MMM yyyy HH:mm")
+                        </MudTd>
+                        <MudTd DataLabel="Status">
+                            <MudChip T="string" Color="@GetStatusColor(context.AccessControllerScheduleExceptionAccessStatus)"
+                                     Size="Size.Small">
+                                @GetStatusText(context.AccessControllerScheduleExceptionAccessStatus)
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Enabled">
+                            <MudSwitch @bind-Value="@context.AccessControllerScheduleExceptionEnabled" 
+                                       Disabled="true"
+                                       Color="Color.Success"
+                                       Size="Size.Small" />
+                        </MudTd>
+                        <MudTd DataLabel="Actions">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                           Color="Color.Primary" 
+                                           Size="Size.Small"
+                                           OnClick="() => OpenEditDialog(context)" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                           Color="Color.Error" 
+                                           Size="Size.Small"
+                                           OnClick="() => OpenDeleteDialog(context)" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+
+
+@code {
+    [Parameter] public string AccessGroupId { get; set; } = default!;
+
+    private bool loading = false;
+    private string AccessGroupName { get; set; } = string.Empty;
+    private List<ScheduleExceptions> exceptions = new();
+
+    // Dialog management
+    private bool dialogVisible = false;
+    private bool isEditMode = false;
+    private MudForm? form;
+
+    // Current form data (unified view model for simplicity)
+
+    private DateTime? fromDate;
+    private TimeSpan? fromTime;
+    private DateTime? toDate;
+    private TimeSpan? toTime;
+
+    // Delete
+    private bool deleteDialogVisible = false;
+    private ScheduleExceptions? deleteTarget;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await StaffService.StaffGetScheduleExceptionsAsync(AccessGroupId.ToString());
+            exceptions = result?.ScheduleExceptions ?? new();
+            AccessGroupName = result?.AccessGroupName ?? AccessGroupId;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load exceptions: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            ["AccessGroupId"] = AccessGroupId,
+            ["ExceptionId"] = (string?)null,           // null = create mode
+            ["OnSuccess"] = EventCallback.Factory.Create(this, async () => await LoadDataAsync())
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true,
+            CloseOnEscapeKey = true
+        };
+
+        var dialog = await DialogService.ShowAsync<ScheduleExceptionEditDialog>("Create New Schedule Exception", parameters, options);
+
+        // Optional: you can wait for result if you want
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            // already refreshed via OnSuccess callback
+        }
+    }
+
+    private async Task OpenEditDialog(ScheduleExceptions item)
+    {
+        var parameters = new DialogParameters
+        {
+            ["AccessGroupId"] = AccessGroupId,
+            ["ExceptionId"] = item.AccessControllerScheduleExceptionGUID,
+            ["OnSuccess"] = EventCallback.Factory.Create(this, async () => await LoadDataAsync())
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true,
+            CloseOnEscapeKey = true
+        };
+
+        var dialog = await DialogService.ShowAsync<ScheduleExceptionEditDialog>(
+            $"Edit: {item.AccessControllerScheduleExceptionName}",
+            parameters,
+            options);
+
+        // Optional
+        var result = await dialog.Result;
+    }
+
+    private void CloseDialog()
+    {
+        dialogVisible = false;
+    }
+
+   
+
+    private void OpenDeleteDialog(ScheduleExceptions item)
+    {
+        deleteTarget = item;
+        deleteDialogVisible = true;
+    }
+
+    private void CloseDeleteDialog()
+    {
+        deleteDialogVisible = false;
+        deleteTarget = null;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (deleteTarget == null) return;
+
+        try
+        {
+            var response = await StaffService.StaffDeleteScheduleExceptionAsync(
+                deleteTarget.AccessControllerScheduleExceptionGUID);
+
+            if (response?.Success == true)
+            {
+                Snackbar.Add("Exception deleted", Severity.Success);
+                await LoadDataAsync();
+            }
+            else
+            {
+                Snackbar.Add(response?.Message ?? "Delete failed", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Delete error: {ex.Message}", Severity.Error);
+        }
+
+        CloseDeleteDialog();
+    }
+
+    // Helpers
+    private static string GetStatusText(int status) => status switch
+    {
+        0 => "Allow",
+        1 => "Deny",
+        _ => $"Status {status}"
+    };
+
+    private static Color GetStatusColor(int status) => status switch
+    {
+        0 => Color.Success,
+        1 => Color.Error,
+        _ => Color.Default
+    };
+
+
+}

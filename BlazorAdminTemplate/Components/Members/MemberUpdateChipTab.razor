@@ -1,0 +1,182 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Chips
+@using BlazorAdminTemplate.Application.Interfaces
+@inject IStaffManagementService StaffService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudPaper Class="pa-6" Elevation="2">
+    <MudStack Spacing="6">
+        <div class="d-flex align-center justify-space-between">
+            <MudText Typo="Typo.h5">
+                <MudIcon Icon="@Icons.Material.Filled.Contactless" Class="mr-2" />
+                Access Chips (RFID / NFC)
+            </MudText>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.AddCard"
+                       OnClick="OpenAssignDialog">
+                Assign New Chip
+            </MudButton>
+        </div>
+
+        <div>
+            <MudText Typo="Typo.subtitle1" Class="mb-3" Color="Color.Secondary">
+                Assignment History (@totalHistoryCount records)
+            </MudText>
+
+            <MudTable ServerData="LoadChipHistory"
+                      Dense="true"
+                      Hover="true"
+                      Striped="true"
+                      Bordered="true"
+                      Elevation="2"
+                      CurrentPage="currentPage"
+                      TotalItems="totalRecords"
+                      @ref="historyTable">
+                <HeaderContent>
+                    <MudTh>Date Assigned</MudTh>
+                    <MudTh>Chip UID</MudTh>
+                    <MudTh>Type</MudTh>
+                    <MudTh>Comment</MudTh>
+                    <MudTh Style="width:140px">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.MemberChipCreated.ToString("dd MMM yyyy HH:mm")</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary">
+                            @context.MemberChipData.ToUpperInvariant()
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                            @context.MemberChipTypeName
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>
+                        @(string.IsNullOrWhiteSpace(context.MemberChipComment) ? "-" : context.MemberChipComment)
+                    </MudTd>
+                    <MudTd>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                                   OnClick="@(() => OpenEditDialog(context))">
+                            Edit
+                        </MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error"
+                                   OnClick="@(() => DeleteChip(context.MemberChipGUID))">
+                            Delete
+                        </MudButton>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="my-6">
+                        <MudText>No chips assigned yet.</MudText>
+                        <MudText Typo="Typo.body2" Class="mt-2">
+                            Click <strong>Assign New Chip</strong> to add one.
+                        </MudText>
+                    </MudAlert>
+                </NoRecordsContent>
+            </MudTable>
+        </div>
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter] public string MemberGuid { get; set; } = string.Empty;
+
+    private int totalRecords = 0;
+    private int currentPage = 0;
+
+    private int totalHistoryCount = 0;
+    private MudTable<MemberChip> historyTable = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadHistoryCountAsync();
+    }
+
+    private async Task LoadHistoryCountAsync()
+    {
+        var req = new StaffGetMemberChipDTO { MemberGuid = MemberGuid, Page = 1, PageSize = 1 };
+        var res = await StaffService.StaffGetMemberChipsAsync(req);
+        totalHistoryCount = res?.Pagination?.TotalRecords ?? 0;
+    }
+
+    private async Task<TableData<MemberChip>> LoadChipHistory(TableState state, CancellationToken cancellationToken)
+    {
+        var req = new StaffGetMemberChipDTO
+        {
+            MemberGuid = MemberGuid,
+            Page = state.Page + 1,
+            PageSize = state.PageSize
+        };
+
+        var res = await StaffService.StaffGetMemberChipsAsync(req);
+        if (res != null)
+        {
+            totalHistoryCount = res.Pagination.TotalRecords;
+            totalRecords = res.Pagination.TotalRecords;
+            currentPage = res.Pagination.CurrentPage;
+            return new TableData<MemberChip>
+            {
+                Items = res.MemberChips,
+                TotalItems = res.Pagination.TotalRecords
+            };
+        }
+
+        return new TableData<MemberChip> { Items = new List<MemberChip>(), TotalItems = 0 };
+    }
+
+    private async Task OpenAssignDialog()
+    {
+        var parameters = new DialogParameters { ["MemberGuid"] = MemberGuid };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+
+        var dialog = await DialogService.ShowAsync<MemberChipEditDialog>("Assign New Chip", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await historyTable.ReloadServerData();
+            await LoadHistoryCountAsync(); // Update count after adding new chip
+        }
+    }
+
+    private async Task OpenEditDialog(MemberChip chip)
+    {
+        var parameters = new DialogParameters
+        {
+            ["MemberGuid"] = MemberGuid,
+            ["ExistingChip"] = chip
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+
+        var dialog = await DialogService.ShowAsync<MemberChipEditDialog>("Edit Chip", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await historyTable.ReloadServerData();
+            await LoadHistoryCountAsync(); // Update count after editing chip
+        }
+    }
+
+    private async Task DeleteChip(string memberChipGuid)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Delete Chip?",
+            "This action cannot be undone.",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            var result = await StaffService.StaffDeleteMemberChipAsync(memberChipGuid);
+            Snackbar.Add(
+                result.Message.Contains("successfully", StringComparison.OrdinalIgnoreCase)
+                    ? "Chip deleted successfully"
+                    : result.Message ?? "Failed to delete chip",
+                result.Message.Contains("successfully") ? Severity.Success : Severity.Error);
+
+            await historyTable.ReloadServerData();
+            await LoadHistoryCountAsync(); // Update count after deleting chip
+        }
+    }
+}

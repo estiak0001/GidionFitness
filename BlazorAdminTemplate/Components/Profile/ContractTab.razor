@@ -1,0 +1,168 @@
+﻿@inject IMemberContractService MemberContractService
+@using BlazorAdminTemplate.Application.DTOs.ContractsDTOs
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Components.PaginationComponents
+@using BlazorAdminTemplate.Domain.Enums
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+
+@if(currentView == ViewType.Cards)
+{
+    <!-- Mobile Layout - Centered Cards -->
+    <div class="text-center">
+        <MudText Typo="Typo.h5" GutterBottom="true" Class="mb-4" Align="Align.Center">Kontraker</MudText>
+
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center">
+                <MudProgressCircular Indeterminate="true" />
+            </div>
+        }
+        else if (memberContract != null && memberContract.MemberContracts.Count > 0)
+        {
+            <!-- Centered Cards Stack -->
+            <MudStack Spacing="3" AlignItems="AlignItems.Center">
+                @foreach (var log in memberContract.MemberContracts)
+                {
+                    <MudCard Elevation="2" Style="width: 100%; max-width: 400px;">
+                        <MudCardContent Class="text-center">
+                            <MudStack Spacing="2" AlignItems="AlignItems.Center">
+                                <MudText Typo="Typo.h6">
+                                    @{
+                                        var formattedDate = DateTime.TryParse(log.MemberContractDataSignageDate, out var dt)
+                                        ? dt.ToString("dd-MM-yyyy HH:mm")
+                                        : log.MemberContractDataSignageDate;
+                                    }
+                                @formattedDate
+                            </MudText>
+
+                                <MudTooltip Text="Download">
+
+                                    <MudButton href="@log.PdfDownloadUrl" Target="_blank"
+                                               EndIcon="@Icons.Material.Filled.Download" Color="Color.Success"
+                                               Variant="Variant.Outlined">
+                                        Download
+                                    </MudButton>
+                                </MudTooltip>
+
+                                
+                            </MudStack>
+                        </MudCardContent>
+                    </MudCard>
+                }
+            </MudStack>
+
+            <!-- Centered Mobile Pagination -->
+            <div class="d-flex justify-center mt-4">
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                                   Variant="Variant.Outlined"
+                                   Size="Size.Small"
+                                   Disabled="@(memberContract.Pagination.HasPreviousPage == false)"
+                                   OnClick="@(() => ChangePage(memberContract.Pagination.CurrentPage - 1))" />
+
+                    <MudText Typo="Typo.body2">
+                        Side @memberContract.Pagination.CurrentPage af @memberContract.Pagination.TotalPages
+                    </MudText>
+
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowForward"
+                                   Variant="Variant.Outlined"
+                                   Size="Size.Small"
+                                   Disabled="@(memberContract.Pagination.HasNextPage == false)"
+                                   OnClick="@(() => ChangePage(memberContract.Pagination.CurrentPage + 1))" />
+                </MudStack>
+            </div>
+        }
+        else if (memberContract != null && memberContract.MemberContracts.Count == 0)
+        {
+            <MudText Typo="Typo.body2">Ingen træningshistorik fundet.</MudText>
+        }
+
+
+    </div>
+}
+else
+{
+    <!-- Desktop Layout - Table View -->
+    <MudText Typo="Typo.h5" GutterBottom="true" Class="mb-4">Kontraker</MudText>
+
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (memberContract != null && memberContract.MemberContracts.Count > 0)
+    {
+        <PaginatedList TItem="MemberContractDTO"
+                       Items="memberContract.MemberContracts"
+                       Pagination="memberContract.Pagination"
+                        OnPageChanged="LoadMemberContract">
+            <HeaderTemplate>
+                <MudTh>Dato & Tid</MudTh>
+                <MudTh>Kontrakten</MudTh>
+            </HeaderTemplate>
+
+            <RowTemplate>
+                <MudTd>
+                    @{
+                        var formattedDate = DateTime.TryParse(context.MemberContractDataSignageDate, out var dt)
+                        ? dt.ToString("dd-MM-yyyy HH:mm")
+                        : context.MemberContractDataSignageDate;
+                    }
+                    @formattedDate
+                </MudTd>
+                <MudTd>
+                    <MudTooltip Text="Download">
+
+                        <MudButton href="@context.PdfDownloadUrl" Target="_blank"
+                            EndIcon="@Icons.Material.Filled.Download" Color="Color.Success"
+                            Variant="Variant.Outlined">
+                            Download
+                        </MudButton>
+                    </MudTooltip>
+                </MudTd>
+
+            </RowTemplate>
+            
+        </PaginatedList>
+    }
+    else if (memberContract != null && memberContract.MemberContracts.Count == 0)
+    {
+        <MudText Typo="Typo.body2">Ingen Kontraker fundet.</MudText>
+    }
+
+}
+
+
+
+@code {
+    private MemberContractListResponseDTO memberContract;
+    private bool isLoading = true;
+    private int currentPage = 1;
+    private ViewType currentView = ViewType.Table;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMemberContract(currentPage);
+    }
+
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        currentView = breakpoint <= Breakpoint.Sm ? ViewType.Cards : ViewType.Table;
+        StateHasChanged();
+    }
+
+    private async Task LoadMemberContract(int page)
+    {
+        isLoading = true;
+        memberContract = await MemberContractService.GetMemberContractAsync(page);
+        currentPage = page;
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task ChangePage(int page)
+    {
+        await LoadMemberContract(page);
+    }
+}

@@ -1,0 +1,231 @@
+﻿@page "/access-controller-groups/schedule/{AccessGroupGuid}"
+@using BlazorAdminTemplate.Application.DTOs.Access
+@using BlazorAdminTemplate.Domain.Enums
+@using BlazorAdminTemplate.Pages.AccessControllerGroup
+@inject IStaffManagementService StaffService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-8 pa-4">
+    <MudText Typo="Typo.h4" GutterBottom="true">
+        Schedule Configuration - @AccessGroupName
+    </MudText>
+
+    @if (loading)
+    {
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Class="my-4">@errorMessage</MudAlert>
+    }
+    else
+    {
+        <MudPaper Elevation="2" Class="mt-4">
+            <MudTable Items="@DayConfigs"
+                      Hover="true"
+                      Striped="true"
+                      Dense="false"
+                      FixedHeader="true">
+                <HeaderContent>
+                    <MudTh Style="width: 300px;">Day</MudTh>
+                    <MudTh Style="width: 250px;">Status</MudTh>
+                    @* <MudTh Style="width: 150px;">Time Slots</MudTh> *@
+                    <MudTh Style="width: 250px;">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Day">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudAvatar Color="@(context.IsEnabled ? Color.Primary : Color.Default)" Size="Size.Small">
+                                @context.DayName[0]
+                            </MudAvatar>
+                            <MudText Typo="Typo.body1"><strong>@context.DayName</strong></MudText>
+                        </MudStack>
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudSwitch T="bool" 
+                                   Value="@context.IsEnabled"
+                                   ValueChanged="@(async (bool val) => await ToggleDay(context, val))"
+                                   Color="Color.Primary"
+                                   Label="@(context.IsEnabled ? "Enabled" : "Disabled")" />
+                    </MudTd>
+                    @* <MudTd DataLabel="Time Slots">
+                        <MudChip T="string" Size="Size.Small" 
+                                 Color="@(context.TimeSlots.Count > 0 ? Color.Info : Color.Default)"
+                                 Variant="Variant.Filled">
+                            @context.TimeSlots.Count slot@(context.TimeSlots.Count == 1 ? "" : "s")
+                        </MudChip>
+                    </MudTd> *@
+                    <MudTd DataLabel="Actions">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Schedule"
+                                   Disabled="!context.IsEnabled"
+                                   OnClick="@(() => OpenTimeSlotsDialog(context))">
+                            Manage Time Slots
+                        </MudButton>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+    }
+</MudContainer>
+
+    @code {
+    [Parameter] public string AccessGroupGuid { get; set; } = default!;
+
+    private string? AccessGroupName { get; set; }
+    private bool loading = true;
+    private string? errorMessage;
+
+    private List<DayScheduleViewModel> DayConfigs { get; set; } = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadDayConfigs();
+    }
+
+    private async Task LoadDayConfigs()
+    {
+        loading = true;
+        errorMessage = null;
+
+        try
+        {
+            var response = await StaffService.StaffGetScheduleDayConfigsAsync(AccessGroupGuid.ToString());
+
+            if (response is null || response.ScheduleDayConfigs == null || !response.ScheduleDayConfigs.Any())
+            {
+                errorMessage = response?.Message ?? "Failed to load day configurations";
+                return;
+            }
+
+            DayConfigs = response.ScheduleDayConfigs
+                .Select(d => new DayScheduleViewModel
+                {
+                    Id = d.AccessControllerScheduleDayConfigGUID,
+                    DayNumber = d.AccessControllerScheduleDayConfigDayOfWeek,
+                    IsEnabled = d.AccessControllerScheduleDayConfigEnabled
+                })
+                .OrderBy(d => d.DayNumber)
+                .ToList();
+
+            AccessGroupName = response.AccessControllerAccessGroupsName ?? "Access Group";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading schedule: {ex.Message}";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task LoadTimeSlotsForDay(DayScheduleViewModel day)
+    {
+        if (string.IsNullOrEmpty(day.Id)) return;
+
+        try
+        {
+            var slotsResponse = await StaffService.StaffGetScheduleTimeSlotsAsync(day.Id);
+
+            if (slotsResponse?.ScheduleTimeSlots != null && slotsResponse.ScheduleTimeSlots.Any())
+            {
+                day.TimeSlots = slotsResponse.ScheduleTimeSlots
+                    .Select(t => new TimeSlotViewModel
+                    {
+                        Id = t.AccessControllerScheduleTimeSlotGUID,
+                        DayConfigId = t.AccessControllerScheduleDayConfigGUID,
+                        Start = t.AccessControllerScheduleTimeSlotOpenTime,
+                        End = t.AccessControllerScheduleTimeSlotCloseTime,
+                        IsNew = false
+                    })
+                    .OrderBy(t => t.Start)
+                    .ToList();
+            }
+            else
+            {
+                day.TimeSlots = new List<TimeSlotViewModel>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load time slots: {ex.Message}", Severity.Error);
+            day.TimeSlots = new List<TimeSlotViewModel>();
+        }
+    }
+
+    private async Task ToggleDay(DayScheduleViewModel day, bool newValue)
+    {
+        var original = day.IsEnabled;
+
+        try
+        {
+            // Optimistically update the UI
+            day.IsEnabled = newValue;
+            StateHasChanged();
+
+            var result = await StaffService.StaffToggleScheduleDayConfigAsync(
+                new StaffScheduleDayConfigToggleDTO
+                {
+                    AccessControllerScheduleDayConfigGUID = day.Id,
+                    AccessControllerScheduleDayConfigEnabled = newValue
+                });
+
+            if (result?.Success != true)
+            {
+                // Revert on failure
+                day.IsEnabled = original;
+                Snackbar.Add(result?.Message ?? "Failed to toggle day status", Severity.Error);
+                StateHasChanged();
+            }
+            else
+            {
+                Snackbar.Add($"{day.DayName} is now {(day.IsEnabled ? "enabled" : "disabled")}", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Revert on error
+            day.IsEnabled = original;
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenTimeSlotsDialog(DayScheduleViewModel day)
+    {
+        if (!day.IsEnabled) return;
+
+        // Load slots if not already loaded
+        if (day.TimeSlots.Count == 0)
+        {
+            await LoadTimeSlotsForDay(day);
+        }
+
+        var parameters = new DialogParameters
+        {
+            ["Day"] = day
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true,
+            CloseOnEscapeKey = true
+        };
+
+        var dialog = await DialogService.ShowAsync<TimeSlotEditDialog>($"Time Slots - {day.DayName}", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            // Refresh the day's time slots count
+            await LoadTimeSlotsForDay(day);
+        }
+    }
+
+}

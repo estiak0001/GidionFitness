@@ -1,0 +1,92 @@
+@page "/users"
+
+<PageTitle>Users</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">User Management</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">Users</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.Add">
+                Add User
+            </MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTable Items="@users" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@loading" LoadingProgressColor="Color.Info">
+            <HeaderContent>
+                <MudTh>Avatar</MudTh>
+                <MudTh>Name</MudTh>
+                <MudTh>Email</MudTh>
+                <MudTh>Role</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Avatar">
+                    <MudAvatar Color="Color.Primary">@context.Name.Substring(0, 1)</MudAvatar>
+                </MudTd>
+                <MudTd DataLabel="Name">@context.Name</MudTd>
+                <MudTd DataLabel="Email">@context.Email</MudTd>
+                <MudTd DataLabel="Role">
+                    <MudChip T="string" Color="@GetRoleColor(context.Role)" Size="Size.Small">@context.Role</MudChip>
+                </MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string" Color="@(context.IsActive ? Color.Success : Color.Error)" Size="Size.Small">
+                        @(context.IsActive ? "Active" : "Inactive")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Actions">
+                    <MudIconButton Icon="Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small" />
+                    <MudIconButton Icon="Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private bool loading = true;
+    private List<User> users = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        loading = true;
+        await Task.Delay(1000); // Simulate API call
+        
+        users = new List<User>
+        {
+            new User { Id = 1, Name = "John Doe", Email = "john@example.com", Role = "Admin", IsActive = true },
+            new User { Id = 2, Name = "Jane Smith", Email = "jane@example.com", Role = "User", IsActive = true },
+            new User { Id = 3, Name = "Bob Johnson", Email = "bob@example.com", Role = "Manager", IsActive = false },
+            new User { Id = 4, Name = "Alice Brown", Email = "alice@example.com", Role = "User", IsActive = true },
+        };
+        
+        loading = false;
+    }
+
+    private Color GetRoleColor(string role) => role switch
+    {
+        "Admin" => Color.Error,
+        "Manager" => Color.Warning,
+        "User" => Color.Info,
+        _ => Color.Default
+    };
+
+    public class User
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+    }
+}

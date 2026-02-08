@@ -1,0 +1,236 @@
+﻿@page "/TeamLocation"
+@inject IClassLocationService classLocation
+@inject IDialogService dialogService
+@using BlazorAdminTemplate.Application.DTOs.Location
+@using BlazorAdminTemplate.Application.DTOs
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Components.PaginationComponents
+@using BlazorAdminTemplate.Domain.Enums
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+<AuthorizeView Policy="StaffOnly">
+    <Authorized>
+
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+
+            <MudButton @onclick="NewLocation" Variant="Variant.Filled" Color="Color.Primary">
+                Ny Lokation
+            </MudButton>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudSelect T="int" Label="Loationer per side" Variant="Variant.Outlined" Value="pageSize" ValueChanged="OnPageSizeChanged"
+                           Dense="true" Style="width:120px" Immediate="true" Flex="0">
+                    @foreach (var size in pageSizeOptions)
+                    {
+                        <MudSelectItem Value="@size">@size</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudStack>
+        </MudStack>
+
+    </Authorized>
+</AuthorizeView>
+
+
+
+@if (currentView == ViewType.Cards)
+{
+    //Mobil
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (trainingClassLocation?.Data?.Count > 0)
+    {
+        <MudGrid>
+            @foreach (var item in trainingClassLocation.Data)
+            {
+                <MudItem xs="12" sm="6">
+                    <MudCard>
+                        <MudCardHeader>
+                            <MudText Typo="Typo.h6">@item.TrainingClassLocationName</MudText>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <!-- Add other info if needed -->
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Info" Size="Size.Small" OnClick="@(() => EditLocation(item))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteLocation(item))" />
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else
+    {
+        <MudText>No locations found.</MudText>
+    }
+
+}
+else
+{
+    //Desktop
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (trainingClassLocation != null && trainingClassLocation?.Data?.Count > 0)
+    {
+        <PaginatedList TItem="StaffTrainingClassLocationDTO"
+                       Items="trainingClassLocation.Data"
+                       Pagination="trainingClassLocation.Pagination"
+                       OnPageChanged="LoadLocation">
+
+
+            <HeaderTemplate>
+                <MudTh>Name</MudTh>
+                <MudTh>Handlinger</MudTh>
+            </HeaderTemplate>
+
+            <RowTemplate>
+                <MudTd>
+                    @context.TrainingClassLocationName
+                </MudTd>
+                <MudTd DataLabel="Handlinger">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   OnClick="@(() => DeleteLocation(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Color="Color.Info"
+                                   Size="Size.Small"
+                                   OnClick="@(() => EditLocation(context))" />
+                </MudTd>
+            </RowTemplate>
+
+
+
+        </PaginatedList>
+    }
+}
+
+
+
+
+@code {
+    private ResponseDTO<List<StaffTrainingClassLocationDTO>> trainingClassLocation = new ResponseDTO<List<StaffTrainingClassLocationDTO>>();
+    private bool isLoading = true;
+    private int currentPage = 1;
+    private ViewType currentView = ViewType.Table;
+
+    private int pageSize = 15; // default page size
+    private readonly int[] pageSizeOptions = new int[] { 5, 10, 15, 20, 50, 100 };
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLocation(currentPage);
+    }
+
+
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        currentView = breakpoint <= Breakpoint.Sm ? ViewType.Cards : ViewType.Table;
+        StateHasChanged();
+    }
+
+    private async Task LoadLocation(int page)
+    {
+        isLoading = true;
+
+        var response = await classLocation.GetStaffTrainingClassLocationListAsync(page, pageSize);
+        if (response != null)
+        {
+            trainingClassLocation = response;
+        }
+
+        currentPage = page;
+        isLoading = false;
+        StateHasChanged();
+    }
+
+
+    private async Task OnPageSizeChanged(int newSize)
+    {
+        pageSize = newSize;
+        await LoadLocation(1); // reload from first page with new page size
+    }
+
+    private async Task ChangePage(int page)
+    {
+        await LoadLocation(page);
+    }
+
+    /// <summary>
+    /// opens dialog for adding new Location
+    /// </summary>
+    /// <returns></returns>
+    private async Task NewLocation()
+    {
+        DialogOptions options = new DialogOptions { CloseOnEscapeKey = true };
+        IDialogReference dialog = await dialogService.ShowAsync<NewLocationDialog>("Ny Lokation", options);
+        var result = await dialog.Result;
+        //TODO: Rework
+        if (!result.Canceled)
+        {
+            await LoadLocation(currentPage);
+        }
+    }
+
+    /// <summary>
+    /// Opens dialog to edit Location
+    /// </summary>
+    /// <param name="location"></param>
+    /// <returns></returns>
+    public async Task EditLocation(StaffTrainingClassLocationDTO location)
+    {
+        DialogParameters parameters = new DialogParameters
+    {
+        { "Location", location } // Pass the selected location to the dialog
+    };
+
+        DialogOptions options = new DialogOptions { CloseOnEscapeKey = true };
+        IDialogReference dialog = await dialogService.ShowAsync<EditLocationDialog>("Rediger Lokation", parameters, options);
+
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            var updatedLocation = (StaffTrainingClassLocationDTO)result.Data;
+
+            // Update the location in your backend/service
+            await classLocation.UpdateStaffTrainingClassLocationAsync(updatedLocation);
+
+            // Reload the table
+            await LoadLocation(currentPage);
+        }
+    }
+
+    /// <summary>
+    /// open a dialog asking if they are sure they want to delete, if clicked yes delete it via api
+    /// </summary>
+    /// <param name="location"></param>
+    /// <returns></returns>
+    public async Task DeleteLocation(StaffTrainingClassLocationDTO location)
+    {
+        DialogParameters parameters = new DialogParameters
+        {
+            { "ContentText", $"Are you sure you want to delete '{location.TrainingClassLocationName}'?" },
+            { "ButtonText", "Ja" },
+            { "Color", Color.Error }
+        };
+
+        DialogOptions options = new DialogOptions { CloseOnEscapeKey = true };
+
+        IDialogReference dialog = await dialogService.ShowAsync<ConfirmDialog>("Slet Lokation", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await classLocation.DeleteStaffTrainingClassLocationAsync(location);
+            await LoadLocation(currentPage);
+        }
+    }
+
+}

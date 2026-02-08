@@ -1,0 +1,76 @@
+﻿@inject IDialogService DialogService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-3" /> Payment Details
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudContainer Style="max-height: 500px; overflow-y: scroll">
+            <MudGrid Spacing="4">
+                <MudItem xs="12" sm="6">
+                    <MudText><strong>Transaction ID:</strong></MudText>
+                    <MudText Typo="Typo.body2">@Payment.TransactionId</MudText>
+                </MudItem> 
+                <MudItem xs="12" sm="6">
+                    <MudText><strong>Date:</strong></MudText>
+                    <MudText Typo="Typo.body2">@Payment.Date.ToString("dddd, dd MMMM yyyy HH:mm")</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudText><strong>Member:</strong></MudText>
+                    <MudText Typo="Typo.body2">@Payment.MemberName</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudText><strong>Email:</strong></MudText>
+                    <MudText Typo="Typo.body2">@Payment.MemberEmail</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudText><strong>Amount:</strong></MudText>
+                    <MudText Typo="Typo.h6" Color="@(Payment.Type == "Credit" ? Color.Success : Color.Error)">
+                        @(Payment.Type == "Credit" ? "+" : "-") $@Payment.Amount
+                    </MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudText><strong>Type:</strong></MudText>
+                    <MudChip T="string" Color="@(Payment.Type == "Credit" ? Color.Success : Color.Error)" Size="Size.Small">
+                        @Payment.Type
+                    </MudChip>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudText><strong>Status:</strong></MudText>
+                    <MudChip T="string" Color="@GetStatusColor()" Size="Size.Small">
+                        @Payment.Status
+                    </MudChip>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudText><strong>Card:</strong></MudText>
+                    <MudText Typo="Typo.body2">**** **** **** @Payment.CardLast4 (@Payment.CardBrand)</MudText>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudText><strong>Description:</strong></MudText>
+                    <MudText Typo="Typo.body2">@Payment.Description</MudText>
+                </MudItem>
+            </MudGrid>
+        </MudContainer>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public PaymentDummy Payment { get; set; } = default!;
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    void Close() => MudDialog.Cancel();
+
+    private Color GetStatusColor() => Payment.Status switch
+    {
+        "Completed" => Color.Success,
+        "Pending" => Color.Warning,
+        "Failed" => Color.Error,
+        "Refunded" => Color.Info,
+        _ => Color.Default
+    };
+}

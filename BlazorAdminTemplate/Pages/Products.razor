@@ -1,0 +1,95 @@
+@page "/products"
+
+<PageTitle>Products</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Product Management</MudText>
+
+<MudCard>
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">Products</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.Add">
+                Add Product
+            </MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudDataGrid T="Product" Items="@products" SortMode="SortMode.Multiple" Filterable="true" QuickFilter="@_quickFilter">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">Products</MudText>
+                <MudSpacer />
+                <MudTextField @bind-Value="_searchString" Placeholder="Search" Adornment="Adornment.Start" 
+                             AdornmentIcon="Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+            </ToolBarContent>
+            <Columns>
+                <PropertyColumn Property="x => x.Name" Title="Name" />
+                <PropertyColumn Property="x => x.Category" Title="Category" />
+                <PropertyColumn Property="x => x.Price" Title="Price" Format="C" />
+                <PropertyColumn Property="x => x.Stock" Title="Stock" />
+                <TemplateColumn Title="Status">
+                    <CellTemplate>
+                        <MudChip T="string" Color="@(context.Item.InStock ? Color.Success : Color.Error)" Size="Size.Small">
+                            @(context.Item.InStock ? "In Stock" : "Out of Stock")
+                        </MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Title="Actions" Sortable="false" Filterable="false">
+                    <CellTemplate>
+                        <MudIconButton Icon="Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small" />
+                        <MudIconButton Icon="Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" />
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+        </MudDataGrid>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<Product> products = new();
+    private string _searchString = "";
+
+    private Func<Product, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (x.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (x.Category.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+    }
+
+    private async Task LoadProducts()
+    {
+        await Task.Delay(500); // Simulate API call
+        
+        products = new List<Product>
+        {
+            new Product { Id = 1, Name = "Laptop", Category = "Electronics", Price = 999.99m, Stock = 15 },
+            new Product { Id = 2, Name = "Mouse", Category = "Electronics", Price = 29.99m, Stock = 0 },
+            new Product { Id = 3, Name = "Keyboard", Category = "Electronics", Price = 79.99m, Stock = 8 },
+            new Product { Id = 4, Name = "Monitor", Category = "Electronics", Price = 299.99m, Stock = 5 },
+            new Product { Id = 5, Name = "Desk Chair", Category = "Furniture", Price = 199.99m, Stock = 12 },
+        };
+    }
+
+    public class Product
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+        public int Stock { get; set; }
+        public bool InStock => Stock > 0;
+    }
+}

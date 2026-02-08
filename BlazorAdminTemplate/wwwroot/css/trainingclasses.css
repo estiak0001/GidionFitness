@@ -1,0 +1,302 @@
+﻿.selected-date-highlight {
+    background-color: rgba(0, 0, 0, 0.08) !important;
+    border-radius: 4px;
+}
+
+/* Mobile Training Classes Styles */
+.mobile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0;
+    margin-bottom: 16px;
+}
+
+.mobile-title {
+    font-weight: 600;
+    color: var(--mud-palette-text-primary);
+}
+
+.mobile-filter-btn {
+    min-width: auto;
+    padding: 8px 16px;
+}
+
+.mobile-filters-container {
+    margin-bottom: 16px;
+}
+
+.mobile-classes-dropdown {
+    margin-bottom: 16px;
+}
+
+.classes-select {
+    background-color: white;
+    color: black;
+    border-radius: 8px;
+}
+
+.mobile-week-strip {
+    display: flex;
+    align-items: center;
+    gap: 12px; /* Gap between calendar button and day pills */
+    padding: 24px 16px 16px 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    overflow: visible;
+}
+
+/* Calendar picker button styles */
+.calendar-picker-btn {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    color: white !important;
+    border-radius: 10px !important;
+    flex-shrink: 0; /* Prevent the button from shrinking */
+    transition: all 0.2s ease;
+}
+
+.calendar-picker-btn:hover {
+    background-color: rgba(255, 255, 255, 0.25) !important;
+    transform: scale(1.05);
+}
+
+.calendar-picker-btn:active {
+    transform: scale(0.98);
+}
+
+.week-days-container {
+    display: flex;
+    overflow-x: auto;
+    gap: 8px; /* Reduced gap to fit more comfortably with the button */
+    flex: 1;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-top: 8px;
+}
+
+.week-days-container::-webkit-scrollbar {
+    display: none;
+}
+
+/* Enhanced day pill styles */
+.day-pill {
+    min-width: 50px; /* Slightly smaller to accommodate the button */
+    text-align: center;
+    padding: 12px 6px; /* Reduced horizontal padding */
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+    position: relative;
+    flex-shrink: 0; /* Prevent pills from shrinking too much */
+}
+
+.day-pill.selected {
+    background-color: rgba(255, 255, 255, 0.9);
+    color: var(--mud-palette-primary);
+    transform: scale(1.05);
+}
+
+.day-pill.today:not(.selected) {
+    border: 2px solid rgba(255, 255, 255, 0.8);
+}
+
+.day-number {
+    font-size: 1.1rem; /* Slightly smaller font */
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.day-name {
+    font-size: 0.7rem; /* Slightly smaller font */
+    opacity: 0.8;
+    text-transform: capitalize;
+}
+
+.today-indicator {
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #ffd700;
+    color: #333;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    white-space: nowrap;
+    z-index: 10;
+}
+
+.class-count {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background-color: #ff4081;
+    color: white;
+    border-radius: 50%;
+    width: 18px; /* Slightly smaller */
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 600;
+}
+
+.mobile-classes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.class-card {
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+    .class-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+
+.class-card-content {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px !important;
+}
+
+.class-image-placeholder {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    flex-shrink: 0;
+}
+
+.class-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.class-name {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--mud-palette-text-primary);
+}
+
+.class-info {
+    color: var(--mud-palette-text-secondary);
+    font-size: 0.875rem;
+    line-height: 1.3;
+}
+
+.class-time-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.time-chip {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.no-classes {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--mud-palette-text-secondary);
+}
+
+/* Date Picker Dialog Styles */
+.date-picker-dialog-content {
+    padding: 16px 0;
+    display: flex;
+    justify-content: center;
+}
+
+.full-width-date-picker {
+    width: 100%;
+}
+
+.full-width-date-picker .mud-picker-calendar {
+    width: 100% !important;
+    max-width: none !important;
+}
+
+/* Ensure the date picker looks good in the dialog */
+.mud-dialog .mud-picker-calendar {
+    box-shadow: none !important;
+    border: none !important;
+}
+
+.mud-dialog .mud-date-picker {
+    background: transparent !important;
+}
+
+
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+    .mobile-header {
+        padding: 12px 0;
+    }
+
+    .class-card-content {
+        padding: 12px !important;
+        gap: 12px;
+    }
+
+    .class-image-placeholder {
+        width: 60px;
+        height: 60px;
+    }
+
+    .day-pill {
+        min-width: 42px;
+        padding: 8px 4px;
+    }
+
+    .day-number {
+        font-size: 1rem;
+    }
+
+    .date-picker-btn {
+        padding: 10px 14px;
+        font-size: 0.9rem;
+    }
+    
+    .day-pill {
+        min-width: 45px;
+        padding: 8px 4px;
+    }
+    
+    .day-number {
+        font-size: 1rem;
+    }
+    
+    .day-name {
+        font-size: 0.7rem;
+    }
+}
+
+/* Extra small screens */
+@media (max-width: 360px) {
+    .day-pill {
+        min-width: 38px;
+        padding: 6px 2px;
+    }
+    
+    .week-days-container {
+        gap: 6px;
+    }
+}

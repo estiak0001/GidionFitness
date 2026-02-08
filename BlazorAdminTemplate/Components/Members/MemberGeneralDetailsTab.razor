@@ -1,0 +1,228 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Members
+
+<MudStack Spacing="4">
+    <!-- Member Status Card -->
+    <MudCard Elevation="2">
+        <MudCardContent>
+            <div class="d-flex align-center gap-3 mb-3">
+                <MudAvatar Color="@GetMemberStatusColor()" Size="Size.Large">
+                    @GetMemberInitials()
+                </MudAvatar>
+                <div class="flex-grow-1">
+                    <MudText Typo="Typo.h5">
+                        @($"{MemberDetails.MemberFirstName} {MemberDetails.MemberLastName}")
+                    </MudText>
+                    <MudChip T="string"
+                             Color="@GetMemberStatusColor()"
+                             Size="Size.Small"
+                             Variant="Variant.Filled">
+                        @GetMemberStatusText()
+                    </MudChip>
+                    <MudChip T="string"
+                             Color="@GetMemberTypeColor()"
+                             Size="Size.Small"
+                             Variant="Variant.Outlined"
+                             Class="ml-2">
+                        @(MemberDetails.MemberTypeName ?? "Ukendt")
+                    </MudChip>
+                </div>
+            </div>
+
+            <!-- Quick Info -->
+            <MudGrid>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Medlem siden</MudText>
+                    <MudText Typo="Typo.body2">
+                        @(MemberDetails.MemberCreated?.ToString("dd/MM/yyyy") ?? "Ukendt")
+                    </MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Sidst set</MudText>
+                    <MudText Typo="Typo.body2">
+                        @if (MemberDetails.MemberLastSeen.HasValue)
+                        {
+                            @MemberDetails.MemberLastSeen.Value.ToString("dd/MM/yyyy HH:mm")
+                        }
+                        else
+                        {
+                            <span>Aldrig</span>
+                        }
+                    </MudText>
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+
+    <!-- Contact Information -->
+    <MudCard Elevation="2">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">
+                    <MudIcon Icon="@Icons.Material.Filled.ContactMail" Class="mr-2" />
+                    Kontaktoplysninger
+                </MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Email</MudText>
+                    <MudText Typo="Typo.body2">@MemberDetails.MemberEmail</MudText>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Privat telefon</MudText>
+                    <MudText Typo="Typo.body2">@(string.IsNullOrEmpty(MemberDetails.MemberPhonePrivate) ? "-" : MemberDetails.MemberPhonePrivate)</MudText>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Arbejdstelefon</MudText>
+                    <MudText Typo="Typo.body2">@(string.IsNullOrEmpty(MemberDetails.MemberPhoneWork) ? "-" : MemberDetails.MemberPhoneWork)</MudText>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Jobtitel</MudText>
+                    <MudText Typo="Typo.body2">@(string.IsNullOrEmpty(MemberDetails.MemberJobTitle) ? "-" : MemberDetails.MemberJobTitle)</MudText>
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+
+    <!-- Personal Information -->
+    <MudCard Elevation="2">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">
+                    <MudIcon Icon="@Icons.Material.Filled.Person" Class="mr-2" />
+                    Personlige oplysninger
+                </MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Fødselsdato</MudText>
+                    <MudText Typo="Typo.body2">
+                        @if (MemberDetails.MemberBirthday.HasValue)
+                        {
+                            @($"{MemberDetails.MemberBirthday.Value:dd/MM/yyyy} ({GetAge(MemberDetails.MemberBirthday.Value)} år)")
+                        }
+                        else
+                        {
+                            <span>-</span>
+                        }
+                    </MudText>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Køn</MudText>
+                    <MudText Typo="Typo.body2">@GetGenderText()</MudText>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">CPR</MudText>
+                    <MudText Typo="Typo.body2">@(string.IsNullOrEmpty(MemberDetails.MemberCPR) ? "-" : MemberDetails.MemberCPR)</MudText>
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+
+    <!-- Address Information -->
+    <MudCard Elevation="2">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">
+                    <MudIcon Icon="@Icons.Material.Filled.Home" Class="mr-2" />
+                    Adresse
+                </MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Adresse</MudText>
+                    <MudText Typo="Typo.body2">@(string.IsNullOrEmpty(MemberDetails.MemberAddress) ? "-" : MemberDetails.MemberAddress)</MudText>
+                </MudItem>
+                <MudItem xs="12" md="8">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">By</MudText>
+                    <MudText Typo="Typo.body2">@(string.IsNullOrEmpty(MemberDetails.MemberCity) ? "-" : MemberDetails.MemberCity)</MudText>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Postnummer</MudText>
+                    <MudText Typo="Typo.body2">@(MemberDetails.MemberZipCode == 0 ? "-" : MemberDetails.MemberZipCode.ToString())</MudText>
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+
+    <!-- Comments -->
+    @if (!string.IsNullOrEmpty(MemberDetails.MemberComment))
+    {
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@Icons.Material.Filled.Comment" Class="mr-2" />
+                        Kommentarer
+                    </MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText Typo="Typo.body2">@MemberDetails.MemberComment</MudText>
+            </MudCardContent>
+        </MudCard>
+    }
+</MudStack>
+
+@code {
+    [Parameter] public StaffGetSpecificMemberResponseDTO MemberDetails { get; set; } = new();
+
+    private string GetMemberInitials()
+    {
+        if (MemberDetails == null) return "?";
+
+        var first = !string.IsNullOrEmpty(MemberDetails.MemberFirstName) ? MemberDetails.MemberFirstName[0].ToString() : "";
+        var last = !string.IsNullOrEmpty(MemberDetails.MemberLastName) ? MemberDetails.MemberLastName[0].ToString() : "";
+        return (first + last).ToUpper();
+    }
+
+    private int GetAge(DateTime birthDate)
+    {
+        var today = DateTime.Today;
+        var age = today.Year - birthDate.Year;
+        if (birthDate > today.AddYears(-age)) age--;
+        return age;
+    }
+
+    private Color GetMemberStatusColor()
+    {
+        if (MemberDetails == null) return Color.Default;
+        return MemberDetails.IsActive ? Color.Success : Color.Error;
+    }
+
+    private string GetMemberStatusText()
+    {
+        if (MemberDetails == null) return "Ukendt";
+        return MemberDetails.IsActive ? "Aktiv" : "Inaktiv";
+    }
+
+    private Color GetMemberTypeColor()
+    {
+        if (MemberDetails?.MemberType == null) return Color.Default;
+
+        return MemberDetails.MemberType switch
+        {
+            1 => Color.Primary,   // Regular member
+            2 => Color.Warning,   // Staff
+            3 => Color.Error,     // Admin
+            _ => Color.Default
+        };
+    }
+
+    private string GetGenderText()
+    {
+        if (MemberDetails?.MemberSex == null) return "-";
+
+        return MemberDetails.MemberSex switch
+        {
+            1 => "Mand",
+            2 => "Kvinde",
+            _ => "Andet"
+        };
+    }
+}

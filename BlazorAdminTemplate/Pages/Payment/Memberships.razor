@@ -1,0 +1,237 @@
+@page "/staff/memberships"
+@using BlazorAdminTemplate.Application.DTOs.Payment
+@using BlazorAdminTemplate.Application.DTOs.Pagination
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Components.Payment
+@inject IPaymentGroupService PaymentGroupService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Medlemskaber - Personale</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <div class="d-flex justify-space-between align-center mb-4">
+        <MudText Typo="Typo.h4">
+            <MudIcon Icon="@Icons.Material.Filled.CardMembership" Class="mr-2" />
+            Medlemskaber
+        </MudText>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenCreateDialog">
+            Opret medlemskab
+        </MudButton>
+    </div>
+
+    <MudPaper Elevation="2" Class="pa-4">
+        <div class="d-flex gap-4 mb-4">
+            <MudTextField @bind-Value="searchText"
+                          Placeholder="Søg efter navn eller beskrivelse..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true"
+                          OnKeyUp="OnSearchKeyUp"
+                          Class="flex-grow-1" />
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="LoadPaymentGroups">
+                Søg
+            </MudButton>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center py-8">
+                <MudProgressCircular Indeterminate="true" />
+            </div>
+        }
+        else
+        {
+            <MudTable Items="@paymentGroups"
+                      Hover="true"
+                      Breakpoint="Breakpoint.Sm"
+                      Loading="@isLoading"
+                      LoadingProgressColor="Color.Primary">
+                <HeaderContent>
+                    <MudTh>Navn</MudTh>
+                    <MudTh>Beskrivelse</MudTh>
+                    <MudTh>Pris</MudTh>
+                    <MudTh>Pause pris</MudTh>
+                    <MudTh>Gyldig fra</MudTh>
+                    <MudTh>Gyldig til</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Standard</MudTh>
+                    <MudTh Style="text-align: right;">Handlinger</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Navn">
+                        <strong>@context.MemberPaymentGroupName</strong>
+                    </MudTd>
+                    <MudTd DataLabel="Beskrivelse">
+                        <MudText Typo="Typo.body2" Style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            @context.MemberPaymentGroupDescription
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Pris">
+                        @context.MemberPaymentPrice.ToString("N2") kr.
+                        @if (context.MemberPaymentPriceVAT == 1)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Info">Inkl. moms</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Pause pris">
+                        @(context.MemberPaymentPausePrice?.ToString("N2") ?? "0.00") kr/md
+                    </MudTd>
+                    <MudTd DataLabel="Gyldig fra">
+                        @(context.MemberPaymentValidFrom?.ToString("dd.MM.yyyy") ?? "-")
+                    </MudTd>
+                    <MudTd DataLabel="Gyldig til">
+                        @(context.MemberPaymentValidTo?.ToString("dd.MM.yyyy") ?? "-")
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        @if (context.MemberPaymentEnable == 1)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success">Aktiv</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default">Inaktiv</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Standard">
+                        @if (context.MemberPaymentDefault == 1)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" />
+                        }
+                    </MudTd>
+                    <MudTd Style="text-align: right;">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       OnClick="@(() => OpenEditDialog(context))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Color="Color.Error"
+                                       Size="Size.Small"
+                                       OnClick="@(() => DeletePaymentGroup(context))" />
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="py-8">
+                        Ingen medlemskaber fundet
+                    </MudText>
+                </NoRecordsContent>
+            </MudTable>
+
+            @if (pagination != null && pagination.TotalPages > 1)
+            {
+                <div class="d-flex justify-center mt-4">
+                    <MudPagination Count="@pagination.TotalPages"
+                                   Selected="@currentPage"
+                                   SelectedChanged="OnPageChanged"
+                                   Color="Color.Primary"
+                                   Variant="Variant.Filled" />
+                </div>
+            }
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<StaffPaymentGroupDTO> paymentGroups = new();
+    private PaginationResponseDTO? pagination;
+    private string searchText = string.Empty;
+    private int currentPage = 1;
+    private int pageSize = 15;
+    private bool isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPaymentGroups();
+    }
+
+    private async Task LoadPaymentGroups()
+    {
+        try
+        {
+            isLoading = true;
+            var response = await PaymentGroupService.GetPaymentGroupsAsync(currentPage, pageSize, searchText);
+            paymentGroups = response.PaymentGroups;
+            pagination = response.Pagination;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fejl ved indlæsning: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        currentPage = page;
+        await LoadPaymentGroups();
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            currentPage = 1;
+            await LoadPaymentGroups();
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var dialog = await DialogService.ShowAsync<MembershipFormDialog>("Opret medlemskab",
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadPaymentGroups();
+        }
+    }
+
+    private async Task OpenEditDialog(StaffPaymentGroupDTO group)
+    {
+        var parameters = new DialogParameters
+        {
+            { "PaymentGroup", group }
+        };
+
+        var dialog = await DialogService.ShowAsync<MembershipFormDialog>("Rediger medlemskab",
+            parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadPaymentGroups();
+        }
+    }
+
+    private async Task DeletePaymentGroup(StaffPaymentGroupDTO group)
+    {
+        bool? confirm = await DialogService.ShowMessageBox(
+            "Bekræft sletning",
+            $"Er du sikker på, at du vil slette medlemskabet '{group.MemberPaymentGroupName}'?",
+            yesText: "Slet", cancelText: "Annuller");
+
+        if (confirm == true)
+        {
+            try
+            {
+                await PaymentGroupService.DeletePaymentGroupAsync(group.MemberPaymentGroupGUID);
+                Snackbar.Add("Medlemskab slettet", Severity.Success);
+                await LoadPaymentGroups();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Fejl ved sletning: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

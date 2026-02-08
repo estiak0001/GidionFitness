@@ -1,0 +1,87 @@
+﻿@using BlazorAdminTemplate.Components.Calendar
+@if (State?.FilteredClasses is not null)
+{
+    <MudTable Items="State.FilteredClasses" Dense="true" Hover="true" Striped="true" Bordered="true">
+        <HeaderContent>
+            <MudTh>Dato & Tid</MudTh>
+            <MudTh>Hold</MudTh>
+            <MudTh>Type</MudTh>
+            <MudTh>Træner</MudTh>
+            <MudTh>Ledige pladser</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.TrainingClassClassesStartDateTime.ToString("ddd dd MMM HH:mm")</MudTd>
+            <MudTd><strong>@context.TrainingClassClassesName</strong></MudTd>
+            <MudTd>@context.TrainingClassTypesName</MudTd>
+            <MudTd>@context.TrainingClassClassesTrainerName</MudTd>
+            <MudTd>@context.TrainingClassClassesAvailableSlots / @context.TrainingClassClassesMax</MudTd>
+            <MudTd>
+                <MudChip T="string" Color="@(State.BookedClassGuids.Contains(context.TrainingClassClassesGUID) ? Color.Primary :
+                                                                context.TrainingClassClassesAvailableSlots > 0 ? Color.Success : Color.Error)"
+                         Size="Size.Small">
+                    @(State.BookedClassGuids.Contains(context.TrainingClassClassesGUID) ? "Tilmeldt" :
+                                    context.TrainingClassClassesAvailableSlots > 0 ? "Ledig" : "Fuld")
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudButton Size="Size.Small" OnClick="@(() => OpenDetails(context))">Detaljer</MudButton>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+else
+{
+    <MudProgressCircular Indeterminate="true" Class="my-8" />
+}
+
+
+                        @code {
+    [CascadingParameter]
+    public TrainingClassesState? State { get; set; }
+    [Parameter] public EventCallback OnBookingChanged { get; set; }
+    [Inject] IDialogService DialogService { get; set; } = default!;
+    [Inject] ISnackbar Snackbar { get; set; } = default!;
+
+    private async Task OpenDetails(TrainingClasses cls)
+    {
+        var parameters = new DialogParameters
+        {
+            ["TrainingClass"] = cls,
+            ["IsBooked"] = State.BookedClassGuids.Contains(cls.TrainingClassClassesGUID),
+            ["OnResult"] = EventCallback.Factory.Create<string>(this, async result =>
+            {
+                if (result == "book" || result == "cancel")
+                {
+                    await OnBookingChanged.InvokeAsync();
+                    Snackbar.Add(result == "book" ? "Tilmelding gennemført!" : "Afmelding gennemført!", Severity.Success);
+                }
+            })
+        };
+
+        await DialogService.ShowAsync<TrainingClassDetailsDialog>("", parameters, new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseButton = true
+        });
+    }
+
+    protected override void OnInitialized()
+    {
+        // if (State is null)
+        // {
+        //     throw new InvalidOperationException($"{nameof(ClassesPlannedListView)} requires a cascading parameter of type TrainingClassesState.");
+        // }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (State is not null)
+        {
+            StateHasChanged();
+        }
+    }
+
+}

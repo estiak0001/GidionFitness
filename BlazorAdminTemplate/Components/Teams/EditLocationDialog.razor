@@ -1,0 +1,36 @@
+﻿@* @inject IDialogService DialogService *@
+@using BlazorAdminTemplate.Application.DTOs.Location
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="tempLocation.TrainingClassLocationName" Label="Lokation Navn" Required="true" />
+       
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Save">Gem</MudButton>
+        <MudButton Color="Color.Secondary" OnClick="Cancel">Annuller</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public StaffTrainingClassLocationDTO location { get; set; }
+
+    StaffTrainingClassLocationDTO tempLocation = new StaffTrainingClassLocationDTO();
+
+    protected override void OnInitialized()
+    {
+        tempLocation = new StaffTrainingClassLocationDTO(location);
+    }
+
+    void Save()
+    {
+        location = tempLocation;
+        MudDialog.Close(DialogResult.Ok(location));
+    }
+
+    void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

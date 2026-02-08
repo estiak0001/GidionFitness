@@ -1,0 +1,503 @@
+﻿@page "/profile"
+@using BlazorAdminTemplate.Application.DTOs.Authentication
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Components.Profile
+@inject IProfileService ProfileService
+@inject ILoginService LoginService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Profile</PageTitle>
+<link href="~/css/profile.css" rel="stylesheet" />
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+@if (isMobile)
+{
+    <!-- Mobile Layout -->
+    <div class="mobile-profile-container">
+        <!-- Mobile Hero Banner -->
+        <div class="mobile-hero-banner" style="
+                    background: linear-gradient(135deg, rgba(63, 81, 181, 0.8), rgba(33, 150, 243, 0.8)),
+                                url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80');
+                    background-size: cover;
+                    background-position: center;
+                    height: 200px;
+                    position: relative;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin: 0;
+                    padding: 1rem;">
+
+            <div class="d-flex flex-column align-center text-center" style="color: white;">
+                <!-- Profile Picture -->
+                @if (!string.IsNullOrEmpty(profileImageUrl))
+                {
+                    <MudAvatar Size="Size.Large"
+                               Style="width: 80px; height: 80px; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.3); margin-bottom: 0.75rem;">
+                        <MudImage Src="@profileImageUrl"
+                                  Alt="Profile Picture"
+                                  Style="width: 100%; height: 100%; object-fit: cover;"
+                                  @onerror="OnImageError"
+                                  @onload="OnImageLoad" />
+                    </MudAvatar>
+                }
+                else
+                {
+                    <MudAvatar Size="Size.Large"
+                               Color="Color.Surface"
+                               Style="width: 80px; height: 80px; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.3); margin-bottom: 0.75rem;">
+                        <MudText Typo="Typo.h5" Style="color: var(--mud-palette-primary);">@GetInitials()</MudText>
+                    </MudAvatar>
+                }
+
+                <!-- Loading indicator for image -->
+                @if (isLoadingProfileImage)
+                {
+                    <div style="position: absolute;">
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" />
+                    </div>
+                }
+
+                <!-- Profile Info -->
+                @if (profile != null)
+                {
+                    <MudText Typo="Typo.h5" Style="color: white; font-weight: 600; margin-bottom: 0.25rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5); text-align: center;">
+                        @GetDisplayName()
+                    </MudText>
+                    <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.8); text-shadow: 0 1px 2px rgba(0,0,0,0.5); text-align: center;">
+                        @GetDisplayValue(profile.MemberEmail)
+                    </MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.h5" Style="color: white;">Loading...</MudText>
+                }
+            </div>
+        </div>
+
+        <!-- Mobile Tabs -->
+        <MudPaper Elevation="0" Style="border-bottom: 1px solid var(--mud-palette-divider);">
+            <MudTabs Elevation="0"
+                     ApplyEffectsToContainer="false"
+                     SliderColor="Color.Primary"
+                     ActivePanelIndex="@activeTabIndex"
+                     ActivePanelIndexChanged="@((int index) => activeTabIndex = index)"
+                     Style="min-height: 48px"
+                     Centered="false"
+                     Class="mobile-tabs">
+
+                <MudTabPanel Text="Profil" />
+                <MudTabPanel Text="Træning" />
+                <MudTabPanel Text="Medlemsskaber" />
+                <MudTabPanel Text="Begivenheder" />
+              @*   <MudTabPanel Text="Hjælp" /> *@
+                <MudTabPanel Text="Kontraktor" />
+            </MudTabs>
+        </MudPaper>
+
+        <!-- Mobile Tab Content -->
+        <div Class="pa-3">
+            @if (activeTabIndex == 0)
+            {
+                <ProfileTab Profile="profile"
+                            GetDisplayName="GetDisplayName"
+                            GetDisplayValue="GetDisplayValue"
+                            GetOrganizationStatus="GetOrganizationStatus" />
+            }
+            else if (activeTabIndex == 1)
+            {
+                <TrainingTab />
+            }
+            else if (activeTabIndex == 2)
+            {
+                <!-- Members Tab Content -->
+                <MudCard Elevation="2">
+                    <MudCardContent Class="text-center pa-4">
+                        <MudIcon Icon="@Icons.Material.Filled.Group" Size="Size.Large" />
+                        <MudText Typo="Typo.h6" Class="mt-3">Medlemmer</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">Medlemsfortegnelse og holdoplysninger vil blive vist her.</MudText>
+                    </MudCardContent>
+                </MudCard>
+            }
+            else if (activeTabIndex == 3)
+            {
+                <!-- Events Tab Content -->
+                <MudCard Elevation="2">
+                    <MudCardContent Class="text-center pa-4">
+                        <MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Large" />
+                        <MudText Typo="Typo.h6" Class="mt-3">Begivenheder</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">Kommende begivenheder og tilmeldinger vil blive vist her.</MudText>
+                    </MudCardContent>
+                </MudCard>
+            }
+          @*   else if (activeTabIndex == 4)
+            {
+                <!-- Help Tab Content -->
+                <MudCard Elevation="2">
+                    <MudCardContent Class="text-center pa-4">
+                        <MudIcon Icon="@Icons.Material.Filled.Help" Size="Size.Large" />
+                        <MudText Typo="Typo.h6" Class="mt-3">Hjælp og support</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">Kontaktoplysninger og supportressourcer vil blive vist her.</MudText>
+                    </MudCardContent>
+                </MudCard>
+            } *@
+            else if (activeTabIndex == 4)
+            {
+                <!-- Documents Tab Content -->
+                <MudCard Elevation="2">
+                    <MudCardContent Class="text-center pa-4">
+                        <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Large" />
+                        <MudText Typo="Typo.h6" Class="mt-3">Kontraktor</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">Vigtige Kontraktor.</MudText>
+                    </MudCardContent>
+                </MudCard>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <!-- Desktop Layout (Your existing layout) -->
+    <!-- Hero Banner Section -->
+    <div class="profile-hero-banner" style="
+                                background: linear-gradient(135deg, rgba(63, 81, 181, 0.8), rgba(33, 150, 243, 0.8)),
+                                            url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80');
+                                background-size: cover;
+                                background-position: center;
+                                background-attachment: fixed;
+                                height: 280px;
+                                position: relative;
+                                display: flex;
+                                align-items: end;
+                                padding: 0;
+                                margin: 0;">
+
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Style="padding-bottom: 2rem;">
+            <div class="d-flex align-end">
+                <!-- Profile Picture -->
+                @if (!string.IsNullOrEmpty(profileImageUrl))
+                {
+                    <MudAvatar Size="Size.Large"
+                               Style="width: 120px; height: 120px; border: 4px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.3); margin-right: 1.5rem;">
+                        <MudImage Src="@profileImageUrl"
+                                  Alt="Profile Picture"
+                                  Style="width: 100%; height: 100%; object-fit: cover;"
+                                  @onerror="OnImageError"
+                                  @onload="OnImageLoad" />
+                    </MudAvatar>
+                }
+                else
+                {
+                    <MudAvatar Size="Size.Large"
+                               Color="Color.Surface"
+                               Style="width: 120px; height: 120px; border: 4px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.3); margin-right: 1.5rem;">
+                        <MudText Typo="Typo.h3" Style="color: var(--mud-palette-primary);">@GetInitials()</MudText>
+                    </MudAvatar>
+                }
+
+                <!-- Loading indicator for image -->
+                @if (isLoadingProfileImage)
+                {
+                    <div style="position: absolute; top: 0; left: 0; margin-left: 50px; margin-top: 50px;">
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" />
+                    </div>
+                }
+
+                <!-- Profile Info -->
+                <div class="flex-grow-1" style="color: white; margin-bottom: 8px;">
+                    @if (profile != null)
+                    {
+                        <MudText Typo="Typo.h3" Style="color: white; font-weight: 600; margin-bottom: 0.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                            @GetDisplayName()
+                        </MudText>
+                        <MudText Typo="Typo.body1" Style="color: rgba(255,255,255,0.8); text-shadow: 0 1px 2px rgba(0,0,0,0.5);">
+                            @GetDisplayValue(profile.MemberEmail)
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h3" Style="color: white;">Loading...</MudText>
+                    }
+                </div>
+            </div>
+        </MudContainer>
+    </div>
+
+    <!-- Tabs Section -->
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pa-0">
+        <MudPaper Elevation="0" Style="border-bottom: 1px solid var(--mud-palette-divider);">
+            <MudContainer MaxWidth="MaxWidth.ExtraLarge">
+                <MudTabs Elevation="0"
+                         ApplyEffectsToContainer="false"
+                         SliderColor="Color.Primary"
+                         ActivePanelIndex="@activeTabIndex"
+                         ActivePanelIndexChanged="@((int index) => activeTabIndex = index)"
+                         Style="min-height: 48px"
+                         Class="centered-tabs">
+
+                    <MudTabPanel Text="Profil">
+                        <!-- Content moved to content area below -->
+                    </MudTabPanel>
+
+                    <MudTabPanel Text="Træning">
+                        <!-- Content moved to content area below -->
+                    </MudTabPanel>
+
+                    <MudTabPanel Text="Medlemsskaber">
+                        <!-- Content moved to content area below -->
+                    </MudTabPanel>
+
+                    <MudTabPanel Text="Begivenheder">
+                        <!-- Content moved to content area below -->
+                    </MudTabPanel>
+
+                    <MudTabPanel Text="Kontrakter">
+                        <!-- Content moved to content area below -->
+                    </MudTabPanel>
+                </MudTabs>
+            </MudContainer>
+        </MudPaper>
+    </MudContainer>
+
+    <!-- Tab Content Area -->
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-6 pb-8">
+        @if (activeTabIndex == 0)
+        {
+            <ProfileTab Profile="profile"
+                        GetDisplayName="GetDisplayName"
+                        GetDisplayValue="GetDisplayValue"
+                        GetOrganizationStatus="GetOrganizationStatus" />
+        }
+        else if (activeTabIndex == 1)
+        {
+            <TrainingTab />
+        }
+        else if (activeTabIndex == 2)
+        {
+            <!-- Members Tab Content -->
+            <MudCard Elevation="2">
+                <MudCardContent Class="text-center py-16">
+                    <MudIcon Icon="@Icons.Material.Filled.Group" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-4">Medlemmer</MudText>
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Medlemsfortegnelse og holdoplysninger vil blive vist her.</MudText>
+                </MudCardContent>
+            </MudCard>
+        }
+        else if (activeTabIndex == 3)
+        {
+            <!-- Events Tab Content -->
+            <MudCard Elevation="2">
+                <MudCardContent Class="text-center py-16">
+                    <MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-4">Begivenheder</MudText>
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Kommende begivenheder og tilmeldinger vil blive vist her.</MudText>
+                </MudCardContent>
+            </MudCard>
+        }
+        else if (activeTabIndex == 4)
+        {
+            <!-- Documents Tab Content -->
+          @*   <MudCard Elevation="2">
+                <MudCardContent Class="text-center py-16">
+                    <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-4">Kontraktor</MudText>
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Vigtige Kontraktor.</MudText>
+                </MudCardContent>
+            </MudCard> *@
+            <ContractTab />
+        }
+    </MudContainer>
+}
+
+@code {
+    private ProfileResponseDTO? profile;
+    private string profileImageUrl = string.Empty;
+
+    private bool isLoading = true;
+    private bool isLoadingProfileImage = false;
+    private string errorMessage = string.Empty;
+    private string imageLoadingStatus = "Not started";
+    private int activeTabIndex = 0;
+    private bool showDebugInfo = false;
+    private bool isMobile = false;
+
+    private int individualTrainingSessions = 21;
+    private int teamTrainingSessions = 9;
+
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        isMobile = breakpoint <= Breakpoint.Sm;
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check authentication
+        if (!await LoginService.IsAuthenticatedAsync())
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        await LoadProfile();
+    }
+
+    private async Task LoadProfile()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            imageLoadingStatus = "Profile loading...";
+            StateHasChanged();
+
+            Console.WriteLine("Profile.razor: Loading profile from ProfileService...");
+            profile = await ProfileService.GetProfileAsync();
+
+            if (profile == null)
+            {
+                errorMessage = "Failed to load profile information.";
+                imageLoadingStatus = "Profile load failed";
+            }
+            else
+            {
+                Console.WriteLine($"Profile.razor: Profile loaded successfully: {profile.MemberFirstName}");
+                imageLoadingStatus = "Profile loaded, starting image load...";
+
+                // Load profile image after profile is loaded
+                await LoadProfileImage();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Profile.razor: Error loading profile: {ex.Message}");
+            errorMessage = "An error occurred while loading your profile.";
+            imageLoadingStatus = $"Profile error: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadProfileImage()
+    {
+        try
+        {
+            if (profile?.MemberGuid == null)
+            {
+                imageLoadingStatus = "No member GUID available";
+                Console.WriteLine("Profile.razor: No member GUID available for image loading");
+                return;
+            }
+
+            isLoadingProfileImage = true;
+            imageLoadingStatus = "Loading image...";
+            StateHasChanged();
+
+            Console.WriteLine($"Profile.razor: Loading profile image for: {profile.MemberGuid}");
+            var imageUrl = await ProfileService.GetProfileImageUrlAsync();
+
+            if (!string.IsNullOrEmpty(imageUrl))
+            {
+                profileImageUrl = imageUrl;
+                imageLoadingStatus = $"Image loaded: {imageUrl}";
+                Console.WriteLine($"Profile.razor: Profile image loaded: {imageUrl}");
+                Snackbar.Add("Profile image loaded successfully!", Severity.Success);
+            }
+            else
+            {
+                imageLoadingStatus = "No image found - showing initials";
+                Console.WriteLine("Profile.razor: No profile image found - will show initials");
+            }
+        }
+        catch (Exception ex)
+        {
+            imageLoadingStatus = $"Image load error: {ex.Message}";
+            Console.WriteLine($"Profile.razor: Error loading profile image: {ex.Message}");
+            Snackbar.Add($"Error loading profile image: {ex.Message}", Severity.Warning);
+        }
+        finally
+        {
+            isLoadingProfileImage = false;
+            StateHasChanged();
+        }
+    }
+
+    // Image event handlers for debugging
+    private void OnImageLoad()
+    {
+        imageLoadingStatus = "Image displayed successfully";
+        Console.WriteLine("Profile.razor: Image loaded and displayed in browser");
+        StateHasChanged();
+    }
+
+    private void OnImageError()
+    {
+        imageLoadingStatus = "Image failed to display in browser";
+        Console.WriteLine($"Profile.razor: Image failed to load in browser. URL was: {profileImageUrl}");
+        Snackbar.Add("Image failed to load in browser", Severity.Error);
+
+        // Reset to show initials instead
+        profileImageUrl = string.Empty;
+        StateHasChanged();
+    }
+
+    // Helper methods for display
+
+    private string GetDisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "Not provided" : value;
+
+    private string GetDisplayName()
+    {
+        if (profile == null || (string.IsNullOrWhiteSpace(profile.MemberFirstName) && string.IsNullOrWhiteSpace(profile.MemberLastName)))
+            return "Ikke angivet";
+
+        var firstName = profile.MemberFirstName?.Trim() ?? "";
+        var lastName = profile.MemberLastName?.Trim() ?? "";
+
+        return $"{firstName} {lastName}".Trim();
+    }
+
+    private string GetOrganizationStatus()
+    {
+        if (profile == null) return "Not assigned";
+
+        var hasMainOrg = !string.IsNullOrWhiteSpace(profile.OrganisationMainGuid);
+        var hasSubOrg = !string.IsNullOrWhiteSpace(profile.OrganisationSubGuid);
+
+        if (hasMainOrg && hasSubOrg) return "Active Member";
+        if (hasMainOrg) return "Active Member";
+        if (hasSubOrg) return "Active Member";
+
+        return "Inactive";
+    }
+
+    private string GetInitials()
+    {
+        // Check if we have both first and last name
+        if (string.IsNullOrWhiteSpace(profile?.MemberFirstName) || string.IsNullOrWhiteSpace(profile?.MemberLastName))
+            return "??";
+
+        var initials = "";
+
+        // Get first initial from first name
+        initials += profile.MemberFirstName.Trim()[0].ToString().ToUpper();
+
+        // Handle last name with potential special characters like hyphens and spaces
+        var lastNameParts = profile.MemberLastName.Split(new char[] { '-', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+        // Get initials from all parts of the last name
+        foreach (var part in lastNameParts)
+        {
+            if (!string.IsNullOrWhiteSpace(part))
+            {
+                initials += part.Trim()[0].ToString().ToUpper();
+            }
+        }
+
+        return initials;
+    }
+}

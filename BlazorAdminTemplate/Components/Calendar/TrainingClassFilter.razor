@@ -1,0 +1,210 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Classes
+@using BlazorAdminTemplate.Domain.Entities
+@using BlazorAdminTemplate.Domain.Enums
+
+<MudCard Elevation="2" Style="height: fit-content;">
+    <MudCardContent>
+        <!-- Date Picker -->
+        <MudDatePicker PickerVariant="PickerVariant.Static"
+                       ShowToolbar="false"
+                       @bind-Date="SelectedDate"
+                       @bind-Date:after="OnDateChanged" />
+
+        <MudDivider />
+        <MudText Class="pt-2 pb-2">Filter</MudText>
+
+        <!-- TreeView for Filtering -->
+        <MudTreeView T="FilterItem"
+                     SelectedValues="selectedFilters"
+                     SelectedValuesChanged="EventCallback.Factory.Create(this, OnSelectedValuesChangedWrapper)"
+                     SelectionMode="SelectionMode.ToggleSelection"
+                     CheckBoxColor="Color.Primary">
+
+            <!-- Training Class Types -->
+            <MudTreeViewItem T="FilterItem"
+                             Value="@classTypesRootFilter"
+                             Text="Hold Typer"
+                             Expanded="true">
+                @if (AvailableClassTypes?.Any() == true)
+                {
+                    @foreach (var classType in AvailableClassTypes)
+                    {
+                        <MudTreeViewItem T="FilterItem"
+                                         Value="@(new FilterItem { Type = FilterType.ClassType, Guid = classType.TrainingClassTypesGUID, Name = classType.TrainingClassTypesName })"
+                                         Text="@classType.TrainingClassTypesName" />
+                    }
+                }
+            </MudTreeViewItem>
+
+            <!-- Organizations -->
+            <MudTreeViewItem T="FilterItem"
+                             Value="@organizationsRootFilter"
+                             Text="Centre"
+                             Expanded="true">
+                @if (AvailableOrganizations?.Any() == true)
+                {
+                    @foreach (var org in AvailableOrganizations)
+                    {
+                        <MudTreeViewItem T="FilterItem"
+                                         Value="@(new FilterItem { Type = FilterType.Organization, Guid = org.OrganisationSubGUID, Name = org.OrganisationSubName })"
+                                         Text="@org.OrganisationSubName" />
+                    }
+                }
+            </MudTreeViewItem>
+        </MudTreeView>
+
+        <!-- Applied Filters Display -->
+        @if (HasActiveFilters)
+        {
+            <MudDivider Class="my-3" />
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Aktive filtre:</MudText>
+
+            @if (HasDateFilter && SelectedDate.HasValue)
+            {
+                <MudChip T="string" Text="@($"Dato: {SelectedDate.Value:dd/MM/yyyy}")"
+                         Color="Color.Info"
+                         Size="Size.Small"
+                         OnClose="@(() => ClearDateFilter())"
+                         CloseIcon="@Icons.Material.Filled.Close" />
+            }
+
+            @if (SelectedClassTypeFilters.Any())
+            {
+                @foreach (var filter in SelectedClassTypeFilters)
+                {
+                    <MudChip T="string" Text="@($"Type: {filter.Name}")"
+                             Color="Color.Primary"
+                             Size="Size.Small"
+                             OnClose="@(() => RemoveFilter(filter))"
+                             CloseIcon="@Icons.Material.Filled.Close" />
+                }
+            }
+
+            @if (SelectedOrganizationFilters.Any())
+            {
+                @foreach (var filter in SelectedOrganizationFilters)
+                {
+                    <MudChip T="string" Text="@($"Center: {filter.Name}")"
+                             Color="Color.Secondary"
+                             Size="Size.Small"
+                             OnClose="@(() => RemoveFilter(filter))"
+                             CloseIcon="@Icons.Material.Filled.Close" />
+                }
+            }
+
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Error"
+                       Size="Size.Small"
+                       OnClick="ClearAllFilters"
+                       StartIcon="@Icons.Material.Filled.Clear"
+                       Class="mt-2">
+                Ryd alle filtre
+            </MudButton>
+        }
+
+        <!-- Legend for calendar colors -->
+        <MudStack Spacing="1" Class="mt-3">
+            <MudText Typo="Typo.subtitle2">Signatur:</MudText>
+            <div class="d-flex align-center gap-2">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Primary" Size="Size.Small" />
+                <MudText Typo="Typo.caption">Du er tilmeldt</MudText>
+            </div>
+            <div class="d-flex align-center gap-2">
+                <MudIcon Icon="@Icons.Material.Filled.Circle" Color="Color.Success" Size="Size.Small" />
+                <MudText Typo="Typo.caption">Tilgængelig</MudText>
+            </div>
+            <div class="d-flex align-center gap-2">
+                <MudIcon Icon="@Icons.Material.Filled.Circle" Color="Color.Warning" Size="Size.Small" />
+                <MudText Typo="Typo.caption">Næsten fuldt</MudText>
+            </div>
+            <div class="d-flex align-center gap-2">
+                <MudIcon Icon="@Icons.Material.Filled.Circle" Color="Color.Error" Size="Size.Small" />
+                <MudText Typo="Typo.caption">Fuldt booket</MudText>
+            </div>
+        </MudStack>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    // Parameters passed from parent component
+    [Parameter] public DateTime? SelectedDate { get; set; }
+    [Parameter] public EventCallback<DateTime?> SelectedDateChanged { get; set; }
+    [Parameter] public List<ClassTypes>? AvailableClassTypes { get; set; }
+    [Parameter] public List<GuestTrainingClasses>? AvailableOrganizations { get; set; }
+    [Parameter] public EventCallback<FilterChangedEventArgs> OnFiltersChanged { get; set; }
+
+    // Internal filter state
+    private HashSet<FilterItem> selectedFilters = new();
+
+    // Root filter items (not selectable)
+    private FilterItem classTypesRootFilter = new() { Type = FilterType.Root, Guid = "class-types-root", Name = "Hold Typer" };
+    private FilterItem organizationsRootFilter = new() { Type = FilterType.Root, Guid = "organizations-root", Name = "Centre" };
+
+    // Helper properties for easier access
+    private IEnumerable<FilterItem> SelectedClassTypeFilters => selectedFilters.Where(f => f.Type == FilterType.ClassType);
+    private IEnumerable<FilterItem> SelectedOrganizationFilters => selectedFilters.Where(f => f.Type == FilterType.Organization);
+    private bool HasTreeViewFilters => SelectedClassTypeFilters.Any() || SelectedOrganizationFilters.Any();
+    private bool HasDateFilter => SelectedDate.HasValue;
+    private bool HasActiveFilters => HasDateFilter || HasTreeViewFilters;
+
+    private async Task OnDateChanged()
+    {
+        await SelectedDateChanged.InvokeAsync(SelectedDate);
+        await NotifyFiltersChanged();
+    }
+
+    // Wrapper method that matches the non-generic EventCallback signature
+    private async Task OnSelectedValuesChangedWrapper()
+    {
+        foreach (var filter in selectedFilters.Where(f => f.Type != FilterType.Root))
+        {
+            Console.WriteLine($"  - {filter.Type}: {filter.Name} ({filter.Guid})");
+        }
+
+        await NotifyFiltersChanged();
+    }
+
+    private async Task RemoveFilter(FilterItem filterToRemove)
+    {
+        selectedFilters.Remove(filterToRemove);
+        // Trigger UI update
+        await OnSelectedValuesChangedWrapper();
+        StateHasChanged();
+    }
+
+    private async Task ClearDateFilter()
+    {
+        SelectedDate = null;
+        await OnDateChanged();
+    }
+
+    private async Task ClearAllFilters()
+    {
+        SelectedDate = null;
+        selectedFilters.Clear();
+
+        await SelectedDateChanged.InvokeAsync(SelectedDate);
+        await NotifyFiltersChanged();
+        StateHasChanged();
+    }
+
+    private async Task NotifyFiltersChanged()
+    {
+        var filterArgs = new FilterChangedEventArgs
+        {
+            SelectedDate = SelectedDate,
+            SelectedClassTypeGuids = SelectedClassTypeFilters.Select(f => f.Guid).ToList(),
+            SelectedOrganizationGuids = SelectedOrganizationFilters.Select(f => f.Guid).ToList(),
+            HasDateFilter = HasDateFilter,
+            HasTreeViewFilters = HasTreeViewFilters
+        };
+
+        await OnFiltersChanged.InvokeAsync(filterArgs);
+    }
+
+    // Public method to allow parent to clear filters programmatically
+    public async Task ClearAllFiltersFromParent()
+    {
+        await ClearAllFilters();
+    }
+}

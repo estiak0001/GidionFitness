@@ -1,0 +1,177 @@
+﻿@page "/access-controller-groups/list"
+@using BlazorAdminTemplate.Application.DTOs.Access
+@* @using BlazorAdminTemplate.Components.Access *@
+@using BlazorAdminTemplate.Components.AccessControllerGroup
+@using BlazorAdminTemplate.Domain.Entities
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IStaffManagementService StaffManagementService
+@inject NavigationManager Navigation
+<PageTitle>Access Controller Groups</PageTitle>
+
+<MudPaper Class="pa-8 ma-4" Elevation="6" Style="border-radius: 16px;">
+    <MudText Typo="Typo.h4" GutterBottom="true" Class="mb-6">
+        <MudIcon Icon="@Icons.Material.Filled.GroupWork" Class="mr-3" />
+        Access Controller Groups
+    </MudText>
+
+    <!-- Search -->
+    <MudToolBar Gutters="false" Class="mb-6 gap-4">
+        <MudTextField @bind-Value="_searchString" Placeholder="Search groups..." Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" DebounceInterval="500"
+                      Class="mt-0" />
+        <MudSpacer />
+        <!-- Add Button - adjust if you have a dialog for creating new groups -->
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@OpenAddDialog">
+            Add Group
+        </MudButton>
+    </MudToolBar>
+
+    <!-- Groups Table (Server-side) -->
+    <MudTable @ref="_table" ServerData="LoadGroups" Hover="true" Dense="true" Bordered="true" Striped="true"
+              Elevation="0">
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Description</MudTh>
+            <!-- Add more columns as needed based on AccessControllerGroup properties -->
+            <MudTh style="width: 160px;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Name">@context.AccessControllerAccessGroupsName</MudTd> <!-- Replace with actual property, e.g. GroupName -->
+            <MudTd DataLabel="Description">@context.AccessControllerAccessGroupsDescription</MudTd>
+            <MudTd DataLabel="Actions">
+                <MudButtonGroup>
+                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Text"
+                               OnClick="@(() => OpenEditDialog(context.AccessControllerAccessGroupsGUID))">
+                        <!-- Assume Id or GUID property -->
+                        <MudIcon Icon="@Icons.Material.Filled.Edit" />
+                    </MudButton>
+                    <MudButton Size="Size.Small" Color="Color.Error" Variant="Variant.Text"
+                               OnClick="@(() => DeleteGroup(context.AccessControllerAccessGroupsGUID))">
+                        <MudIcon Icon="@Icons.Material.Filled.Delete" />
+                    </MudButton>
+                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Text"
+                               OnClick="@(() => NavigateToSchedule(context.AccessControllerAccessGroupsGUID))">
+                        <MudIcon Icon="@Icons.Material.Filled.Schedule" />
+                    </MudButton>
+                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Text"
+                               OnClick="@(() => NavigateToException(context.AccessControllerAccessGroupsGUID))">
+                        <MudIcon Icon="@Icons.Material.Filled.Warning" />
+                    </MudButton>
+                </MudButtonGroup>
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="@(new[] { 10, 15, 25, 50 })" />
+        </PagerContent>
+        <LoadingContent>
+            <MudProgressCircular Indeterminate="true" />
+        </LoadingContent>
+        <NoRecordsContent>
+            <MudText>No access controller groups found.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private MudTable<AccessControllerGroup>? _table;
+    private string _searchString = string.Empty;
+
+    private async Task<TableData<AccessControllerGroup>> LoadGroups(TableState state, CancellationToken cancellationToken)
+    {
+        var query = new StaffAccessControllerGroupDTO
+        {
+            Page = state.Page + 1, // MudTable is 0-based, API likely 1-based
+            PageSize = state.PageSize,
+            Search = string.IsNullOrWhiteSpace(_searchString) ? null : _searchString
+        };
+
+        var response = await StaffManagementService.StaffGetAccessControllerGroupListAsync(query);
+
+        return new TableData<AccessControllerGroup>()
+        {
+            Items = response.AccessControllerGroups ?? new List<AccessControllerGroup>(),
+            TotalItems = response?.pagination?.TotalRecords
+                         ?? response?.Count
+                         ?? 0
+        };
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters { ["GroupGuid"] = null };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+        var dialog = await DialogService.ShowAsync<AccessControllerGroupEditDialog>("Add Access Controller Group", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is AccessControllerGroup)
+        {
+            await _table.ReloadServerData(); // Your refresh logic
+        }
+    }
+
+    private async Task OpenEditDialog(string guid)
+    {
+        var parameters = new DialogParameters { ["GroupGuid"] = guid };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+        var dialog = await DialogService.ShowAsync<AccessControllerGroupEditDialog>("Edit Access Controller Group", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is AccessControllerGroup)
+        {
+            await _table.ReloadServerData(); // Your refresh logic
+
+        }
+    }
+
+    private async Task DeleteGroup(string id) // Adjust type as needed
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Delete Group",
+            "Are you sure you want to delete this access controller group?",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirmed == true)
+        {
+            try
+            {
+                // Adjust endpoint as per your API
+                var response = await StaffManagementService.StaffGetAccessControllerGroupDeleteAsync(id);
+
+                Snackbar.Add("Group deleted successfully.", Severity.Success);
+                await _table!.ReloadServerData();
+
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private void NavigateToSchedule(string accessGroupGuid)
+    {
+        // Important: Use string interpolation with ToString("D") or just ToString()
+        // Both work, but "D" is explicit
+        Navigation.NavigateTo($"/access-controller-groups/schedule/{accessGroupGuid}");
+
+        // Alternative formats that also work:
+        // Navigation.NavigateTo($"/access-group-schedule/{accessGroupGuid}");
+        // Navigation.NavigateTo($"/access-group-schedule/{accessGroupGuid.ToString()}");
+    }
+
+    private void NavigateToException(string accessGroupGuid)
+    {
+        // Important: Use string interpolation with ToString("D") or just ToString()
+        // Both work, but "D" is explicit
+        Navigation.NavigateTo($"/access-controller-groups/exceptions/{accessGroupGuid}");
+
+        // Alternative formats that also work:
+        // Navigation.NavigateTo($"/access-group-schedule/{accessGroupGuid}");
+        // Navigation.NavigateTo($"/access-group-schedule/{accessGroupGuid.ToString()}");
+    }
+}

@@ -1,0 +1,267 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Training
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Components.PaginationComponents
+@inject IStaffManagementService StaffManagementService
+
+<MudCard Elevation="0">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.AccessTime" Class="mr-2" />
+                Træningshistorik
+            </MudText>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center align-center pa-4">
+                <MudProgressCircular Indeterminate="true" />
+                <MudText Class="ml-3">Indlæser træningshistorik...</MudText>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">
+                @errorMessage
+            </MudAlert>
+        }
+        else if (accessLogs != null && accessLogs.AccessLogs.Count > 0)
+        {
+            <!-- Summary Cards -->
+            <MudGrid Class="mb-4">
+                <MudItem xs="12" sm="6" md="3">
+                    <MudCard Elevation="1" Class="pa-4 summary-card">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" Class="mr-3" />
+                            <div class="card-text-content">
+                                <MudText Typo="Typo.h6" Class="card-number">@approvedVisitsTotal</MudText>
+                                <MudText Typo="Typo.caption" Class="card-label">Godkendte besøg</MudText>
+                            </div>
+                        </div>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudCard Elevation="1" Class="pa-4 summary-card">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" Size="Size.Large" Class="mr-3" />
+                            <div class="card-text-content">
+                                <MudText Typo="Typo.h6" Class="card-number">@rejectedVisitsTotal</MudText>
+                                <MudText Typo="Typo.caption" Class="card-label">Afviste besøg</MudText>
+                            </div>
+                        </div>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudCard Elevation="1" Class="pa-4 summary-card">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.DateRange" Color="Color.Info" Size="Size.Large" Class="mr-3" />
+                            <div class="card-text-content">
+                                <MudText Typo="Typo.h6" Class="card-number">@totalVisitsFromApi</MudText>
+                                <MudText Typo="Typo.caption" Class="card-label">Total besøg</MudText>
+                            </div>
+                        </div>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudCard Elevation="1" Class="pa-4 summary-card">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Today" Color="Color.Primary" Size="Size.Large" Class="mr-3" />
+                            <div class="card-text-content">
+                                <MudText Typo="Typo.h6" Class="card-number">@GetLastVisitNumber()</MudText>
+                                <MudText Typo="Typo.caption" Class="card-label">@GetLastVisitLabel()</MudText>
+                            </div>
+                        </div>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+
+            <!-- Access Logs Table using PaginatedList component -->
+            <PaginatedList TItem="AccessLogsDTO"
+                           Items="accessLogs.AccessLogs"
+                           Pagination="accessLogs.Pagination"
+                           OnPageChanged="OnPageChanged">
+                <HeaderTemplate>
+                    <MudTh>Dato & Tid</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Controller</MudTh>
+                    <MudTh>Organisation</MudTh>
+                </HeaderTemplate>
+                <RowTemplate>
+                    <MudTd>
+                        @{
+                            var formattedDate = DateTime.TryParse(context.MemberAccessLogTime, out var dt)
+                            ? dt.ToString("dd/MM/yyyy HH:mm")
+                            : context.MemberAccessLogTime;
+                        }
+                        @formattedDate
+                    </MudTd>
+                    <MudTd>
+                        @if (context.MemberAccessLogState == 0)
+                        {
+                            <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="mr-1" />
+                                Godkendt
+                            </MudChip>
+                        }
+                        else if (context.MemberAccessLogState == 1)
+                        {
+                            <MudChip T="string" Color="Color.Error" Variant="Variant.Filled" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" Class="mr-1" />
+                                Afvist
+                            </MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Default" Variant="Variant.Filled" Size="Size.Small">
+                                Ukendt
+                            </MudChip>
+                        }
+                    </MudTd>
+                    <MudTd>@context.AccessControllerName</MudTd>
+                    <MudTd>@($"{context.OrganisationMainName} / {context.OrganisationSubName}")</MudTd>
+                </RowTemplate>
+            </PaginatedList>
+        }
+        else
+        {
+            <div class="text-center pa-8">
+                <MudIcon Icon="@Icons.Material.Filled.EventBusy" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+                <MudText Typo="Typo.body1">Ingen træningshistorik fundet</MudText>
+                @if (totalVisitsFromApi > 0)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Default">Dette medlem har @totalVisitsFromApi besøg i alt, men ingen er synlige på den aktuelle side</MudText>
+                }
+            </div>
+        }
+    </MudCardContent>
+</MudCard>
+
+<style>
+    .summary-card {
+        height: 88px !important;
+        display: flex !important;
+        align-items: center !important;
+        overflow: hidden !important;
+    }
+
+        .summary-card .mud-card-content {
+            padding: 16px !important;
+            height: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+            width: 100% !important;
+            overflow: hidden !important;
+        }
+
+    .card-text-content {
+        flex: 1 !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .card-number {
+        font-size: 1.5rem !important;
+        font-weight: 600 !important;
+        line-height: 1.2 !important;
+        margin-bottom: 2px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .card-label {
+        font-size: 0.75rem !important;
+        line-height: 1.1 !important;
+        margin: 0 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+</style>
+
+@code {
+    [Parameter] public string MemberGuid { get; set; } = string.Empty;
+
+    private AccessLogsListReponseDTO? accessLogs;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private int currentPage = 1;
+    private const int PageSize = 15; // Fixed page size
+
+    // Summary statistics
+    private int approvedVisitsTotal => accessLogs?.Pagination.TotalSuccess ?? 0;
+    private int rejectedVisitsTotal => accessLogs?.Pagination.TotalDenied ?? 0;
+    private int totalVisitsFromApi => accessLogs?.Pagination.TotalRecords ?? 0;
+
+    // Keep these for debugging if needed
+    private int approvedVisitsCurrentPage => accessLogs?.AccessLogs.Count(log => log.MemberAccessLogState == 0) ?? 0;
+    private int rejectedVisitsCurrentPage => accessLogs?.AccessLogs.Count(log => log.MemberAccessLogState == 1) ?? 0;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(MemberGuid))
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        await LoadAccessLogs(1, PageSize);
+    }
+
+    private async Task LoadAccessLogs(int page, int pageSize)
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            StateHasChanged();
+
+            accessLogs = await StaffManagementService.GetMemberAccessLogsAsync(MemberGuid, page, pageSize);
+            currentPage = page;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading access logs: {ex.Message}");
+            errorMessage = $"Fejl ved indlæsning af træningshistorik: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        await LoadAccessLogs(page, PageSize);
+    }
+
+    private string GetLastVisitNumber()
+    {
+        // Use the LastSeen property from pagination - this won't change when navigating pages
+        var lastSeen = accessLogs?.Pagination.LastSeen ?? -1;
+
+        if (lastSeen < 0)
+            return "Aldrig";
+
+        return lastSeen == 0 ? "I dag" :
+               lastSeen == 1 ? "I går" :
+               $"{lastSeen} dage";
+    }
+
+    private string GetLastVisitLabel()
+    {
+        // Use the LastSeen property from pagination - this won't change when navigating pages
+        var lastSeen = accessLogs?.Pagination.LastSeen ?? -1;
+
+        if (lastSeen < 0)
+            return "sidste besøg";
+
+        return lastSeen == 0 ? "sidste besøg" :
+               lastSeen == 1 ? "sidste besøg" :
+               "Siden sidste besøg";
+    }
+}

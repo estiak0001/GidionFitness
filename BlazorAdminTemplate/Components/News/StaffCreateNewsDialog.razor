@@ -1,0 +1,147 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.NewsDTO
+@using BlazorAdminTemplate.Application.Interfaces
+@inject INewsService NewsService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">Opret Nyhed</MudText>
+
+        <EditForm Model="@newsRequest" OnValidSubmit="@HandleCreate">
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="newsRequest.MemberNewsSubject"
+                              Label="Overskrift"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              MaxLength="200"
+                              HelperText="Indtast en beskrivende overskrift for nyheden"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="Icons.Material.Filled.Title" />
+
+                <MudTextField @bind-Value="newsRequest.MemberNewsText"
+                              Label="Indhold"
+                              Variant="Variant.Outlined"
+                              Lines="6"
+                              Required="true"
+                              MaxLength="2000"
+                              HelperText="Skriv nyhedens indhold"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="Icons.Material.Filled.Article" />
+
+                <MudDatePicker Date="newsRequest.MemberNewsDate"
+                               DateChanged="@((DateTime? date) => newsRequest.MemberNewsDate = date ?? DateTime.Today)"
+                               Label="Nyhedsdato"
+                               Variant="Variant.Outlined"
+                               Required="true"
+                               HelperText="Vælg hvornår nyheden skal vises"
+                               PickerVariant="PickerVariant.Dialog"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="Icons.Material.Filled.CalendarToday" />
+            </MudStack>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-3">
+                    @errorMessage
+                </MudAlert>
+            }
+        </EditForm>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">
+            Annuller
+        </MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="@HandleCreate"
+                   Disabled="@isCreating"
+                   StartIcon="@Icons.Material.Filled.Add">
+            @if (isCreating)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Opretter...</span>
+            }
+            else
+            {
+                <span>Opret Nyhed</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public EventCallback OnNewsCreated { get; set; }
+
+    private StaffCreateNewsRequestDTO newsRequest = new()
+    {
+        MemberNewsDate = DateTime.Today
+    };
+
+    private bool isCreating = false;
+    private string errorMessage = string.Empty;
+
+    private async Task HandleCreate()
+    {
+        if (string.IsNullOrWhiteSpace(newsRequest.MemberNewsSubject))
+        {
+            errorMessage = "Overskrift er påkrævet";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newsRequest.MemberNewsText))
+        {
+            errorMessage = "Indhold er påkrævet";
+            return;
+        }
+
+        if (newsRequest.MemberNewsDate == default)
+        {
+            errorMessage = "Nyhedsdato er påkrævet";
+            return;
+        }
+
+        try
+        {
+            isCreating = true;
+            errorMessage = string.Empty;
+
+            var response = await NewsService.CreateStaffNewsAsync(newsRequest);
+
+            if (response != null && !string.IsNullOrEmpty(response.Message))
+            {
+                // Check if the response indicates success (you may need to adjust this based on your API response)
+                if (response.Message.Contains("success", StringComparison.OrdinalIgnoreCase) ||
+                    response.Message.Contains("created", StringComparison.OrdinalIgnoreCase))
+                {
+                    Snackbar.Add("Nyhed oprettet succesfuldt!", Severity.Success);
+                    await OnNewsCreated.InvokeAsync();
+                    MudDialog.Close(DialogResult.Ok(true));
+                }
+                else
+                {
+                    errorMessage = response.Message;
+                }
+            }
+            else
+            {
+                errorMessage = "Der opstod en fejl ved oprettelsen af nyheden";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Fejl: {ex.Message}";
+            Console.WriteLine($"Error creating news: {ex.Message}");
+        }
+        finally
+        {
+            isCreating = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

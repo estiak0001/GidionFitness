@@ -1,0 +1,173 @@
+﻿@inject IAccessLogsService AccessLogsService
+@using BlazorAdminTemplate.Application.DTOs.Training
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Components.PaginationComponents
+@using BlazorAdminTemplate.Domain.Enums
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+@if (currentView == ViewType.Cards)
+{
+    <!-- Mobile Layout - Centered Cards -->
+    <div class="text-center">
+        <MudText Typo="Typo.h5" GutterBottom="true" Class="mb-4" Align="Align.Center">Træningshistorik</MudText>
+
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center">
+                <MudProgressCircular Indeterminate="true" />
+            </div>
+        }
+        else if (accessLogs != null && accessLogs.AccessLogs.Count > 0)
+        {
+            <!-- Centered Cards Stack -->
+            <MudStack Spacing="3" AlignItems="AlignItems.Center">
+                @foreach (var log in accessLogs.AccessLogs)
+                {
+                    <MudCard Elevation="2" Style="width: 100%; max-width: 400px;">
+                        <MudCardContent Class="text-center">
+                            <MudStack Spacing="2" AlignItems="AlignItems.Center">
+                                <MudText Typo="Typo.h6">
+                                    @{
+                                        var formattedDate = DateTime.TryParse(log.MemberAccessLogTime, out var dt)
+                                        ? dt.ToString("dd-MM-yyyy HH:mm")
+                                        : log.MemberAccessLogTime;
+                                    }
+                                @formattedDate
+                            </MudText>
+
+                            <MudChip T="string"
+                                     Color="@(log.MemberAccessLogState == 0 ? Color.Success : log.MemberAccessLogState == 1 ? Color.Error : Color.Default)"
+                                     Variant="Variant.Filled"
+                                     Size="Size.Small">
+                                @(log.MemberAccessLogState == 0 ? "Godkendt"
+                                                        : log.MemberAccessLogState == 1 ? "Afvist"
+                                                        : "Ukendt")
+                    </MudChip>
+
+                                <MudText Typo="Typo.body2" Color="Color.Primary">
+                                    @log.AccessControllerName
+                                </MudText>
+
+                                <MudText Typo="Typo.caption" Color="Color.Default">
+                                    @($"{log.OrganisationMainName} / {log.OrganisationSubName}")
+                                </MudText>
+                            </MudStack>
+                        </MudCardContent>
+                    </MudCard>
+                }
+            </MudStack>
+
+            <!-- Centered Mobile Pagination -->
+            <div class="d-flex justify-center mt-4">
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                                   Variant="Variant.Outlined"
+                                   Size="Size.Small"
+                                   Disabled="@(accessLogs.Pagination.HasPreviousPage == false)"
+                                   OnClick="@(() => ChangePage(accessLogs.Pagination.CurrentPage - 1))" />
+
+                    <MudText Typo="Typo.body2">
+                        Side @accessLogs.Pagination.CurrentPage af @accessLogs.Pagination.TotalPages
+                    </MudText>
+
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowForward"
+                                   Variant="Variant.Outlined"
+                                   Size="Size.Small"
+                                   Disabled="@(accessLogs.Pagination.HasNextPage == false)"
+                                   OnClick="@(() => ChangePage(accessLogs.Pagination.CurrentPage + 1))" />
+                </MudStack>
+            </div>
+        }
+        else if (accessLogs != null && accessLogs.AccessLogs.Count == 0)
+        {
+            <MudText Typo="Typo.body2">Ingen træningshistorik fundet.</MudText>
+        }
+    </div>
+}
+else
+{
+    <!-- Desktop Layout - Table View -->
+    <MudText Typo="Typo.h5" GutterBottom="true" Class="mb-4">Træningshistorik</MudText>
+
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (accessLogs != null && accessLogs.AccessLogs.Count > 0)
+    {
+        <PaginatedList TItem="AccessLogsDTO"
+                       Items="accessLogs.AccessLogs"
+                       Pagination="accessLogs.Pagination"
+                       OnPageChanged="LoadAccessLogs">
+            <HeaderTemplate>
+                <MudTh>Dato & Tid</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Controller</MudTh>
+                <MudTh>Organisation</MudTh>
+            </HeaderTemplate>
+            <RowTemplate>
+                <MudTd>
+                    @{
+                        var formattedDate = DateTime.TryParse(context.MemberAccessLogTime, out var dt)
+                        ? dt.ToString("dd-MM-yyyy HH:mm")
+                        : context.MemberAccessLogTime;
+                    }
+                    @formattedDate
+                </MudTd>
+                <MudTd>
+                    @if (context.MemberAccessLogState == 0)
+                    {
+                        <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Size="Size.Small">Godkendt</MudChip>
+                    }
+                    else if (context.MemberAccessLogState == 1)
+                    {
+                        <MudChip T="string" Color="Color.Error" Variant="Variant.Filled" Size="Size.Small">Afvist</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Color="Color.Default" Variant="Variant.Filled" Size="Size.Small">Ukendt</MudChip>
+                    }
+                </MudTd>
+                <MudTd>@context.AccessControllerName</MudTd>
+                <MudTd>@($"{context.OrganisationMainName} / {context.OrganisationSubName}")</MudTd>
+            </RowTemplate>
+        </PaginatedList>
+    }
+    else if (accessLogs != null && accessLogs.AccessLogs.Count == 0)
+    {
+        <MudText Typo="Typo.body2">Ingen træningshistorik fundet.</MudText>
+    }
+}
+
+@code {
+    private AccessLogsListReponseDTO accessLogs;
+    private bool isLoading = true;
+    private int currentPage = 1;
+    private ViewType currentView = ViewType.Table;
+
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        currentView = breakpoint <= Breakpoint.Sm ? ViewType.Cards : ViewType.Table;
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAccessLogs(currentPage);
+    }
+
+    private async Task LoadAccessLogs(int page)
+    {
+        isLoading = true;
+        accessLogs = await AccessLogsService.GetAccessLogsAsync(page);
+        currentPage = page;
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task ChangePage(int page)
+    {
+        await LoadAccessLogs(page);
+    }
+}

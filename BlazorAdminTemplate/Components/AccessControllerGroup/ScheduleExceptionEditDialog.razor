@@ -1,0 +1,243 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Access
+@inject IStaffManagementService StaffService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            @(IsEditMode ? "Edit Schedule Exception" : "Create New Schedule Exception")
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        @if (loading)
+        {
+            <div class="text-center py-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudForm @ref="form">
+                <MudTextField @bind-Value="CurrentException.AccessControllerScheduleExceptionName"
+                              Label="Exception Name"
+                              Required="true"
+                              Immediate="true"
+                              For="@(() => CurrentException.AccessControllerScheduleExceptionName)" />
+
+                <MudTextField @bind-Value="CurrentException.AccessControllerScheduleExceptionDescription"
+                              Label="Description"
+                              Lines="3"
+                              Immediate="true" />
+
+                <div class="d-flex gap-4 flex-wrap mt-4">
+                    <MudDatePicker @bind-Date="fromDate"
+                                   Label="Start Date"
+                                   Required="true"
+                                   Immediate="true" />
+
+                    <MudTimePicker @bind-Time="fromTime"
+                                   Label="Start Time"
+                                   Required="true"
+                                   Immediate="true" />
+                </div>
+
+                <div class="d-flex gap-4 flex-wrap mt-3">
+                    <MudDatePicker @bind-Date="toDate"
+                                   Label="End Date"
+                                   Required="true"
+                                   Immediate="true" />
+
+                    <MudTimePicker @bind-Time="toTime"
+                                   Label="End Time"
+                                   Required="true"
+                                   Immediate="true" />
+                </div>
+
+                <MudSelect T="int" @bind-Value="CurrentException.AccessControllerScheduleExceptionAccessStatus"
+                           Label="Access Status" Class="mt-4"
+                           Immediate="true">
+                    <MudSelectItem Value="0">Allow</MudSelectItem>
+                    <MudSelectItem Value="1">Deny</MudSelectItem>
+                    <!-- Add more statuses if your system supports them -->
+                </MudSelect>
+
+                <MudSwitch @bind-Value="CurrentException.AccessControllerScheduleExceptionEnabled"
+                           Label="Active / Enabled"
+                           Color="Color.Primary"
+                           Immediate="true"
+                           Class="mt-4" />
+            </MudForm>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="Submit"
+                   Disabled="@loading">
+            @(IsEditMode ? "Update" : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string? ExceptionId { get; set; }
+    [Parameter] public string AccessGroupId { get; set; } = default!;
+    [Parameter] public EventCallback OnSuccess { get; set; }
+
+    private bool loading = false;
+    private MudForm? form;
+
+    private StaffScheduleExceptionCreateDTO CurrentException { get; set; } = new();
+    private DateTime? fromDate;
+    private TimeSpan? fromTime;
+    private DateTime? toDate;
+    private TimeSpan? toTime;
+
+    private bool IsEditMode => string.IsNullOrEmpty(ExceptionId) == false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsEditMode)
+        {
+            await LoadExceptionData();
+        }
+        else
+        {
+            // New exception - default values
+            CurrentException = new StaffScheduleExceptionCreateDTO
+            {
+                AccessControllerAccessGroupsGUID = AccessGroupId,
+                AccessControllerScheduleExceptionEnabled = true
+            };
+
+            fromDate = DateTime.Today;
+            fromTime = new TimeSpan(9, 0, 0);
+            toDate = DateTime.Today.AddDays(1);
+            toTime = new TimeSpan(17, 0, 0);
+        }
+    }
+
+    private async Task LoadExceptionData()
+    {
+        loading = true;
+        try
+        {
+            var response = await StaffService.StaffGetScheduleExceptionAsync(ExceptionId);
+
+            if (response?.Data != null)
+            {
+                var data = response.Data;
+
+                CurrentException = new StaffScheduleExceptionCreateDTO
+                {
+                    AccessControllerAccessGroupsGUID = data.AccessControllerAccessGroupsGUID,
+                    AccessControllerScheduleExceptionName = data.AccessControllerScheduleExceptionName,
+                    AccessControllerScheduleExceptionDescription = data.AccessControllerScheduleExceptionDescription,
+                    AccessControllerScheduleExceptionAccessStatus = data.AccessControllerScheduleExceptionAccessStatus,
+                    AccessControllerScheduleExceptionEnabled = data.AccessControllerScheduleExceptionEnabled
+                };
+
+                fromDate = data.AccessControllerScheduleExceptionFromDateTime.Date;
+                fromTime = data.AccessControllerScheduleExceptionFromDateTime.TimeOfDay;
+                toDate = data.AccessControllerScheduleExceptionToDateTime.Date;
+                toTime = data.AccessControllerScheduleExceptionToDateTime.TimeOfDay;
+            }
+            else
+            {
+                Snackbar.Add(response?.Message ?? "Could not load exception data", Severity.Error);
+                MudDialog.Close(DialogResult.Cancel());
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading data: {ex.Message}", Severity.Error);
+            MudDialog.Close(DialogResult.Cancel());
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task Submit()
+    {
+        await form!.Validate();
+        if (!form.IsValid) return;
+
+        var start = fromDate?.Date + fromTime;
+        var end = toDate?.Date + toTime;
+
+        if (!start.HasValue || !end.HasValue || start >= end)
+        {
+            Snackbar.Add("Invalid date/time range (End must be after Start)", Severity.Warning);
+            return;
+        }
+
+        loading = true;
+
+        try
+        {
+            if (IsEditMode)
+            {
+                var editDto = new StaffScheduleExceptionEditDTO
+                {
+                    AccessControllerScheduleExceptionGUID = ExceptionId,
+                    AccessControllerAccessGroupsGUID = AccessGroupId,
+                    AccessControllerScheduleExceptionName = CurrentException.AccessControllerScheduleExceptionName,
+                    AccessControllerScheduleExceptionDescription = CurrentException.AccessControllerScheduleExceptionDescription ?? "",
+                    AccessControllerScheduleExceptionFromDateTime = start.Value,
+                    AccessControllerScheduleExceptionToDateTime = end.Value,
+                    AccessControllerScheduleExceptionAccessStatus = CurrentException.AccessControllerScheduleExceptionAccessStatus,
+                    AccessControllerScheduleExceptionEnabled = CurrentException.AccessControllerScheduleExceptionEnabled
+                };
+
+                var result = await StaffService.StaffEditScheduleExceptionAsync(editDto);
+                if (result?.Data != null)
+                {
+                    Snackbar.Add("Exception updated successfully", Severity.Success);
+                    await OnSuccess.InvokeAsync();
+                    MudDialog.Close(DialogResult.Ok(true));
+                }
+                else
+                {
+                    Snackbar.Add(result?.Message ?? "Update failed", Severity.Error);
+                }
+            }
+            else
+            {
+                CurrentException.AccessControllerScheduleExceptionFromDateTime = start.Value;
+                CurrentException.AccessControllerScheduleExceptionToDateTime = end.Value;
+
+                var result = await StaffService.StaffCreateScheduleExceptionAsync(CurrentException);
+                if (result?.Data != null)
+                {
+                    Snackbar.Add("Exception created successfully", Severity.Success);
+                    await OnSuccess.InvokeAsync();
+                    MudDialog.Close(DialogResult.Ok(true));
+                }
+                else
+                {
+                    Snackbar.Add(result?.Message ?? "Creation failed", Severity.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Operation failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Close(DialogResult.Cancel());
+    }
+}

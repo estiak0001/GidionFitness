@@ -1,0 +1,101 @@
+﻿@page "/templates"
+@using BlazorAdminTemplate.Application.DTOs.Templates
+@using BlazorAdminTemplate.Components.Template
+@using BlazorAdminTemplate.Domain.Entities
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject ITemplateService TemplateService
+
+<PageTitle>Email Templates</PageTitle>
+
+<MudPaper Class="pa-8 ma-4" Elevation="6" Style="border-radius: 16px;">
+    <MudText Typo="Typo.h4" GutterBottom="true" Class="mb-6">
+        <MudIcon Icon="@Icons.Material.Filled.Email" Class="mr-3" />
+        Email Templates
+    </MudText>
+
+    <!-- Search -->
+    <MudToolBar Gutters="false" Class="mb-6 gap-4">
+        <MudTextField @bind-Value="_searchString" Placeholder="Search templates..." Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" DebounceInterval="500"
+                      Class="mt-0" />
+        <MudSpacer />
+    </MudToolBar>
+
+    <!-- Templates Table (Server-side) -->
+    <MudTable @ref="_table" ServerData="LoadTemplates" Hover="true" Dense="true" Bordered="true" Striped="true"
+              Elevation="0">
+        <HeaderContent>
+            <MudTh>Key</MudTh>
+            <MudTh>Subject</MudTh>
+            <MudTh style="width: 160px;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Key">@context.MailTemplateName</MudTd>
+            <MudTd DataLabel="Subject">@context.MailTemplateSubject</MudTd>
+            <MudTd DataLabel="Actions">
+                <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Text"
+                           OnClick="@(() => OpenEditDialog(context.MailTemplateGUID))">
+                    <MudIcon Icon="@Icons.Material.Filled.Edit" />
+                </MudButton>
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="@(new[] { 10, 15, 25, 50 })" />
+        </PagerContent>
+        <LoadingContent>
+            <MudProgressCircular Indeterminate="true" />
+        </LoadingContent>
+        <NoRecordsContent>
+            <MudText>No templates found.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private MudTable<MailTemplate>? _table;
+    private string _searchString = string.Empty;
+
+    private async Task<TableData<MailTemplate>> LoadTemplates(TableState state, CancellationToken cancellationToken)
+    {
+        var query = new TemplateDTO
+        {
+            Page = state.Page + 1,          // MudTable is 0-based, your API likely 1-based
+            PageSize = state.PageSize,
+            Search = string.IsNullOrWhiteSpace(_searchString) ? null : _searchString
+        };
+
+        var response = await TemplateService.StaffGetMailTemplatesAsync(query);
+
+        return new TableData<MailTemplate>()
+        {
+            Items = response.Templates ?? new List<MailTemplate>(),
+            TotalItems = response?.Pagination?.TotalRecords
+                           ?? response?.Count
+                           ?? 0
+        };
+    }
+
+    private async Task OpenEditDialog(string keyOrGuid)
+    {
+        // For custom, you might pass empty string or special value; adjust dialog logic accordingly
+        var parameters = new DialogParameters<TemplateEditDialog>
+        {
+            { x => x.TemplateGuid, keyOrGuid }  // assuming the dialog accepts GUID or "Custom"
+        };
+
+        var dialog = await DialogService.ShowAsync<TemplateEditDialog>("Edit Template", parameters, new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true
+        });
+
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await _table!.ReloadServerData();  // Refresh table after edit/save
+        }
+    }
+}

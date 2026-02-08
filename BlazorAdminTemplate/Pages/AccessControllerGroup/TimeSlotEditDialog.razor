@@ -1,0 +1,261 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Access
+@using BlazorAdminTemplate.Pages.AccessControllerGroup
+@inject IStaffManagementService StaffService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudAlert Severity="Severity.Info" Dense="true">
+                Configure access time slots for @Day.DayName
+            </MudAlert>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="AddNewTimeSlot"
+                       FullWidth="false">
+                Add Time Slot
+            </MudButton>
+
+            @if (slotsLoading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+
+            <MudTable Items="@Day.TimeSlots"
+                      Hover="true"
+                      Dense="true"
+                      Elevation="0">
+                <HeaderContent>
+                    <MudTh>Start Time</MudTh>
+                    <MudTh>End Time</MudTh>
+                    <MudTh Style="width:150px">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Start Time">
+                        <MudTimePicker Time="@context.Start"
+                                       TimeChanged="@((TimeSpan? newTime) => OnStartTimeChanged(context, newTime))"
+                                       Label="Start"
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
+                                       AmPm="false"
+                                   />
+                    </MudTd>
+                    <MudTd DataLabel="End Time">
+                        <MudTimePicker Time="@context.End"
+                                       TimeChanged="@((TimeSpan? newTime) => OnEndTimeChanged(context, newTime))"
+                                       Label="End"
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
+                                       AmPm="false" />
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                            @if (context.IsNew)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Text">Unsaved</MudChip>
+                            }
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Color="Color.Error"
+                                           Size="Size.Small"
+                                           OnClick="@(() => DeleteSlot(context))" />
+                        </MudStack>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Typo="Typo.body2" Align="Align.Center" Class="pa-4">
+                        No time slots defined yet. Click "Add Time Slot" to create one.
+                    </MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public DayScheduleViewModel Day { get; set; } = default!;
+
+    private bool slotsLoading = false;
+
+    private async Task OnStartTimeChanged(TimeSlotViewModel slot, TimeSpan? newTime)
+    {
+        if (newTime.HasValue)
+        {
+            slot.Start = newTime.Value;
+            await SaveSlotIfValid(slot);
+        }
+    }
+
+    private async Task OnEndTimeChanged(TimeSlotViewModel slot, TimeSpan? newTime)
+    {
+        if (newTime.HasValue)
+        {
+            slot.End = newTime.Value;
+            await SaveSlotIfValid(slot);
+        }
+    }
+
+    private void AddNewTimeSlot()
+    {
+        if (Day == null) return;
+
+        var newSlot = new TimeSlotViewModel
+        {
+            DayConfigId = Day.Id,
+            Start = TimeSpan.FromHours(9),
+            End = TimeSpan.FromHours(17),
+            IsNew = true
+        };
+
+        Day.TimeSlots.Add(newSlot);
+        StateHasChanged();
+    }
+
+    private async Task SaveSlotIfValid(TimeSlotViewModel slot)
+    {
+        if (Day == null) return;
+
+        // Validation
+        if (slot.Start >= slot.End)
+        {
+            Snackbar.Add("End time must be after start time", Severity.Warning);
+            return;
+        }
+
+        var hasOverlap = Day.TimeSlots
+            .Where(s => s != slot)
+            .Any(s => slot.Start < s.End && slot.End > s.Start);
+
+        if (hasOverlap)
+        {
+            Snackbar.Add("Time slot overlaps with another slot!", Severity.Error);
+            return;
+        }
+
+        slotsLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            if (string.IsNullOrEmpty(slot.Id) || slot.IsNew)
+            {
+                // CREATE - Using StaffCreateScheduleTimeSlotAsync
+                var createDTO = new StaffScheduleTimeSlotCreateDTO
+                {
+                    AccessControllerScheduleDayConfigGUID = Day.Id,
+                    AccessControllerScheduleTimeSlotOpenTime = slot.Start ?? TimeSpan.Zero,
+                    AccessControllerScheduleTimeSlotCloseTime = slot.End ?? TimeSpan.Zero
+                };
+
+                var result = await StaffService.StaffCreateScheduleTimeSlotAsync(createDTO);
+
+                if (result?.Data != null && !string.IsNullOrEmpty(result.Data.AccessControllerScheduleTimeSlotGUID))
+                {
+                    slot.Id = result.Data.AccessControllerScheduleTimeSlotGUID;
+                    slot.DayConfigId = result.Data.AccessControllerScheduleDayConfigGUID;
+                    slot.Start = result.Data.AccessControllerScheduleTimeSlotOpenTime;
+                    slot.End = result.Data.AccessControllerScheduleTimeSlotCloseTime;
+                    slot.IsNew = false;
+                    Snackbar.Add("Time slot created successfully", Severity.Success);
+                }
+                else
+                {
+                    Snackbar.Add(result?.Message ?? "Failed to create time slot", Severity.Error);
+                }
+            }
+            else
+            {
+                // UPDATE - Using StaffUpdateScheduleTimeSlotAsync
+                var updateDTO = new StaffScheduleTimeSlotUpdateDTO
+                {
+                    AccessControllerScheduleTimeSlotGUID = slot.Id,
+                    AccessControllerScheduleDayConfigGUID = Day.Id,
+                    AccessControllerScheduleTimeSlotOpenTime = slot.Start ?? TimeSpan.Zero,
+                    AccessControllerScheduleTimeSlotCloseTime = slot.End ?? TimeSpan.Zero
+                };
+
+                var result = await StaffService.StaffUpdateScheduleTimeSlotAsync(updateDTO);
+
+                if (result?.Data != null)
+                {
+                    slot.Start = result.Data.AccessControllerScheduleTimeSlotOpenTime;
+                    slot.End = result.Data.AccessControllerScheduleTimeSlotCloseTime;
+                    Snackbar.Add("Time slot updated successfully", Severity.Success);
+                }
+                else
+                {
+                    Snackbar.Add(result?.Message ?? "Failed to update time slot", Severity.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving time slot: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            slotsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteSlot(TimeSlotViewModel slot)
+    {
+        if (Day == null) return;
+
+        var confirmed = await DialogService.ShowMessageBox(
+            "Confirm Delete",
+            "Are you sure you want to delete this time slot?",
+            yesText: "Delete",
+            cancelText: "Cancel");
+
+        if (confirmed == true)
+        {
+            slotsLoading = true;
+            StateHasChanged();
+
+            try
+            {
+                if (!string.IsNullOrEmpty(slot.Id) && !slot.IsNew)
+                {
+                    // DELETE - Using StaffDeleteScheduleTimeSlotAsync
+                    var result = await StaffService.StaffDeleteScheduleTimeSlotAsync(slot.Id);
+
+                    if (result?.Success == true)
+                    {
+                        Day.TimeSlots.Remove(slot);
+                        Snackbar.Add("Time slot deleted successfully", Severity.Success);
+                    }
+                    else
+                    {
+                        Snackbar.Add(result?.Message ?? "Failed to delete time slot", Severity.Error);
+                    }
+                }
+                else
+                {
+                    // Just remove from list if it wasn't saved yet
+                    Day.TimeSlots.Remove(slot);
+                    Snackbar.Add("Time slot removed", Severity.Info);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting time slot: {ex.Message}", Severity.Error);
+            }
+            finally
+            {
+                slotsLoading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

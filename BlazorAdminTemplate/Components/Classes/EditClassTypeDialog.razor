@@ -1,0 +1,224 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Location
+@using BlazorAdminTemplate.Application.DTOs.ClassTypes
+@using Tizzani.MudBlazor.HtmlEditor
+@* @inject IStaffManagementService StaffService *@
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            @(IsEditMode ? "Edit Class Type" : "Add New Class Type")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid Spacing="4" Class="mt-3">
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="ClassType.TrainingClassTypesName"
+                              Label="Class Type Name"
+                              Required="true"
+                              RequiredError="Name is required!" />
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudSelect T="string"
+                           Label="Location"
+                           @bind-Value="ClassType.TrainingClassLocationGUID"
+                           Required="true"
+                           RequiredError="Please select a location">
+                    @if (loadingLocations)
+                    {
+                        <MudSelectItem Value="@string.Empty" Disabled="true">Loading locations...</MudSelectItem>
+                    }
+                    else
+                    {
+                        foreach (var loc in locations)
+                        {
+                            <MudSelectItem Value="@loc.TrainingClassLocationGUID">
+                                @loc.TrainingClassLocationName
+                            </MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="ClassType.TrainingClassTypesMax"
+                              Label="Max Participants"
+                              InputType="InputType.Number"
+                              Min="1"
+                              Required="true" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Description</MudText>
+                <MudTextField @bind-Value="descriptionContent"
+                              Label="Description"
+                              Lines="8"
+                              Variant="Variant.Outlined"
+                              Placeholder="Enter description" />
+                @* Temporarily using regular textarea instead of HTML editor for testing
+                <MudHtmlEditor Content="@descriptionContent"
+                               ContentChanged="OnDescriptionChanged"
+                               Placeholder="Enter detailed description (supports bold, lists, links, etc.)"
+                               Style="height: 320px;" />
+                *@
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="@loading">
+            Save
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Inject] public IStaffManagementService StaffService { get; set; } = default!;
+    [Inject] public ISnackbar Snackbar { get; set; } = default!;
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public StaffTrainingClassTypeDTO ClassType { get; set; } = new();
+    [Parameter] public bool IsEditMode { get; set; } = false;
+
+    private List<StaffTrainingClassLocationDTO> locations = new();
+    private bool loadingLocations = true;
+    private bool loading = false;
+    private string? selectedLocationGuid;
+    private string descriptionContent = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLocationsAsync();
+
+        // Ensure the selected location is set correctly when editing
+        if (IsEditMode && !string.IsNullOrEmpty(ClassType.TrainingClassLocationGUID))
+        {
+            selectedLocationGuid = ClassType.TrainingClassLocationGUID;
+        }
+
+        // Initialize description content
+        descriptionContent = ClassType.TrainingClassTypesDescription ?? string.Empty;
+    }
+
+    private async Task LoadLocationsAsync()
+    {
+        try
+        {
+            var response = await StaffService.StaffGetClassLocationsAsync(1, 100);
+            locations = response.StaffTrainingClassLocations ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Failed to load locations: " + ex.Message, Severity.Error);
+            locations = new();
+        }
+        finally
+        {
+            loadingLocations = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(ClassType.TrainingClassTypesName))
+        {
+            Snackbar.Add("Class type name is required.", Severity.Error);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(ClassType.TrainingClassLocationGUID))
+        {
+            Snackbar.Add("Please select a location.", Severity.Error);
+            return;
+        }
+
+        if (ClassType.TrainingClassTypesMax < 1)
+        {
+            Snackbar.Add("Max participants must be at least 1.", Severity.Error);
+            return;
+        }
+
+        // Update the display name from the selected location
+        var selectedLoc = locations.FirstOrDefault(l => l.TrainingClassLocationGUID == ClassType.TrainingClassLocationGUID);
+        if (selectedLoc != null)
+        {
+            ClassType.TrainingClassLocationName = selectedLoc.TrainingClassLocationName;
+        }
+
+        // Update description from the editor
+        ClassType.TrainingClassTypesDescription = descriptionContent ?? string.Empty;
+        
+        Console.WriteLine($"Description content before save: {descriptionContent}");
+        Console.WriteLine($"ClassType.TrainingClassTypesDescription: {ClassType.TrainingClassTypesDescription}");
+
+        loading = true;
+
+        try
+        {
+            if (IsEditMode)
+            {
+                Console.WriteLine($"Updating class type - Description: {ClassType.TrainingClassTypesDescription}");
+                var response = await StaffService.StaffUpdateClassTypeAsync(ClassType);
+                if (!string.IsNullOrEmpty(response.Message))
+                {
+                    if (response.Message.Contains("Error"))
+                    {
+                        Snackbar.Add(response.Message, Severity.Error);
+                        loading = false;
+                        return;
+                    }
+                    MudDialog.Close(DialogResult.Ok(response.Message));
+                }
+                else
+                {
+                    MudDialog.Close(DialogResult.Ok("Class type updated successfully"));
+                }
+            }
+            else
+            {
+                var addDto = new AddNewTypeDTO
+                {
+                    TrainingClassLocationGUID = ClassType.TrainingClassLocationGUID,
+                    TrainingClassTypesName = ClassType.TrainingClassTypesName,
+                    TrainingClassTypesDescription = ClassType.TrainingClassTypesDescription,
+                    TrainingClassTypesMax = ClassType.TrainingClassTypesMax
+                };
+                Console.WriteLine($"Creating new class type - Description: {addDto.TrainingClassTypesDescription}");
+                var response = await StaffService.StaffAddClassTypeAsync(addDto);
+                if (!string.IsNullOrEmpty(response.Message))
+                {
+                    if (response.Message.Contains("Error"))
+                    {
+                        Snackbar.Add(response.Message, Severity.Error);
+                        loading = false;
+                        return;
+                    }
+                    MudDialog.Close(DialogResult.Ok(response.Message));
+                }
+                else
+                {
+                    MudDialog.Close(DialogResult.Ok("Class type added successfully"));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void OnDescriptionChanged(string value)
+    {
+        descriptionContent = value ?? string.Empty;
+        Console.WriteLine($"Description changed event - New value: {descriptionContent}");
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

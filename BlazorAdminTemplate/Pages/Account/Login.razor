@@ -1,0 +1,181 @@
+﻿@page "/login"
+@inject ILoginService LoginService
+@inject IProfileService ProfileService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Member Login</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    <MudCard Elevation="3">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <div class="d-flex align-center justify-center mb-4">
+                    <MudIcon Icon="Icons.Material.Filled.Login" Size="Size.Large" Color="Color.Primary" Class="mr-3" />
+                    <MudText Typo="Typo.h4" Color="Color.Primary">Member Login</MudText>
+                </div>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <EditForm Model="@loginRequest" OnValidSubmit="@HandleLogin">
+                <DataAnnotationsValidator />
+                <MudStack Spacing="4">
+                    <MudTextField @bind-Value="loginRequest.Email"
+                                  Label="Email Address"
+                                  Variant="Variant.Outlined"
+                                  InputType="InputType.Email"
+                                  Required="true"
+                                  For="@(() => loginRequest.Email)"
+                                  HelperText="Enter your registered email address"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="Icons.Material.Filled.Email" />
+
+                    <MudTextField @bind-Value="loginRequest.Password"
+                                  Label="Password"
+                                  Variant="Variant.Outlined"
+                                  InputType="@(showPassword? InputType.Text: InputType.Password)"
+                                  Required="true"
+                                  For="@(() => loginRequest.Password)"
+                                  HelperText="Enter your password"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@(showPassword? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                  OnAdornmentClick="@(() => showPassword = !showPassword)" />
+
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               FullWidth="true"
+                               Disabled="@isLoading"
+                               Size="Size.Large">
+                        @if (isLoading)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            <MudText Class="ml-2">Logging in...</MudText>
+                        }
+                        else
+                        {
+                            <MudIcon Icon="Icons.Material.Filled.Login" Class="mr-2" />
+                            <span>Login</span>
+                        }
+                    </MudButton>
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <MudAlert Severity="Severity.Error" ContentAlignment="HorizontalAlignment.Center">
+                            @errorMessage
+                        </MudAlert>
+                    }
+
+                </MudStack>
+            </EditForm>
+
+            <div class="mt-4">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           OnClick="@(() => Navigation.NavigateTo("/login/forgot-password"))">
+                    <MudIcon Icon="Icons.Material.Filled.LockReset" Class="mr-2" />
+                    <span>Forgot Password?</span>
+                </MudButton>
+            </div>
+
+        </MudCardContent>
+        <MudCardActions Class="justify-center pb-4">
+            <MudStack AlignItems="AlignItems.Center" Spacing="3">
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                    Har du ikke en konto?
+                </MudText>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.PersonAdd"
+                           OnClick="@(() => Navigation.NavigateTo("/register"))"
+                           Size="Size.Medium">
+                    Registrer dig her
+                </MudButton>
+            </MudStack>
+        </MudCardActions>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private LoginRequestDTO loginRequest = new();
+    private bool isLoading = false;
+    private bool showPassword = false;
+    private string errorMessage = string.Empty;
+    private string host = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if user is already logged in
+        if (await LoginService.IsAuthenticatedAsync())
+        {
+            Navigation.NavigateTo("/");
+        }
+
+        var uri = new Uri(Navigation.Uri);
+        host = uri.Host;
+
+        Console.WriteLine($"Current host: {host}");
+    }
+
+    private async Task HandleLogin()
+    {
+        if (string.IsNullOrWhiteSpace(loginRequest.Email) || string.IsNullOrWhiteSpace(loginRequest.Password))
+        {
+            errorMessage = "Please enter both email and password.";
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            var result = await LoginService.LoginAsync(loginRequest);
+
+            if (!string.IsNullOrEmpty(result.AccessToken))
+            {
+                Snackbar.Add($"Welcome back, {result.MemberName}!", Severity.Success);
+
+                var profile = await ProfileService.GetProfileAsync();
+
+                if (profile != null && profile.Notifications.Any(n => n.MemberNotificationType == 1))
+                {
+                    Navigation.NavigateTo("/membership-payment");
+                    return;
+                }
+
+                // Navigate to the intended page or home
+                var returnUrl = Navigation.GetUriWithQueryParameter("returnUrl", (string?)null);
+                var targetUrl = Navigation.Uri.Contains("returnUrl=")
+                    ? Navigation.Uri.Split("returnUrl=")[1]
+                    : "/";
+
+                
+
+                Navigation.NavigateTo(targetUrl);
+            }
+            else
+            {
+                errorMessage = "Invalid email or password. Please try again.";
+                Snackbar.Add("Login failed. Please check your credentials.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred during login. Please try again.";
+            Snackbar.Add($"Login failed: {ex.Message}", Severity.Error);
+            Console.WriteLine($"Login error: {ex}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ClearForm()
+    {
+        loginRequest = new LoginRequestDTO();
+        errorMessage = string.Empty;
+    }
+}

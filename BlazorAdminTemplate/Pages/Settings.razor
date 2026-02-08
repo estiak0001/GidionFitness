@@ -1,0 +1,552 @@
+@page "/settings"
+@using BlazorAdminTemplate.Application.DTOs.Authentication
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Components.Settings
+@inject IProfileService ProfileService
+@inject ILoginService LoginService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Settings</PageTitle>
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+@if (isLoading)
+{
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pa-4">
+        <MudCard>
+            <MudCardContent Class="text-center py-8">
+                <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
+                <MudText Typo="Typo.h6" Class="mt-4">Loading settings...</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudContainer>
+}
+else if (!string.IsNullOrEmpty(errorMessage))
+{
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pa-4">
+        <MudAlert Severity="Severity.Error" Class="mb-4">
+            <MudText Typo="Typo.h6">Error</MudText>
+            <MudText>@errorMessage</MudText>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@LoadProfile" Class="mt-2">
+                Try Again
+            </MudButton>
+        </MudAlert>
+    </MudContainer>
+}
+else
+{
+    @if (isMobile)
+    {
+        <!-- Mobile Layout -->
+        <div class="mobile-settings-container">
+            <!-- Mobile Header Section -->
+            <div class="mobile-settings-header" style="
+                        background: linear-gradient(135deg, rgba(63, 81, 181, 0.8), rgba(33, 150, 243, 0.8));
+                        height: 160px;
+                        position: relative;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin: 0;
+                        padding: 1rem;">
+
+                <div class="d-flex flex-column align-center text-center" style="color: white;">
+                    <!-- Profile Image -->
+                    @if (!string.IsNullOrEmpty(profileImageUrl))
+                    {
+                        <MudAvatar Size="Size.Large" Color="Color.Surface"
+                                   Style="width: 60px; height: 60px; border: 3px solid white; margin-bottom: 0.75rem;">
+                            <MudImage Src="@profileImageUrl" Alt="Profile Picture" Style="width: 100%; height: 100%; object-fit: cover;" />
+                        </MudAvatar>
+                    }
+                    else
+                    {
+                        <MudAvatar Size="Size.Large" Color="Color.Surface"
+                                   Style="width: 60px; height: 60px; border: 3px solid white; margin-bottom: 0.75rem;">
+                            <MudText Typo="Typo.h6" Style="color: var(--mud-palette-primary);">@GetInitials()</MudText>
+                        </MudAvatar>
+                    }
+
+                    <MudText Typo="Typo.h6" Style="color: white; font-weight: 600; margin-bottom: 0.25rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                        Indstillinger
+                    </MudText>
+                    <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.8); text-shadow: 0 1px 2px rgba(0,0,0,0.5);">
+                        @GetDisplayName()
+                    </MudText>
+
+                    @if (isLoadingProfileImage)
+                    {
+                        <div style="margin-top: 0.5rem;">
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" />
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Mobile Tabs -->
+            <MudPaper Elevation="0" Style="border-bottom: 1px solid var(--mud-palette-divider);">
+                <MudTabs Elevation="0"
+                         ApplyEffectsToContainer="false"
+                         SliderColor="Color.Primary"
+                         ActivePanelIndex="@activeTabIndex"
+                         ActivePanelIndexChanged="@((int index) => activeTabIndex = index)"
+                         Style="min-height: 48px"
+                         Centered="false"
+                         Class="mobile-tabs">
+
+                    <MudTabPanel Text="Profil" />
+                    <MudTabPanel Text="Konto" />
+                    <MudTabPanel Text="Sikkerhed" />
+                    <MudTabPanel Text="Fakturering" />
+                   @*  <MudTabPanel Text="Notifikationer" />
+                    <MudTabPanel Text="Præferencer" /> *@
+                </MudTabs>
+            </MudPaper>
+
+            <!-- Mobile Tab Content -->
+            <div Class="pa-3">
+                @switch (activeTabIndex)
+                {
+                    case 0:
+                        <ProfileSettingsTab Profile="@profile"
+                                            EditableProfile="@editableProfile"
+                                            IsEditing="@isEditing"
+                                            IsSaving="@isSaving"
+                                            OnStartEditing="@StartEditingProfile"
+                                            OnCancelEditing="@CancelEditingProfile"
+                                            OnSaveProfile="@SaveProfile"
+                                            OnImageUpdated="@OnProfileImageUpdated" />
+                        break;
+                    case 1:
+                        <AccountSettingsTab Profile="@profile" />
+                        break;
+                    case 2:
+                        <SecuritySettingsTab Profile="@profile" />
+                        break;
+                    case 3:
+                        <BillingSettingsTab />
+                        break;
+                 @*    case 4:
+                        <NotificationsSettingsTab EmailAccountUpdates="@emailAccountUpdates"
+                                                  EmailTrainingReminders="@emailTrainingReminders"
+                                                  EmailMarketing="@emailMarketing"
+                                                  PushMobile="@pushMobile"
+                                                  PushSMS="@pushSMS" />
+                        break;
+                    case 5:
+                        <!-- Preferences Tab - Placeholder -->
+                        <MudCard Elevation="2">
+                            <MudCardContent Class="text-center pa-4">
+                                <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Large" />
+                                <MudText Typo="Typo.h6" Class="mt-3">Præferencer</MudText>
+                                <MudText Typo="Typo.body2" Class="mud-text-secondary">Indstillinger vil blive vist her.</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                        break; *@
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Desktop Layout (Your existing layout) -->
+        <!-- Profile Header Section -->
+        <div style="background: linear-gradient(135deg, rgba(63, 81, 181, 0.8), rgba(33, 150, 243, 0.8));
+                                        height: 180px; position: relative; display: flex; align-items: center; margin: 0 -16px 24px -16px; padding: 0 16px;">
+            <MudContainer MaxWidth="MaxWidth.ExtraLarge">
+                <div class="d-flex align-center">
+                    <!-- ENHANCED: Profile Image with Initials Fallback -->
+                    @if (!string.IsNullOrEmpty(profileImageUrl))
+                    {
+                        <!-- Show Profile Image -->
+                        <MudAvatar Size="Size.Large" Color="Color.Surface"
+                                   Style="width: 80px; height: 80px; border: 3px solid white; margin-right: 1.5rem;">
+                            <MudImage Src="@profileImageUrl" Alt="Profile Picture" Style="width: 100%; height: 100%; object-fit: cover;" />
+                        </MudAvatar>
+                    }
+                    else
+                    {
+                        <!-- Show Initials as Fallback -->
+                        <MudAvatar Size="Size.Large" Color="Color.Surface"
+                                   Style="width: 80px; height: 80px; border: 3px solid white; margin-right: 1.5rem;">
+                            <MudText Typo="Typo.h4" Style="color: var(--mud-palette-primary);">@GetInitials()</MudText>
+                        </MudAvatar>
+                    }
+
+                    <div style="color: white;">
+                        <MudText Typo="Typo.h4" Style="color: white; font-weight: 600; margin-bottom: 0.5rem;">
+                            Indstillinger
+                        </MudText>
+                        <MudText Typo="Typo.body1" Style="color: rgba(255,255,255,0.8);">
+                            @GetDisplayName()
+                        </MudText>
+                        <!-- NEW: Image loading indicator -->
+                        @if (isLoadingProfileImage)
+                        {
+                            <div style="margin-top: 0.5rem;">
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" />
+                                <MudText Typo="Typo.caption" Style="color: rgba(255,255,255,0.6); margin-left: 0.5rem;">
+                                    Indlæser profilbillede...
+                                </MudText>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </MudContainer>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <MudPaper Elevation="0" Style="border-bottom: 1px solid var(--mud-palette-divider); margin: 0 -16px 24px -16px;">
+            <MudContainer MaxWidth="MaxWidth.ExtraLarge">
+                <MudTabs Elevation="0"
+                         ApplyEffectsToContainer="false"
+                         SliderColor="Color.Primary"
+                         ActivePanelIndex="@activeTabIndex"
+                         ActivePanelIndexChanged="@((int index) => activeTabIndex = index)"
+                         Style="min-height: 48px;">
+
+                    <MudTabPanel Text="Profil" Icon="@Icons.Material.Filled.Person" />
+                    <MudTabPanel Text="Konto" Icon="@Icons.Material.Filled.AccountCircle" />
+                    <MudTabPanel Text="Sikkerhed" Icon="@Icons.Material.Filled.Security" />
+                    <MudTabPanel Text="Fakturering" Icon="@Icons.Material.Filled.Payment" />
+                   @*  <MudTabPanel Text="Notifikationer" Icon="@Icons.Material.Filled.Notifications" />
+                    <MudTabPanel Text="Præferencer" Icon="@Icons.Material.Filled.Settings" /> *@
+                </MudTabs>
+            </MudContainer>
+        </MudPaper>
+
+        <!-- Tab Content Area -->
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-2 pb-8">
+            @switch (activeTabIndex)
+            {
+                case 0:
+                    // Profile Tab
+                    <ProfileSettingsTab Profile="@profile"
+                                        EditableProfile="@editableProfile"
+                                        IsEditing="@isEditing"
+                                        IsSaving="@isSaving"
+                                        OnStartEditing="@StartEditingProfile"
+                                        OnCancelEditing="@CancelEditingProfile"
+                                        OnSaveProfile="@SaveProfile"
+                                        OnImageUpdated="@OnProfileImageUpdated" />
+                    break;
+                case 1:
+                    // Account Tab
+                    <AccountSettingsTab Profile="@profile" />
+                    break;
+                case 2:
+                    // Security Tab
+                    <SecuritySettingsTab Profile="@profile" />
+                    break;
+                case 3:
+                    // Billing Tab
+                    <BillingSettingsTab />
+                    break;
+              @*   case 4:
+                    // Notifications Tab
+                    <NotificationsSettingsTab EmailAccountUpdates="@emailAccountUpdates"
+                                              EmailTrainingReminders="@emailTrainingReminders"
+                                              EmailMarketing="@emailMarketing"
+                                              PushMobile="@pushMobile"
+                                              PushSMS="@pushSMS" />
+                    break;
+                case 5:
+                    // Preferences Tab - Placeholder
+                    <MudCard Elevation="2">
+                        <MudCardContent Class="text-center py-16">
+                            <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Large" />
+                            <MudText Typo="Typo.h6" Class="mt-4">Præferencer</MudText>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">Indstillinger vil blive vist her.</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                    break; *@
+            }
+        </MudContainer>
+    }
+}
+
+@code {
+    private ProfileResponseDTO? profile;
+    private UpdateProfileRequestDTO editableProfile = new();
+    private UpdateProfileRequestDTO? originalProfile;
+
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private bool isEditing = false;
+    private bool isLoadingProfileImage = false;
+    private bool isMobile = false; // NEW: Mobile state
+    private string errorMessage = string.Empty;
+    private int activeTabIndex = 0;
+    private string profileImageUrl = string.Empty;
+
+    // Original settings variables (moved to Preferences tab)
+    private string siteName = "Admin Dashboard";
+    private string siteDescription = "A modern admin dashboard built with Blazor and MudBlazor";
+    private string selectedLanguage = "en";
+    private string selectedTimezone = "UTC";
+
+    private bool emailAccountUpdates = true;
+    private bool emailTrainingReminders = true;
+    private bool emailMarketing = false;
+    private bool pushMobile = true;
+    private bool pushSMS = false;
+
+    private string selectedTheme = "light";
+    private MudBlazor.Utilities.MudColor primaryColor = "#594AE2";
+    private double fontSize = 14;
+
+    // NEW: Breakpoint change handler
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        isMobile = breakpoint <= Breakpoint.Sm;
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check authentication
+        if (!await LoginService.IsAuthenticatedAsync())
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        await LoadProfile();
+    }
+
+    private async Task LoadProfile()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            StateHasChanged();
+
+            Console.WriteLine("Loading profile from ProfileService...");
+            profile = await ProfileService.GetProfileAsync();
+
+            if (profile == null)
+            {
+                errorMessage = "Failed to load profile information.";
+            }
+            else
+            {
+                Console.WriteLine($"Profile loaded successfully: {profile.MemberFirstName}");
+                CopyProfileToEditable();
+
+                // Load profile image after profile is loaded
+                await LoadProfileImage();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading profile: {ex.Message}");
+            errorMessage = "An error occurred while loading your profile.";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    // ENHANCED: Load profile image implementation
+    private async Task LoadProfileImage()
+    {
+        if (profile?.MemberGuid == null) return;
+
+        try
+        {
+            isLoadingProfileImage = true;
+            StateHasChanged();
+
+            Console.WriteLine($"Loading profile image for member: {profile.MemberGuid}");
+            var imageUrl = await ProfileService.GetProfileImageUrlAsync();
+
+            if (!string.IsNullOrEmpty(imageUrl))
+            {
+                profileImageUrl = imageUrl;
+                Console.WriteLine($"Profile image loaded: {imageUrl}");
+            }
+            else
+            {
+                Console.WriteLine("No profile image found, will show initials");
+                profileImageUrl = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading profile image: {ex.Message}");
+            profileImageUrl = string.Empty; // Fallback to initials
+        }
+        finally
+        {
+            isLoadingProfileImage = false;
+            StateHasChanged();
+        }
+    }
+
+    // NEW: Callback for when profile image is updated in ProfileSettingsTab
+    private async Task OnProfileImageUpdated(string? newImageUrl)
+    {
+        profileImageUrl = newImageUrl ?? string.Empty;
+        Console.WriteLine($"Profile image updated in header: {profileImageUrl}");
+        StateHasChanged();
+    }
+
+    private void CopyProfileToEditable()
+    {
+        if (profile == null) return;
+
+        editableProfile = new UpdateProfileRequestDTO
+        {
+            MemberGUID = profile.MemberGuid,
+            OrganisationMainGUID = profile.OrganisationMainGuid,
+            OrganisationSubGUID = profile.OrganisationSubGuid,
+            MemberPaymentGroupGUID = profile.MemberPaymentGroupGuid,
+            MemberFirstName = profile.MemberFirstName,
+            MemberLastName = profile.MemberLastName,
+            MemberAddress = profile.MemberAddress,
+            MemberCity = profile.MemberCity,
+            MemberZipCode = profile.MemberZipCode,
+            MemberBirthday = TryParseDate(profile.MemberBirthdate),
+            MemberSex = profile.MemberSex,
+            MemberCPR = profile.MemberCPR,
+            MemberPhonePrivate = profile.MemberPhonePrivate,
+            MemberPhoneWork = profile.MemberPhoneWork,
+            MemberEmail = profile.MemberEmail,
+            MemberJobTitle = profile.MemberJobTitle,
+        };
+
+        originalProfile = new UpdateProfileRequestDTO
+        {
+            MemberGUID = profile.MemberGuid,
+            OrganisationMainGUID = profile.OrganisationMainGuid,
+            OrganisationSubGUID = profile.OrganisationSubGuid,
+            MemberPaymentGroupGUID = profile.MemberPaymentGroupGuid,
+            MemberFirstName = profile.MemberFirstName,
+            MemberLastName = profile.MemberLastName,
+            MemberAddress = profile.MemberAddress,
+            MemberCity = profile.MemberCity,
+            MemberZipCode = profile.MemberZipCode,
+            MemberBirthday = TryParseDate(profile.MemberBirthdate),
+            MemberSex = profile.MemberSex,
+            MemberCPR = profile.MemberCPR,
+            MemberPhonePrivate = profile.MemberPhonePrivate,
+            MemberPhoneWork = profile.MemberPhoneWork,
+            MemberEmail = profile.MemberEmail,
+            MemberJobTitle = profile.MemberJobTitle,
+        };
+    }
+
+    private DateTime? TryParseDate(string? dateString)
+    {
+        if (string.IsNullOrWhiteSpace(dateString))
+            return null;
+
+        if (DateTime.TryParse(dateString, out var date))
+            return date;
+
+        return null;
+    }
+
+    private void StartEditingProfile()
+    {
+        isEditing = true;
+        StateHasChanged();
+    }
+
+    private void CancelEditingProfile()
+    {
+        if (originalProfile != null)
+        {
+            CopyProfileToEditable();
+        }
+        isEditing = false;
+        StateHasChanged();
+    }
+
+    private async Task SaveProfile()
+    {
+        try
+        {
+            isSaving = true;
+            StateHasChanged();
+
+            var success = await ProfileService.UpdateProfileAsync(editableProfile);
+
+            if (success)
+            {
+                await LoadProfile();
+                isEditing = false;
+                Snackbar.Add("Profile updated successfully!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Failed to update profile. Please try again.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving profile: {ex.Message}");
+            Snackbar.Add("An error occurred while saving your profile.", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    // Helper methods for display (same as Profile.razor)
+    private string GetDisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "Not provided" : value;
+
+    private string GetFormattedDate(string? dateValue)
+    {
+        if (string.IsNullOrWhiteSpace(dateValue))
+            return "Not provided";
+
+        if (DateTime.TryParse(dateValue, out var date))
+            return date.ToString("MMM dd, yyyy");
+
+        return dateValue;
+    }
+
+    private string GetDisplayName()
+    {
+        if (string.IsNullOrWhiteSpace(profile?.MemberFirstName) && string.IsNullOrWhiteSpace(profile?.MemberLastName))
+            return "User";
+
+        var firstName = profile?.MemberFirstName?.Trim() ?? "";
+        var lastName = profile?.MemberLastName?.Trim() ?? "";
+
+        return $"{firstName} {lastName}".Trim();
+    }
+
+    private string GetInitials()
+    {
+        // Check if we have both first and last name
+        if (string.IsNullOrWhiteSpace(profile?.MemberFirstName) || string.IsNullOrWhiteSpace(profile?.MemberLastName))
+            return "U";
+
+        var initials = "";
+
+        // Get first initial from first name
+        initials += profile.MemberFirstName.Trim()[0].ToString().ToUpper();
+
+        // Handle last name with potential special characters like hyphens and spaces
+        var lastNameParts = profile.MemberLastName.Split(new char[] { '-', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+        // Get initials from all parts of the last name
+        foreach (var part in lastNameParts)
+        {
+            if (!string.IsNullOrWhiteSpace(part))
+            {
+                initials += part.Trim()[0].ToString().ToUpper();
+            }
+        }
+
+        return initials;
+    }
+}

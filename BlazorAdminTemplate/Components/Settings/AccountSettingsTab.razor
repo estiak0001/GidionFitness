@@ -1,0 +1,130 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Authentication
+
+<MudText Typo="Typo.h5" GutterBottom="true">Account Information</MudText>
+<MudGrid>
+    <MudItem xs="12" md="8">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Account Details</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" md="6">
+                        <MudTextField Label="Email Address"
+                                      Variant="Variant.Outlined"
+                                      Value="@GetDisplayValue(Profile?.MemberEmail)"
+                                      ReadOnly />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField Label="First Name"
+                                      Variant="Variant.Outlined"
+                                      Value="@GetDisplayValue(Profile?.MemberFirstName)"
+                                      ReadOnly />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField Label="Last Name"
+                                      Variant="Variant.Outlined"
+                                      Value="@GetDisplayValue(Profile?.MemberLastName)"
+                                      ReadOnly />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField Label="Member Type"
+                                      Variant="Variant.Outlined"
+                                      Value="@GetDisplayValue(Profile?.MemberTypeName)"
+                                      ReadOnly />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField Label="Account Created"
+                                      Variant="Variant.Outlined"
+                                      Value="@GetDisplayValue(Profile?.MemberCreated)"
+                                      ReadOnly />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField Label="Last Activity"
+                                      Variant="Variant.Outlined"
+                                      Value="@GetDisplayValue(Profile?.MemberLastSeen)"
+                                      ReadOnly />
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit" Disabled>
+                    Edit Account
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Account Status</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudStack Spacing="3">
+                    <div class="d-flex justify-space-between align-center">
+                        <MudText Typo="Typo.body2">Status</MudText>
+                        <MudChip T="string" Color="@(Profile?.IsActive == true ? Color.Success : Color.Error)" Size="Size.Small">
+                            @(Profile?.IsActive == true ? "Active" : "Inactive")
+                        </MudChip>
+                    </div>
+                    <MudDivider />
+                    <div class="d-flex justify-space-between align-center">
+                        <MudText Typo="Typo.body2">Member Type</MudText>
+                        <MudText Typo="Typo.body2">@GetDisplayValue(Profile?.MemberTypeName)</MudText>
+                    </div>
+                    <div class="d-flex justify-space-between align-center">
+                        <MudText Typo="Typo.body2">Member Since</MudText>
+                        <MudText Typo="Typo.body2">@GetFormattedDate(Profile?.MemberCreated)</MudText>
+                    </div>
+                    <div class="d-flex justify-space-between align-center">
+                        <MudText Typo="Typo.body2">Last Login</MudText>
+                        <MudText Typo="Typo.body2">@GetFormattedDate(Profile?.MemberLastSeen)</MudText>
+                    </div>
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+
+        <MudCard Elevation="2" Class="mt-4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Account Actions</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudStack Spacing="2">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit" FullWidth="true" Disabled>
+                        Edit Account Details
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Download" FullWidth="true" Disabled>
+                        Export Account Data
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Material.Filled.Pause" FullWidth="true" Disabled>
+                        Suspend Account
+                    </MudButton>
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter] public ProfileResponseDTO? Profile { get; set; }
+
+    private string GetDisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "Not provided" : value;
+
+    private string GetFormattedDate(string? dateValue)
+    {
+        if (string.IsNullOrWhiteSpace(dateValue))
+            return "Not provided";
+
+        if (DateTime.TryParse(dateValue, out var date))
+            return date.ToString("MMM dd, yyyy");
+
+        return dateValue;
+    }
+}

@@ -1,0 +1,226 @@
+﻿@using MudBlazor
+@using BlazorAdminTemplate.Application.DTOs.Memberships
+@using BlazorAdminTemplate.Application.DTOs.Payment
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Update" Class="mr-3" />
+            Change Your Membership Plan
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        @if (IsLoadingCurrent || IsLoadingPlans)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+        }
+        else if (CurrentMembership != null)
+        {
+            <MudPaper Class="pa-4 mb-6" Elevation="1"
+                      Style="border-left: 4px solid var(--mud-palette-primary);">
+                <MudText Typo="Typo.subtitle1" Class="mb-1">
+                    <strong>Current Plan:</strong> @CurrentMembership.PaymentInfo.MemberPaymentGroupName
+                </MudText>
+                <MudText Typo="Typo.body1">
+                    Price: <strong>$@CurrentMembership.PaymentInfo.MemberPaymentPrice.ToString("0.00")</strong> per year
+                </MudText>
+                @if (!string.IsNullOrEmpty(CurrentMembership.PaymentInfo.MemberPaymentGroupDescription))
+                {
+                    <MudText Typo="Typo.body2" Class="mt-2 text-medium-emphasis">
+                        @CurrentMembership.PaymentInfo.MemberPaymentGroupDescription
+                    </MudText>
+                }
+            </MudPaper>
+        }
+
+        <MudAlert Severity="Severity.Info" Class="mb-6" Dense="true">
+            Pick a new plan below. It will start <strong>today</strong> unless you choose a future date.
+        </MudAlert>
+
+        <MudSelect T="string"
+                   Label="Select your new plan"
+                   Value="@SelectedPlanId"
+                   ValueChanged="@(s => SelectedPlanId = s)"
+                   Variant="Variant.Outlined"
+                   Adornment="Adornment.Start"
+                   AdornmentIcon="@Icons.Material.Filled.CardMembership"
+                   Placeholder="Choose a plan..."
+                   Disabled="@IsLoadingPlans"
+                   Class="mb-5">
+
+            @if (IsLoadingPlans)
+            {
+                <MudSelectItem T="string" Value="@null">
+                    <MudProgressCircular Indeterminate="true" Size="Size.Small" class="mr-2" />
+                    Loading plans...
+                </MudSelectItem>
+            }
+            else
+            {
+                foreach (var plan in AvailablePlans)
+                {
+                    bool isCurrent = plan.MemberPaymentGroupGUID == CurrentPlanId;
+
+                    <MudSelectItem T="string" Value="@plan.MemberPaymentGroupGUID">
+                        <div class="d-flex justify-space-between align-center w-100">
+                            <div>
+                                <div class="mud-typography-subtitle1 font-weight-medium">
+                                    @plan.MemberPaymentGroupName
+                                    @if (isCurrent)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="ml-3">Current Plan</MudChip>
+                                    }
+                                </div>
+                                <div class="mud-typography-caption text-muted">
+                                    @plan.MemberPaymentGroupDescription
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <strong>$@plan.MemberPaymentPrice</strong><span class="mud-typography-caption">/year</span>
+                            </div>
+                        </div>
+                    </MudSelectItem>
+                }
+            }
+        </MudSelect>
+
+        @if (!string.IsNullOrEmpty(SelectedPlanId) && SelectedPlanId != CurrentPlanId)
+        {
+            var selectedPlan = AvailablePlans.FirstOrDefault(p => p.MemberPaymentGroupGUID == SelectedPlanId);
+            if (selectedPlan != null)
+            {
+                bool isUpgrade = selectedPlan.MemberPaymentPrice > CurrentPlanPrice;
+
+                <MudAlert Severity="@(isUpgrade? Severity.Success: Severity.Warning)"
+                          Variant="Variant.Filled"
+                          Class="mb-5">
+                    <strong>
+                        You're @(isUpgrade ? "upgrading to" : "switching to") @selectedPlan.MemberPaymentGroupName!
+                    </strong>
+                    <br /><br />
+                    @if (isUpgrade && ProratedAmount > 0)
+                    {
+                        <text>You'll be charged <strong>$@ProratedAmount</strong> today (prorated).</text>
+                    }
+                    else if (!isUpgrade && ProratedCredit > 0)
+                    {
+                        <text>You'll receive a <strong>$@ProratedCredit:0.00</strong> credit on your next bill.</text>
+                    }
+                    else
+                    {
+                        <text>No charge today — new rate starts next cycle.</text>
+                    }
+                </MudAlert>
+            }
+        }
+
+        <MudDatePicker @bind-Date="EffectiveDate"
+                       Label="Effective date (optional)"
+                       Placeholder="Today (recommended)"
+                       MinDate="@DateTime.Today"
+                       Variant="Variant.Outlined"
+                       Class="mb-4" />
+
+        <MudCheckBox T="bool"
+                     @bind-Checked="Confirmed"
+                     Required="true"
+                     Label="I agree to change my membership plan as shown above" />
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@(!CanSubmit)"
+                   OnClick="SubmitChange">
+            @if (IsProcessing)
+            {
+                <MudProgressCircular Class="ms-2" Size="Size.Small" Indeterminate="true" />
+            }
+            else
+            {
+                @(IsUpgrade ? "UPGRADE NOW" : "Change Plan")
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Inject] IMemberMembershipService MemberMembershipService { get; set; } = default!;
+    [Inject] IMembershipService MembershipService { get; set; } = default!;
+    [Inject] ISnackbar Snackbar { get; set; } = default!;
+
+    private MemberPaymentMembershipInfoResponseDTO? CurrentMembership { get; set; }
+    private List<MembershipsDTO> AvailablePlans { get; set; } = new();
+
+    private string CurrentPlanId => CurrentMembership?.PaymentInfo.MemberPaymentGroupGUID ?? string.Empty;
+    private decimal CurrentPlanPrice => (decimal)(CurrentMembership?.PaymentInfo.MemberPaymentPrice ?? 0);
+
+    private string? SelectedPlanId { get; set; }
+    private DateTime? EffectiveDate { get; set; }
+    private bool Confirmed { get; set; }
+
+    private bool IsLoadingCurrent { get; set; } = true;
+    private bool IsLoadingPlans { get; set; } = true;
+    private bool IsProcessing { get; set; }
+
+    private bool IsUpgrade => !string.IsNullOrEmpty(SelectedPlanId) &&
+                              SelectedPlanId != CurrentPlanId &&
+                              AvailablePlans.Any(p => p.MemberPaymentGroupGUID == SelectedPlanId && p.MemberPaymentPrice > CurrentPlanPrice);
+
+    private bool CanSubmit => !string.IsNullOrEmpty(SelectedPlanId) &&
+                              SelectedPlanId != CurrentPlanId &&
+                              Confirmed &&
+                              !IsProcessing &&
+                              CurrentMembership != null;
+
+    // Replace with real proration calculation
+    private decimal ProratedAmount => 2.05m;
+    private decimal ProratedCredit => 1.50m;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadCurrentMembership(), LoadAvailablePlans());
+    }
+
+    private async Task LoadCurrentMembership()
+    {
+        try
+        {
+            CurrentMembership = await MemberMembershipService.GetMembershipInfo();
+        }
+        finally { IsLoadingCurrent = false; }
+    }
+
+    private async Task LoadAvailablePlans()
+    {
+        try
+        {
+            var response = await MembershipService.GetMembershipListAsync();
+            AvailablePlans = response.PaymentGroups
+                .OrderBy(p => p.MemberPaymentPrice)
+                .ToList();
+        }
+        finally { IsLoadingPlans = false; }
+    }
+
+    private async Task SubmitChange()
+    {
+        IsProcessing = true;
+        try
+        {
+            await Task.Delay(1200);
+            Snackbar.Add("Your plan has been updated successfully!", Severity.Success);
+            Dialog.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
+    }
+
+    private void Cancel() => Dialog.Cancel();
+}

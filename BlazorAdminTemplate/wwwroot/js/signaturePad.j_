@@ -1,0 +1,107 @@
+﻿// Simple signature pad for canvas using mouse/touch.
+// Exposes window.signaturePad.{ensure,init,clear,isEmpty,getDataUrl}
+(function () {
+    if (window.signaturePad) return;
+
+    const pads = new Map();
+
+    function resizeCanvasToDisplaySize(canvas) {
+        const rect = canvas.getBoundingClientRect();
+        // Account for device pixel ratio for crisp lines
+        const ratio = window.devicePixelRatio || 1;
+        const width = Math.floor(rect.width * ratio);
+        const height = Math.floor(rect.height * ratio);
+        if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+        }
+        const ctx = canvas.getContext("2d");
+        ctx.scale(ratio, ratio);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#111";
+    }
+
+    function attach(canvasId) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+
+        resizeCanvasToDisplaySize(canvas);
+
+        const ctx = canvas.getContext("2d");
+        const state = { drawing: false, lastX: 0, lastY: 0, dirty: false };
+
+        function getPos(e) {
+            if (e.touches && e.touches.length) {
+                const rect = canvas.getBoundingClientRect();
+                return {
+                    x: e.touches[0].clientX - rect.left,
+                    y: e.touches[0].clientY - rect.top
+                };
+            } else {
+                const rect = canvas.getBoundingClientRect();
+                return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            }
+        }
+
+        function start(e) {
+            e.preventDefault();
+            const pos = getPos(e);
+            state.drawing = true;
+            state.lastX = pos.x;
+            state.lastY = pos.y;
+        }
+
+        function move(e) {
+            if (!state.drawing) return;
+            e.preventDefault();
+            const pos = getPos(e);
+            ctx.beginPath();
+            ctx.moveTo(state.lastX, state.lastY);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+            state.lastX = pos.x;
+            state.lastY = pos.y;
+            state.dirty = true;
+        }
+
+        function end(e) {
+            if (!state.drawing) return;
+            e.preventDefault();
+            state.drawing = false;
+        }
+
+        // Mouse
+        canvas.addEventListener("mousedown", start);
+        canvas.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", end);
+        // Touch
+        canvas.addEventListener("touchstart", start, { passive: false });
+        canvas.addEventListener("touchmove", move, { passive: false });
+        canvas.addEventListener("touchend", end);
+
+        pads.set(canvasId, { canvas, ctx, state });
+    }
+
+    window.signaturePad = {
+        ensure: () => true,
+        init: (canvasId) => attach(canvasId),
+        clear: (canvasId) => {
+            const p = pads.get(canvasId);
+            if (!p) return;
+            p.ctx.clearRect(0, 0, p.canvas.width, p.canvas.height);
+            p.state.dirty = false;
+        },
+        isEmpty: (canvasId) => {
+            const p = pads.get(canvasId);
+            if (!p) return true;
+            return !p.state.dirty;
+        },
+        getDataUrl: (canvasId) => {
+            const p = pads.get(canvasId);
+            if (!p) return "";
+            return p.canvas.toDataURL("image/png");
+        }
+    };
+})();

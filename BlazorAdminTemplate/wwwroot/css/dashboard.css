@@ -1,0 +1,63 @@
+﻿.hero-banner {
+    background: linear-gradient(135deg, rgba(63,81,181,.9), rgba(33,150,243,.9));
+    border-radius: 16px;
+    padding: 18px 22px;
+    color: white;
+}
+
+.hero-subtle {
+    color: rgba(255,255,255,.85);
+}
+
+.hero-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.hero-left {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+}
+
+/* Make the grid span the whole available content width */
+.dashboard-grid {
+    width: 100%;
+    max-width: none;
+}
+
+.dashboard-warning {
+    border-radius: 16px;
+    background: red;
+    color: white;
+}
+
+    .dashboard-warning .warning-content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+        flex-wrap: wrap;
+    }
+
+.warning-left {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+}
+
+/* Signature pad styling */
+.signature-canvas-container {
+    border: 2px solid #000000;
+    border-radius: 6px;
+    background-color: #ffffff;
+    padding: 4px;
+}
+
+    .signature-canvas-container canvas {
+        display: block;
+        border-radius: 4px;
+    }

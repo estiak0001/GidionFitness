@@ -1,0 +1,622 @@
+﻿@page "/members"
+@using BlazorAdminTemplate.Application.DTOs.Members
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Components.Members
+@using BlazorAdminTemplate.Domain.Entities
+@using Microsoft.AspNetCore.Authorization
+@inject IMemberService MemberService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+
+<PageTitle>Member List</PageTitle>
+
+<AuthorizeView Policy="StaffOnly">
+    <Authorized>
+        <MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+
+            @if (isMobile)
+            {
+                <!-- Mobile Layout -->
+                <div class="text-center mb-4">
+                    <MudText Typo="Typo.h5" GutterBottom="true">Medlemsliste</MudText>
+
+                    <!-- Mobile Add Member Button -->
+                    <div class="mb-3">
+                        <MudFab Color="Color.Primary"
+                                StartIcon="@Icons.Material.Filled.PersonAdd"
+                                Size="Size.Medium"
+                                OnClick="OpenAddMemberDialog"
+                                Label="Tilføj medlem" />
+                    </div>
+
+                    <!-- Mobile Search with Built-in Debouncing -->
+                    <MudTextField @bind-Value="searchTerm"
+                                  Label="Søg medlemmer..."
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  OnAdornmentClick="SearchImmediately"
+                                  DebounceInterval="500"
+                                  OnDebounceIntervalElapsed="OnSearchDebounced"
+                                  Class="mb-3"
+                                  Clearable="true"
+                                  OnClearButtonClick="ClearSearch"
+                                  HelperText="@GetSearchHelperText()" />
+                </div>
+
+                @if (isLoading)
+                {
+                    <div class="d-flex justify-center">
+                        <MudProgressCircular Indeterminate="true" />
+                        <MudText Class="ml-3">
+                            @if (isSearching)
+                            {
+                                <span>Søger efter "@currentSearchTerm"...</span>
+                            }
+                            else
+                            {
+                                <span>Indlæser medlemmer...</span>
+                            }
+                        </MudText>
+                    </div>
+                }
+                else if (memberResponse?.Members?.Count > 0)
+                {
+                    <!-- Mobile Member Cards -->
+                    <MudStack Spacing="3" AlignItems="AlignItems.Center">
+                        @foreach (var member in memberResponse.Members)
+                        {
+                            <MudCard Elevation="2" Style="width: 100%; max-width: 400px;">
+                                <MudCardContent>
+                                    <div class="d-flex align-center gap-3">
+                                        <!-- Member Avatar -->
+                                        <MudAvatar Color="@GetMemberStatusColor(member)" Size="Size.Large">
+                                            @if (!string.IsNullOrEmpty(member.MemberImage))
+                                            {
+                                                <MudImage Src="@member.MemberImage" Alt="Profile" />
+                                            }
+                                            else
+                                            {
+                                                @GetMemberInitials(member)
+                                            }
+                                        </MudAvatar>
+
+                                        <!-- Member Info -->
+                                        <div class="flex-grow-1">
+                                            <MudText Typo="Typo.h6">
+                                                @($"{member.MemberFirstName} {member.MemberLastName}")
+                                            </MudText>
+                                            <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                                                @member.MemberEmail
+                                            </MudText>
+                                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                                @member.MemberPhonePrivate
+                                            </MudText>
+                                            <div class="mt-1">
+                                                <MudChip T="string"
+                                                         Color="@GetMemberStatusColor(member)"
+                                                         Size="Size.Small"
+                                                         Variant="Variant.Filled">
+                                                    @GetMemberStatusText(member)
+                                                </MudChip>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Mobile Action Buttons -->
+                                    <div class="d-flex justify-end gap-2 mt-3">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                                       Color="Color.Primary"
+                                                       Size="Size.Small"
+                                                       Title="Se detaljer"
+                                                       OnClick="@(() => ViewMemberDetails(member))" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                       Color="Color.Info"
+                                                       Size="Size.Small"
+                                                       Title="Rediger medlem"
+                                                       OnClick="@(() => EditMember(member))" />
+                                    </div>
+                                </MudCardContent>
+                            </MudCard>
+                        }
+                    </MudStack>
+
+                    <!-- Mobile Pagination -->
+                    @if (memberResponse.Pagination.TotalPages > 1)
+                    {
+                        <div class="d-flex justify-center mt-4">
+                            <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                                               Variant="Variant.Outlined"
+                                               Size="Size.Small"
+                                               Disabled="@(!memberResponse.Pagination.HasPreviousPage)"
+                                               OnClick="@(() => LoadMembers(memberResponse.Pagination.CurrentPage - 1))" />
+
+                                <MudText Typo="Typo.body2">
+                                    Side @memberResponse.Pagination.CurrentPage af @memberResponse.Pagination.TotalPages
+                                </MudText>
+
+                                <MudIconButton Icon="@Icons.Material.Filled.ArrowForward"
+                                               Variant="Variant.Outlined"
+                                               Size="Size.Small"
+                                               Disabled="@(!memberResponse.Pagination.HasNextPage)"
+                                               OnClick="@(() => LoadMembers(memberResponse.Pagination.CurrentPage + 1))" />
+                            </MudStack>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <MudAlert Severity="MudBlazor.Severity.Info" Class="mt-4">
+                        @if (!string.IsNullOrEmpty(currentSearchTerm))
+                        {
+                            <span>Ingen medlemmer fundet for søgning: "@currentSearchTerm"</span>
+                        }
+                        else
+                        {
+                            <span>Ingen medlemmer fundet.</span>
+                        }
+                    </MudAlert>
+                }
+            }
+            else
+            {
+                <!-- Desktop Layout -->
+                <MudText Typo="Typo.h4" GutterBottom="true">
+                    <MudIcon Icon="@Icons.Material.Filled.People" Class="mr-2" />
+                    Medlemsliste
+                </MudText>
+
+                <MudCard Elevation="2">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">
+                                Medlemmer (@(memberResponse?.Count ?? 0))
+                            </MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <!-- Desktop Add Member Button -->
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.PersonAdd"
+                                       OnClick="OpenAddMemberDialog"
+                                       Class="mr-3">
+                                Tilføj medlem
+                            </MudButton>
+
+                            <!-- Desktop Search with Built-in Debouncing -->
+                            <MudTextField @bind-Value="searchTerm"
+                                          Label="Søg medlemmer..."
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.End"
+                                          AdornmentIcon="@Icons.Material.Filled.Search"
+                                          OnAdornmentClick="SearchImmediately"
+                                          DebounceInterval="500"
+                                          OnDebounceIntervalElapsed="OnSearchDebounced"
+                                          Style="min-width: 300px;"
+                                          Clearable="true"
+                                          OnClearButtonClick="ClearSearch"
+                                          HelperText="@GetSearchHelperText()" />
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (isLoading)
+                        {
+                            <div class="d-flex justify-center align-center pa-4">
+                                <MudProgressCircular Indeterminate="true" />
+                                <MudText Class="ml-3">
+                                    @if (isSearching)
+                                    {
+                                        <span>Søger efter "@currentSearchTerm"...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Indlæser medlemmer...</span>
+                                    }
+                                </MudText>
+                            </div>
+                        }
+                        else if (memberResponse?.Members?.Count > 0)
+                        {
+                            <MudTable Items="@memberResponse.Members"
+                                      Hover="true"
+                                      Breakpoint="Breakpoint.Sm"
+                                      Dense="true"
+                                      FixedHeader="true"
+                                      Height="600px">
+                                <HeaderContent>
+                                    <MudTh>Medlem</MudTh>
+                                    <MudTh>Email</MudTh>
+                                    <MudTh>Telefon</MudTh>
+                                    <MudTh>By</MudTh>
+                                    <MudTh>Status</MudTh>
+                                    <MudTh>Medlemsskab</MudTh>
+                                    <MudTh>Sidst set</MudTh>
+                                    <MudTh>Handlinger</MudTh>
+                                </HeaderContent>
+                                <RowTemplate Context="member">
+                                    <MudTd DataLabel="Medlem">
+                                        <div class="d-flex align-center gap-3">
+                                            <MudAvatar Color="@GetMemberStatusColor(member)" Size="Size.Medium">
+                                                @if (!string.IsNullOrEmpty(member.MemberImage))
+                                                {
+                                                    <MudImage Src="@member.MemberImage" Alt="Profile" />
+                                                }
+                                                else
+                                                {
+                                                    @GetMemberInitials(member)
+                                                }
+                                            </MudAvatar>
+                                            <div>
+                                                <MudText Typo="Typo.body1">
+                                                    @($"{member.MemberFirstName} {member.MemberLastName}")
+                                                </MudText>
+                                                @if (member.MemberBirthday.HasValue)
+                                                {
+                                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                                        @GetAge(member.MemberBirthday.Value) år
+                                                    </MudText>
+                                                }
+                                            </div>
+                                        </div>
+                                    </MudTd>
+                                    <MudTd DataLabel="Email">
+                                        <MudText Typo="Typo.body2">@member.MemberEmail</MudText>
+                                    </MudTd>
+                                    <MudTd DataLabel="Telefon">
+                                        <MudText Typo="Typo.body2">@member.MemberPhonePrivate</MudText>
+                                    </MudTd>
+                                    <MudTd DataLabel="By">
+                                        <MudText Typo="Typo.body2">
+                                            @if (!string.IsNullOrEmpty(member.MemberCity))
+                                            {
+                                                @($"{member.MemberCity} {member.MemberZipCode}")
+                                            }
+                                            else
+                                            {
+                                                <span>-</span>
+                                            }
+                                        </MudText>
+                                    </MudTd>
+                                    <MudTd DataLabel="Status">
+                                        <MudChip T="string"
+                                                 Color="@GetMemberStatusColor(member)"
+                                                 Size="Size.Small"
+                                                 Variant="Variant.Filled">
+                                            @GetMemberStatusText(member)
+                                        </MudChip>
+                                    </MudTd>
+                                    <MudTd DataLabel="Medlemsskab">
+                                        <MudChip T="string"
+                                                 Color="@GetMembershipColor(member)"
+                                                 Size="Size.Small"
+                                                 Variant="Variant.Outlined">
+                                            @GetMembershipText(member)
+                                        </MudChip>
+                                    </MudTd>
+                                    <MudTd DataLabel="Sidst set">
+                                        <MudText Typo="Typo.body2">
+                                            @if (member.MemberLastSeen.HasValue && member.MemberLastSeen.Value != default)
+                                            {
+                                                @member.MemberLastSeen.Value.ToString("dd/MM/yyyy")
+                                            }
+                                            else
+                                            {
+                                                <span>Aldrig</span>
+                                            }
+                                        </MudText>
+                                    </MudTd>
+                                    <MudTd DataLabel="Handlinger">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                                       Color="Color.Primary"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => ViewMemberDetails(member))" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                       Color="Color.Info"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => EditMember(member))" />
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+
+                            <!-- Desktop Pagination -->
+                            @if (memberResponse.Pagination.TotalPages > 1)
+                            {
+                                <div class="d-flex justify-center align-center mt-3 gap-2">
+                                    <MudButton Variant="Variant.Text"
+                                               StartIcon="@Icons.Material.Filled.ChevronLeft"
+                                               Disabled="@(!memberResponse.Pagination.HasPreviousPage)"
+                                               OnClick="@(() => LoadMembers(memberResponse.Pagination.CurrentPage - 1))">
+                                        Forrige
+                                    </MudButton>
+
+                                    <MudText Typo="Typo.body2" Class="mx-3">
+                                        Side @memberResponse.Pagination.CurrentPage af @memberResponse.Pagination.TotalPages
+                                        (@memberResponse.Count medlemmer)
+                                    </MudText>
+
+                                    <MudButton Variant="Variant.Text"
+                                               EndIcon="@Icons.Material.Filled.ChevronRight"
+                                               Disabled="@(!memberResponse.Pagination.HasNextPage)"
+                                               OnClick="@(() => LoadMembers(memberResponse.Pagination.CurrentPage + 1))">
+                                        Næste
+                                    </MudButton>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <MudAlert Severity="MudBlazor.Severity.Info">
+                                @if (!string.IsNullOrEmpty(currentSearchTerm))
+                                {
+                                    <span>Ingen medlemmer fundet for søgning: "@currentSearchTerm"</span>
+                                }
+                                else
+                                {
+                                    <span>Ingen medlemmer fundet.</span>
+                                }
+                            </MudAlert>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            }
+        </MudContainer>
+    </Authorized>
+    <NotAuthorized>
+        <MudAlert Severity="MudBlazor.Severity.Warning" Class="ma-4">
+            <MudText Typo="Typo.h6">Adgang nægtet</MudText>
+            <MudText>Du har ikke tilladelse til at se medlemslisten.</MudText>
+        </MudAlert>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private StaffMemberListResponseDTO? memberResponse;
+    private bool isLoading = true;
+    private bool isSearching = false;
+    private string searchTerm = string.Empty;
+    private string currentSearchTerm = string.Empty;
+    private string searchMembership = string.Empty;
+    private int currentPage = 1;
+    private const int pageSize = 20;
+    private bool isMobile = false;
+
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        isMobile = breakpoint <= Breakpoint.Sm;
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMembers();
+    }
+
+    private async Task OnSearchDebounced(string searchValue)
+    {
+        searchTerm = searchValue;
+        await SearchMembers();
+    }
+
+    private async Task OnSearchKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SearchMembers();
+        }
+    }
+
+    private async Task SearchImmediately()
+    {
+        await SearchMembers();
+    }
+
+    private async Task SearchMembers()
+    {
+        try
+        {
+            isSearching = !string.IsNullOrWhiteSpace(searchTerm);
+            currentSearchTerm = searchTerm;
+
+            await LoadMembers(1);
+        }
+        finally
+        {
+            isSearching = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ClearSearch()
+    {
+        searchTerm = string.Empty;
+        currentSearchTerm = string.Empty;
+        await SearchMembers();
+    }
+
+    private string GetSearchHelperText()
+    {
+        if (isSearching && !string.IsNullOrWhiteSpace(currentSearchTerm))
+        {
+            return $"Søger efter '{currentSearchTerm}'...";
+        }
+        if (!string.IsNullOrWhiteSpace(searchTerm) && searchTerm != currentSearchTerm)
+        {
+            return "Søger automatisk om lidt...";
+        }
+        return string.Empty;
+    }
+
+    private async Task LoadMembers(int page = 1)
+    {
+        try
+        {
+            isLoading = true;
+            currentPage = page;
+            StateHasChanged();
+
+            memberResponse = await MemberService.GetMemberListAsync(page, pageSize, searchTerm, searchMembership);
+
+            if (memberResponse != null)
+            {
+                if (memberResponse.Members?.Count > 0)
+                {
+                    var firstMember = memberResponse.Members[0];
+                }
+            }
+
+            if (memberResponse == null)
+            {
+                Snackbar.Add("Kunne ikke indlæse medlemsliste", MudBlazor.Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error loading members: {ex.Message}");
+            Snackbar.Add($"Fejl ved indlæsning: {ex.Message}", MudBlazor.Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenAddMemberDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            ["OnMemberRegistered"] = EventCallback.Factory.Create(this, OnMemberRegisteredFromDialog)
+        };
+
+        var options = new DialogOptions()
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseButton = true,
+            Position = DialogPosition.Center
+        };
+
+        await DialogService.ShowAsync<MemberRegisterMemberDialog>("Registrer nyt medlem", parameters, options);
+    }
+
+    private async Task OnMemberRegisteredFromDialog()
+    {
+        // Reload the member list to show the newly registered member
+        await LoadMembers(currentPage);
+        Snackbar.Add("Medlemsliste opdateret", MudBlazor.Severity.Success);
+    }
+
+    private async Task ViewMemberDetails(Member member)
+    {
+        var parameters = new DialogParameters
+        {
+            ["MemberGuid"] = member.MemberGUID,
+            ["OnMemberUpdated"] = EventCallback.Factory.Create(this, OnMemberUpdatedFromDialog)
+        };
+
+        var options = new DialogOptions()
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true,
+            Position = DialogPosition.Center
+        };
+
+        await DialogService.ShowAsync<MemberDetailsDialog>("Medlemsdetaljer", parameters, options);
+    }
+
+    private async Task EditMember(Member member)
+    {
+        var parameters = new DialogParameters
+        {
+            ["MemberGuid"] = member.MemberGUID,
+            ["OnMemberUpdated"] = EventCallback.Factory.Create(this, OnMemberUpdatedFromDialog)
+        };
+
+        var options = new DialogOptions()
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseButton = true,
+            Position = DialogPosition.Center
+        };
+
+        await DialogService.ShowAsync<MemberUpdateDialog>("Rediger medlem", parameters, options);
+    }
+
+    private async Task OnMemberUpdatedFromDialog()
+    {
+        // Reload the member list to reflect any changes
+        await LoadMembers(currentPage);
+        Snackbar.Add("Medlemsliste opdateret", MudBlazor.Severity.Success);
+    }
+
+    private string GetMemberInitials(Member member)
+    {
+        var first = !string.IsNullOrEmpty(member.MemberFirstName) ? member.MemberFirstName[0].ToString() : "";
+        var last = !string.IsNullOrEmpty(member.MemberLastName) ? member.MemberLastName[0].ToString() : "";
+        return (first + last).ToUpper();
+    }
+
+    private int GetAge(DateTime birthDate)
+    {
+        var today = DateTime.Today;
+        var age = today.Year - birthDate.Year;
+        if (birthDate > today.AddYears(-age)) age--;
+        return age;
+    }
+
+    private Color GetMemberStatusColor(Member member)
+    {
+        if (member.MemberActive == 1)
+        {
+            return (member.MemberTrial ?? 0) == 1 ? Color.Warning : Color.Success;
+        }
+        return (member.MemberPause ?? 0) == 1 ? Color.Info : Color.Error;
+    }
+
+    private string GetMemberStatusText(Member member)
+    {
+        if (member.MemberActive == 1)
+        {
+            return (member.MemberTrial ?? 0) == 1 ? "Prøve" : "Aktiv";
+        }
+        return (member.MemberPause ?? 0) == 1 ? "Pause" : "Inaktiv";
+    }
+
+    private Color GetMembershipColor(Member member)
+    {
+        return !string.IsNullOrEmpty(member.MemberPaymentGroupName) ? Color.Primary : Color.Default;
+    }
+
+    private string GetMembershipText(Member member)
+    {
+        return !string.IsNullOrEmpty(member.MemberPaymentGroupName) ? member.MemberPaymentGroupName : "Ikke angivet";
+    }
+
+    private Color GetMemberTypeColor(Member member)
+    {
+        return member.MemberType switch
+        {
+            1 => Color.Primary,
+            2 => Color.Warning,
+            3 => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private string GetMemberTypeText(Member member)
+    {
+        return member.MemberType switch
+        {
+            1 => "Medlem",
+            2 => "Staff",
+            3 => "Admin",
+            _ => "Ukendt"
+        };
+    }
+}

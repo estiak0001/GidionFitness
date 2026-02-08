@@ -1,0 +1,210 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Authentication
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Application.Validators
+@using FluentValidation
+@using Blazored.FluentValidation
+@inject IResetPasswordService ResetPasswordService
+@inject ISnackbar Snackbar
+@inject IValidator<ChangePasswordRequestDTO> ChangePasswordValidator
+
+<MudText Typo="Typo.h5" GutterBottom="true">Security Settings</MudText>
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Password & Authentication</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudStack Spacing="3">
+                    @if (!IsChangingPassword)
+                    {
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Key"
+                                   FullWidth="true"
+                                   OnClick="StartPasswordChange">
+                            Change Password
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <!-- Change Password Form with FluentValidation -->
+                        <EditForm Model="@changePasswordRequest" OnValidSubmit="@ChangePassword">
+                            <FluentValidationValidator @ref="fluentValidationValidator" />
+
+                            <MudStack Spacing="3">
+                                <MudText Typo="Typo.subtitle1" Color="Color.Primary">Change Your Password</MudText>
+
+                                <MudTextField @bind-Value="changePasswordRequest.CurrentPassword"
+                                              Label="Current Password"
+                                              Variant="Variant.Outlined"
+                                              InputType="@(showCurrentPassword? InputType.Text: InputType.Password)"
+                                              Required="true"
+                                              For="@(() => changePasswordRequest.CurrentPassword)"
+                                              Adornment="Adornment.End"
+                                              AdornmentIcon="@(showCurrentPassword? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                              OnAdornmentClick="@(() => showCurrentPassword = !showCurrentPassword)" />
+
+                                <MudTextField @bind-Value="changePasswordRequest.NewPassword"
+                                              Label="New Password"
+                                              Variant="Variant.Outlined"
+                                              InputType="@(showNewPassword? InputType.Text: InputType.Password)"
+                                              Required="true"
+                                              HelperText="Minimum 8 characters with uppercase, lowercase, and number"
+                                              For="@(() => changePasswordRequest.NewPassword)"
+                                              Adornment="Adornment.End"
+                                              AdornmentIcon="@(showNewPassword? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                              OnAdornmentClick="@(() => showNewPassword = !showNewPassword)" />
+
+                                <MudTextField @bind-Value="changePasswordRequest.ConfirmNewPassword"
+                                              Label="Confirm New Password"
+                                              Variant="Variant.Outlined"
+                                              InputType="@(showConfirmPassword? InputType.Text: InputType.Password)"
+                                              Required="true"
+                                              For="@(() => changePasswordRequest.ConfirmNewPassword)"
+                                              Adornment="Adornment.End"
+                                              AdornmentIcon="@(showConfirmPassword? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                              OnAdornmentClick="@(() => showConfirmPassword = !showConfirmPassword)" />
+
+                                <div class="d-flex gap-2">
+                                    <MudButton ButtonType="ButtonType.Submit"
+                                               Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.Save"
+                                               Disabled="@IsChangingPasswordInProgress"
+                                               FullWidth="true">
+                                        @if (IsChangingPasswordInProgress)
+                                        {
+                                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Inherit" />
+                                            <span class="ml-2">Changing...</span>
+                                        }
+                                        else
+                                        {
+                                            <span>Change Password</span>
+                                        }
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Text"
+                                               Color="Color.Secondary"
+                                               StartIcon="@Icons.Material.Filled.Cancel"
+                                               OnClick="CancelPasswordChange"
+                                               Disabled="@IsChangingPasswordInProgress"
+                                               FullWidth="true">
+                                        Cancel
+                                    </MudButton>
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(errorMessage))
+                                {
+                                    <MudAlert Severity="MudBlazor.Severity.Error" ContentAlignment="HorizontalAlignment.Center">
+                                        @errorMessage
+                                    </MudAlert>
+                                }
+                            </MudStack>
+                        </EditForm>
+                    }
+
+                   
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+   
+</MudGrid>
+
+@code {
+    [Parameter] public ProfileResponseDTO? Profile { get; set; }
+  
+
+    private ChangePasswordRequestDTO changePasswordRequest = new();
+    private FluentValidationValidator? fluentValidationValidator;
+    private bool IsChangingPassword = false;
+    private bool IsChangingPasswordInProgress = false;
+    private string errorMessage = string.Empty;
+
+    // Password visibility toggles
+    private bool showCurrentPassword = false;
+    private bool showNewPassword = false;
+    private bool showConfirmPassword = false;
+
+    private void StartPasswordChange()
+    {
+        IsChangingPassword = true;
+        changePasswordRequest = new ChangePasswordRequestDTO();
+        errorMessage = string.Empty;
+        StateHasChanged();
+    }
+
+    private void CancelPasswordChange()
+    {
+        IsChangingPassword = false;
+        changePasswordRequest = new ChangePasswordRequestDTO();
+        errorMessage = string.Empty;
+        showCurrentPassword = false;
+        showNewPassword = false;
+        showConfirmPassword = false;
+        StateHasChanged();
+    }
+
+    private async Task ChangePassword()
+    {
+        try
+        {
+            // Validate using FluentValidation
+            if (fluentValidationValidator != null)
+            {
+                var isValid = fluentValidationValidator.Validate(options => options.IncludeAllRuleSets());
+                if (!isValid)
+                {
+                    errorMessage = "Please correct the validation errors before submitting.";
+                    StateHasChanged();
+                    return;
+                }
+            }
+
+            IsChangingPasswordInProgress = true;
+            errorMessage = string.Empty;
+            StateHasChanged();
+
+            
+
+            var response = await ResetPasswordService.ChangePasswordAsync(changePasswordRequest);
+
+            if (!string.IsNullOrEmpty(response.Message))
+            {
+                // Check if the response indicates success or failure
+                if (response.Message.Contains("success", StringComparison.OrdinalIgnoreCase) ||
+                    response.Message.Contains("changed", StringComparison.OrdinalIgnoreCase))
+                {
+                    Snackbar.Add(response.Message, MudBlazor.Severity.Success);
+                   
+                    CancelPasswordChange(); // Reset form and exit change mode
+                }
+                else
+                {
+                    Snackbar.Add(response.Message, MudBlazor.Severity.Error);
+                    errorMessage = response.Message;
+                   
+                }
+            }
+            else
+            {
+                Snackbar.Add("Password change failed. Please try again.", MudBlazor.Severity.Error);
+                errorMessage = "Password change failed. Please try again.";
+                Console.WriteLine("SecuritySettingsTab: Password change failed - empty response message");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SecuritySettingsTab: Error changing password - {ex.Message}");
+            errorMessage = "An error occurred while changing your password. Please try again.";
+            Snackbar.Add(errorMessage, MudBlazor.Severity.Error);
+        }
+        finally
+        {
+            IsChangingPasswordInProgress = false;
+            StateHasChanged();
+        }
+    }
+}

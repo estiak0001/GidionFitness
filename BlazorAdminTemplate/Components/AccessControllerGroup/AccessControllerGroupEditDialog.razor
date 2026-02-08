@@ -1,0 +1,259 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Access
+@using BlazorAdminTemplate.Domain.Entities
+
+@inject ISnackbar Snackbar
+@inject IStaffManagementService StaffManagementService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            @(IsEditMode ? "Edit Access Controller Group" : "Add New Access Controller Group")
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        @if (isLoadingGroup)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+            <MudText Align="Align.Center">Loading group details...</MudText>
+        }
+        else if (isLoadingLevels)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+            <MudText Align="Align.Center">Loading access levels...</MudText>
+        }
+        else
+        {
+            <MudForm @ref="form" @bind-IsValid="@isValid">
+                <MudGrid Spacing="4" Class="mt-2">
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="Model.Name"
+                                      Label="Group Name"
+                                      Required="true"
+                                      RequiredError="Group name is required!"
+                                      Immediate="true"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="Model.Description"
+                                      Label="Description"
+                                      Lines="5"
+                                      Immediate="true"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudSelect T="int"
+                                   @bind-Value="Model.ControllerLevelId"
+                                   Label="Access Level"
+                                   Required="true"
+                                   RequiredError="Access level is required!"
+                                   Immediate="true"
+                                   Variant="Variant.Outlined"
+                                   AnchorOrigin="Origin.BottomCenter">
+                            @if (!AccessLevels.Any())
+                            {
+                                <MudSelectItem Value="0">No access levels available</MudSelectItem>
+                            }
+                            else
+                            {
+                                foreach (var level in AccessLevels)
+                                {
+                                    <MudSelectItem Value="@level.AccessControllerAccessGroupsControllerLevel">
+                                        @level.AccessControllerAccessGroupsControllerLevelName
+                                    </MudSelectItem>
+                                }
+                            }
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+            </MudForm>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="@isSubmitting">
+            Cancel
+        </MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="!isValid || isSubmitting || isLoadingGroup || isLoadingLevels"
+                   OnClick="SubmitAsync">
+            @if (isSubmitting)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ml-2">Saving...</MudText>
+            }
+            else
+            {
+                @(IsEditMode ? "Update" : "Add")
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>
+    /// Pass null or empty for Add mode, pass GUID string for Edit mode
+    /// </summary>
+    [Parameter] public string? GroupGuid { get; set; }
+
+    private MudForm form = default!;
+    private bool isValid = false;
+    private bool isSubmitting = false;
+    private bool isLoadingLevels = false;
+    private bool isLoadingGroup = false;
+
+    private List<AccessLevel> AccessLevels = new();
+    private bool IsEditMode => !string.IsNullOrEmpty(GroupGuid);
+
+    private class DialogModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public int ControllerLevelId { get; set; }
+    }
+
+    private DialogModel Model = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAccessLevelsAsync();
+
+        if (IsEditMode)
+        {
+            await LoadGroupForEditAsync();
+        }
+    }
+
+    private async Task LoadAccessLevelsAsync()
+    {
+        isLoadingLevels = true;
+        StateHasChanged();
+
+        var response = await StaffManagementService.StaffGetAccessControllerLevelsAsync();
+
+        AccessLevels = response?.ControllerLevels ?? new List<AccessLevel>();
+
+        if (!string.IsNullOrEmpty(response?.Message))
+        {
+            Snackbar.Add(response.Message, Severity.Info);
+        }
+
+        isLoadingLevels = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadGroupForEditAsync()
+    {
+        isLoadingGroup = true;
+        StateHasChanged();
+
+        if(GroupGuid is not null)
+        {
+            var response = await StaffManagementService.StaffGetAccessControllerGroupAsync(GroupGuid);
+            var group = response?.Data;
+
+
+
+            if (group != null)
+            {
+                Model.Name = group.AccessControllerAccessGroupsName;
+                Model.Description = group.AccessControllerAccessGroupsDescription;
+                Model.ControllerLevelId = group.AccessControllerAccessGroupsControllerLevel;
+            }
+            else
+            {
+                var msg = !string.IsNullOrEmpty(response?.Message)
+                    ? response.Message
+                    : "Group not found or access denied.";
+
+                Snackbar.Add(msg, Severity.Error);
+                MudDialog.Cancel();
+                return;
+            }
+
+            isLoadingGroup = false;
+            StateHasChanged();
+        }
+
+
+    }
+
+    private async Task SubmitAsync()
+    {
+        await form.Validate();
+        if (!isValid) return;
+
+        isSubmitting = true;
+        StateHasChanged();
+
+        if (IsEditMode)
+        {
+            var editDto = new StaffAccessControllerGroupEditDTO
+            {
+                AccessControllerAccessGroupsGUID = GroupGuid!,
+                AccessControllerAccessGroupsName = Model.Name,
+                AccessControllerAccessGroupsDescription = Model.Description,
+                AccessControllerAccessGroupsControllerLevel = Model.ControllerLevelId
+            };
+
+            var response = await StaffManagementService.StaffGetAccessControllerGroupEditAsync(editDto);
+
+            // Success: Data is returned and populated
+            if (response?.Data?.AccessControllerAccessGroupsGUID != null)
+            {
+                var successMsg = !string.IsNullOrEmpty(response.Message)
+                    ? response.Message
+                    : "Group updated successfully.";
+
+                Snackbar.Add(successMsg, Severity.Success);
+                MudDialog.Close(DialogResult.Ok(response.Data));
+            }
+            else
+            {
+                var errorMsg = !string.IsNullOrEmpty(response?.Message)
+                    ? response.Message
+                    : "Failed to update group.";
+
+                Snackbar.Add(errorMsg, Severity.Error);
+            }
+        }
+        else
+        {
+            var addDto = new StaffAccessControllerGroupAddDTO
+            {
+                AccessControllerAccessGroupsName = Model.Name,
+                AccessControllerAccessGroupsDescription = Model.Description,
+                AccessControllerAccessGroupsControllerLevel = Model.ControllerLevelId
+            };
+
+            var response = await StaffManagementService.StaffGetAccessControllerGroupAddAsync(addDto);
+
+            if (response?.Data?.AccessControllerAccessGroupsGUID != null)
+            {
+                var successMsg = !string.IsNullOrEmpty(response.Message)
+                    ? response.Message
+                    : "Group added successfully.";
+
+                Snackbar.Add(successMsg, Severity.Success);
+                MudDialog.Close(DialogResult.Ok(response.Data));
+            }
+            else
+            {
+                var errorMsg = !string.IsNullOrEmpty(response?.Message)
+                    ? response.Message
+                    : "Failed to add group.";
+
+                Snackbar.Add(errorMsg, Severity.Error);
+            }
+        }
+
+        isSubmitting = false;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

@@ -1,0 +1,177 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Classes
+@using BlazorAdminTemplate.Domain.Entities
+@using BlazorAdminTemplate.Domain.Enums
+
+<MudCard Elevation="2" Style="height: fit-content;">
+    <MudCardContent>
+        @if (ShowDatePicker)
+        {
+            <MudDatePicker PickerVariant="PickerVariant.Static"
+                           ShowToolbar="false"
+                           Date="SelectedDate"
+                           DateChanged="HandleDateChanged"
+                           ShowWeekNumbers="true"
+                           Label="Vælg dato at navigere til" />
+            <MudDivider />
+        }
+
+        <MudText Class="pt-2 pb-2">Filter</MudText>
+
+        <MudTreeView T="FilterItem"
+                     SelectedValues="SelectedFilters"
+                     SelectedValuesChanged="OnSelectedFiltersChanged"
+                     SelectionMode="SelectionMode.MultiSelection"
+                     TriState="false"
+                     CheckBoxColor="Color.Primary">
+
+            <MudTreeViewItem T="FilterItem"
+                             Text="Hold Typer"
+                             Expanded="true">
+                @if (AvailableClassTypes?.Any() == true)
+                {
+                    @foreach (var classType in AvailableClassTypes)
+                    {
+                        var filterItem = new FilterItem
+                        {
+                            Type = FilterType.ClassType,
+                            Guid = classType.TrainingClassTypesGUID,
+                            Name = classType.TrainingClassTypesName
+                        };
+                        <MudTreeViewItem T="FilterItem"
+                                         Value="@filterItem"
+                                         Text="@classType.TrainingClassTypesName"
+                                         CanBeSelected="true" />
+                    }
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Class="ml-4">Ingen hold typer tilgængelige</MudText>
+                }
+            </MudTreeViewItem>
+
+            <MudTreeViewItem T="FilterItem"
+                             Text="Centre"
+                             Expanded="true"
+                             CanBeSelected="false">
+                @if (AvailableOrganizations?.Any() == true)
+                {
+                    @foreach (var org in AvailableOrganizations)
+                    {
+                        var filterItem = new FilterItem
+                        {
+                            Type = FilterType.Organization,
+                            Guid = org.OrganisationSubGUID,
+                            Name = org.OrganisationSubName
+                        };
+                        <MudTreeViewItem T="FilterItem"
+                                         Value="@filterItem"
+                                         Text="@org.OrganisationSubName"
+                                         CanBeSelected="true" />
+                    }
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Class="ml-4">Ingen centre tilgængelige</MudText>
+                }
+            </MudTreeViewItem>
+        </MudTreeView>
+
+        @if (HasActiveFilters)
+        {
+            <MudDivider Class="my-3" />
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Aktive filtre:</MudText>
+
+            @if (SelectedDate.HasValue)
+            {
+                <MudChip T="string" Text="@DateNavigationText"
+                         Color="Color.Info"
+                         Size="Size.Small"
+                         OnClose="OnClearDateHighlight"
+                         CloseIcon="@Icons.Material.Filled.Close" />
+            }
+
+            @foreach (var f in SelectedFilters.Where(f => f.Type == FilterType.ClassType))
+            {
+                <MudChip T="string" Text="@($"Type: {f.Name}")"
+                         Color="Color.Primary"
+                         Size="Size.Small"
+                         OnClose="@(() => OnRemoveFilter.InvokeAsync(f))"
+                         CloseIcon="@Icons.Material.Filled.Close" />
+            }
+
+            @foreach (var f in SelectedFilters.Where(f => f.Type == FilterType.Organization))
+            {
+                <MudChip T="string" Text="@($"Center: {f.Name}")"
+                         Color="Color.Secondary"
+                         Size="Size.Small"
+                         OnClose="@(() => OnRemoveFilter.InvokeAsync(f))"
+                         CloseIcon="@Icons.Material.Filled.Close" />
+            }
+
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Error"
+                       Size="Size.Small"
+                       OnClick="OnClearAll"
+                       StartIcon="@Icons.Material.Filled.Clear"
+                       Class="mt-2">
+                Ryd alle filtre
+            </MudButton>
+        }
+
+        @if (ShowLegend)
+        {
+            <MudStack Spacing="1" Class="mt-3">
+                <MudText Typo="Typo.subtitle2">Signatur:</MudText>
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Primary" Size="Size.Small" />
+                    <MudText Typo="Typo.caption">Du er tilmeldt</MudText>
+                </div>
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Circle" Color="Color.Success" Size="Size.Small" />
+                    <MudText Typo="Typo.caption">Tilgængelig</MudText>
+                </div>
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Circle" Color="Color.Warning" Size="Size.Small" />
+                    <MudText Typo="Typo.caption">Næsten fuldt</MudText>
+                </div>
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Circle" Color="Color.Error" Size="Size.Small" />
+                    <MudText Typo="Typo.caption">Fuldt booket</MudText>
+                </div>
+            </MudStack>
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter] public List<ClassTypes>? AvailableClassTypes { get; set; }
+    [Parameter] public List<GuestTrainingClasses>? AvailableOrganizations { get; set; }
+
+    [Parameter] public DateTime? SelectedDate { get; set; }
+    [Parameter] public EventCallback<DateTime?> DateChanged { get; set; }
+    [Parameter] public EventCallback DateAfterChanged { get; set; }
+
+    [Parameter] public IReadOnlyCollection<FilterItem> SelectedFilters { get; set; } = new HashSet<FilterItem>();
+    [Parameter] public EventCallback<IReadOnlyCollection<FilterItem>> OnSelectedFiltersChanged { get; set; }
+
+    [Parameter] public EventCallback<FilterItem> OnRemoveFilter { get; set; }
+    [Parameter] public EventCallback OnClearAll { get; set; }
+
+    [Parameter] public string DateNavigationText { get; set; } = string.Empty;
+
+    [Parameter] public bool ShowLegend { get; set; } = true;
+    [Parameter] public bool ShowDatePicker { get; set; } = true;
+
+    private bool HasActiveFilters =>
+        SelectedDate.HasValue ||
+        (SelectedFilters?.Any(f => f.Type == FilterType.ClassType || f.Type == FilterType.Organization) ?? false);
+
+    private async Task HandleDateChanged(DateTime? newDate)
+    {
+        SelectedDate = newDate;
+        await DateChanged.InvokeAsync(newDate);
+        await DateAfterChanged.InvokeAsync();
+    }
+
+    private Task OnClearDateHighlight() => DateChanged.InvokeAsync(null);
+}

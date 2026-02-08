@@ -1,0 +1,114 @@
+@using BlazorAdminTemplate.Application.DTOs.Payment
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" />
+            Payment Details
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (Payment != null)
+        {
+            <MudList T="string" Dense="true">
+                <MudListItem>
+                    <MudText Typo="Typo.body2">
+                        <strong>GUID:</strong> @Payment.MemberPaymentDataGUID
+                    </MudText>
+                </MudListItem>
+                <MudDivider />
+                <MudListItem>
+                    <MudText Typo="Typo.body2">
+                        <strong>Date:</strong> 
+                        @{
+                            if (DateTime.TryParse(Payment.MemberPaymentDataDate, out var date))
+                            {
+                                @date.ToString("dd MMMM yyyy HH:mm")
+                            }
+                            else
+                            {
+                                @Payment.MemberPaymentDataDate
+                            }
+                        }
+                    </MudText>
+                </MudListItem>
+                <MudDivider />
+                <MudListItem>
+                    <MudText Typo="Typo.body2">
+                        <strong>Amount:</strong> 
+                        <span class="@(Payment.MemberPaymentDataDirection == 1 ? "mud-success-text" : "mud-error-text")">
+                            @(Payment.MemberPaymentDataDirection == 1 ? "+" : "-")@Payment.MemberPaymentDataAmount.ToString("N2") DKK
+                        </span>
+                    </MudText>
+                </MudListItem>
+                <MudDivider />
+                <MudListItem>
+                    <MudText Typo="Typo.body2">
+                        <strong>Type:</strong> @GetPaymentType(Payment.MemberPaymentDataType)
+                    </MudText>
+                </MudListItem>
+                <MudDivider />
+                <MudListItem>
+                    <MudText Typo="Typo.body2">
+                        <strong>Direction:</strong> @(Payment.MemberPaymentDataDirection == 1 ? "Incoming" : "Outgoing")
+                    </MudText>
+                </MudListItem>
+                <MudDivider />
+                <MudListItem>
+                    <MudText Typo="Typo.body2">
+                        <strong>Status:</strong>
+                        <MudChip T="int" Size="Size.Small" Color="@GetStatusColor(Payment.MemberPaymentDataStatus)">
+                            @GetStatusText(Payment.MemberPaymentDataStatus)
+                        </MudChip>
+                    </MudText>
+                </MudListItem>
+                <MudDivider />
+                <MudListItem>
+                    <MudText Typo="Typo.body2">
+                        <strong>Order #:</strong> @Payment.MemberPaymentDataOrderNumber
+                    </MudText>
+                </MudListItem>
+            </MudList>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Warning">No payment details available.</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public MemberPaymentDTO? Payment { get; set; }
+
+    private void Close() => MudDialog.Close(DialogResult.Ok(true));
+
+    private string GetPaymentType(int type) => type switch
+    {
+        1 => "Membership",
+        2 => "Personal Training",
+        3 => "Product Sale",
+        4 => "Event",
+        _ => "Other"
+    };
+
+    private string GetStatusText(int status) => status switch
+    {
+        0 => "Pending",
+        1 => "Success",
+        2 => "Failed",
+        3 => "Refunded",
+        _ => "Unknown"
+    };
+
+    private Color GetStatusColor(int status) => status switch
+    {
+        1 => Color.Success,
+        2 => Color.Error,
+        3 => Color.Warning,
+        _ => Color.Default
+    };
+}

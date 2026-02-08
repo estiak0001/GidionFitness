@@ -1,0 +1,46 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.NewsDTO
+@using Tizzani.MudBlazor.HtmlEditor
+
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="tempNews.MemberNewsSubject" Label="Emne" Required="true" />
+        <MudHtmlEditor @bind-Html="tempNews.MemberNewsText" style="height:500px" /> @* temp style move to css later *@
+        <MudDatePicker @bind-Date="tempNews.MemberNewsDate"
+                        PickerVariant="PickerVariant.Inline"
+                        Label="Vis indtil" Required="true" />
+
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Save">Gem</MudButton>
+        <MudButton Color="Color.Secondary" OnClick="Cancel">Annuller</MudButton>
+    </DialogActions>
+</MudDialog>
+
+
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public StaffNewsDTO news { get; set; }
+
+    StaffNewsDTO tempNews = new StaffNewsDTO();
+
+    protected override void OnInitialized()
+    {
+        tempNews = new StaffNewsDTO(news);
+    }
+
+    void Save()
+    {
+        news = tempNews;
+        MudDialog.Close(DialogResult.Ok(news));
+    }
+
+    void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+
+
+}

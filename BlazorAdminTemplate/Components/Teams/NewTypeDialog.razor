@@ -1,0 +1,82 @@
+﻿@inject IClassLocationService classLocationService
+@using BlazorAdminTemplate.Application.DTOs.Location
+@using BlazorAdminTemplate.Application.DTOs.ClassTypes
+
+
+<MudDialog>
+    <TitleContent>
+        Ny Type
+    </TitleContent>
+
+    <DialogContent>
+        <MudTextField @bind-Value="NewType.TrainingClassTypesName" Label="Navn" />
+        
+        <MudSelect T="string" @bind-Value="NewType.TrainingClassLocationGUID" Label="Location" Dense="true">
+            @foreach (var location in ClassLocationList)
+            {
+                <MudSelectItem T="string" Value="location.TrainingClassLocationGUID">
+                    @location.TrainingClassLocationName
+                </MudSelectItem>
+            }
+        </MudSelect>
+        <MudTextField Label="Type Description"
+                      @bind-Value="NewType.TrainingClassTypesDescription"
+                      Required="true"
+                      Lines="4"
+                      TextArea="true"
+                      FullWidth="true" />
+
+        <MudNumericField T="int"
+                         @bind-Value="NewType.TrainingClassTypesMax"
+                         Label="Enter number"
+                         Min="0"
+                         Max="999"
+                         Required="true" />
+
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">OK</MudButton>
+    </DialogActions>
+</MudDialog>
+
+
+@code {
+    private bool isLoading = false;
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+    [Parameter]
+    public List<StaffTrainingClassLocationDTO> ClassLocationList { get; set; }
+    public StaffTrainingClassTypeDTO NewType { get; set; } = new StaffTrainingClassTypeDTO();
+
+
+
+    private async Task Submit()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+            //TODO check both fields are filled.
+            await classLocationService.PostStaffTrainingClassNewTypeAsync(NewType);
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            
+            Console.WriteLine($"Error during Add New type: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+
+    private void Cancel() => MudDialog.Cancel();
+
+}

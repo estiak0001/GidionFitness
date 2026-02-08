@@ -1,0 +1,85 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Location
+@using BlazorAdminTemplate.Application.DTOs.ClassTypes
+
+<MudDialog>
+    <DialogContent>
+
+        <MudTextField Label="Type Navn"
+                      @bind-Value="tempType.TrainingClassTypesName"
+                      Required="true" />
+
+        <MudSelect T="string"
+                   Label="Lokation"
+                   Value="tempType.TrainingClassLocationGUID"
+                   ValueChanged="OnLocationChanged"
+                   Required="true">
+
+            @foreach (var loc in location)
+            {
+                <MudSelectItem T="string" Value="loc.TrainingClassLocationGUID">
+                    @loc.TrainingClassLocationName
+                </MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudTextField Label="Type Description"
+                      @bind-Value="tempType.TrainingClassTypesDescription"
+                      Required="true"
+                      Lines="4"
+                      TextArea="true"
+                      FullWidth="true" />
+
+        <MudNumericField T="int"
+                         @bind-Value="tempType.TrainingClassTypesMax"
+                         Label="Enter number"
+                         Min="0"
+                         Max="999"
+                         Required="true" />
+
+
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Save" Color="Color.Primary">Gem</MudButton>
+        <MudButton OnClick="Cancel" Color="Color.Secondary">Annuller</MudButton>
+    </DialogActions>
+</MudDialog>
+
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public StaffTrainingClassTypeDTO type { get; set; }
+    [Parameter] public List<StaffTrainingClassLocationDTO> location { get; set; }
+
+    StaffTrainingClassTypeDTO tempType = new StaffTrainingClassTypeDTO();
+
+    protected override void OnInitialized()
+    {
+        tempType = new StaffTrainingClassTypeDTO(type);
+    }
+
+
+    void Save()
+    {
+        type = tempType;
+        var selected = location.FirstOrDefault(x => x.TrainingClassLocationGUID == type.TrainingClassLocationGUID);
+        if (selected != null)
+            type.TrainingClassLocationName = selected.TrainingClassLocationName;
+
+        MudDialog.Close(DialogResult.Ok(type));
+    }
+
+    void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void OnLocationChanged(string guid)
+    {
+        type.TrainingClassLocationGUID = guid;
+
+        var selected = location.FirstOrDefault(x => x.TrainingClassLocationGUID == guid);
+        if (selected != null)
+            type.TrainingClassLocationName = selected.TrainingClassLocationName;
+    }
+}

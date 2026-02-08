@@ -1,0 +1,320 @@
+@using BlazorAdminTemplate.Application.DTOs.Payment
+@using BlazorAdminTemplate.Application.Interfaces
+@inject IPaymentGroupService PaymentGroupService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.CardMembership" Class="mr-2" />
+            @(IsEditMode ? "Rediger medlemskab" : "Opret medlemskab")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center py-4">
+                <MudProgressCircular Indeterminate="true" />
+            </div>
+        }
+        else
+        {
+            <MudForm @ref="form" @bind-IsValid="@isValid">
+                <MudGrid>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="model.MemberPaymentGroupName"
+                                      Label="Navn"
+                                      Required="true"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="model.MemberPaymentGroupDescription"
+                                      Label="Beskrivelse"
+                                      Lines="3"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudNumericField @bind-Value="model.MemberPaymentPrice"
+                                         Label="Pris (årlig)"
+                                         Required="true"
+                                         Adornment="Adornment.End"
+                                         AdornmentText="kr."
+                                         Min="0"
+                                         Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudNumericField @bind-Value="model.MemberPaymentPausePrice"
+                                         Label="Pause pris (månedlig)"
+                                         Required="true"
+                                         Adornment="Adornment.End"
+                                         AdornmentText="kr/md"
+                                         Min="0"
+                                         Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudDatePicker @bind-Date="model.MemberPaymentValidFrom"
+                                       Label="Gyldig fra"
+                                       Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudDatePicker @bind-Date="model.MemberPaymentValidTo"
+                                       Label="Gyldig til"
+                                       Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudSelect @bind-Value="model.PaymentProviderDataGUID"
+                                   Label="Betalingsudbyder"
+                                   Variant="Variant.Outlined"
+                                   Required="true">
+                            @foreach (var provider in paymentProviders)
+                            {
+                                <MudSelectItem Value="@provider.PaymentProviderDataGUID">
+                                    @provider.PaymentProviderName
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudSelect @bind-Value="model.MemberGroupDefaultGroupsGUID"
+                                   Label="Standard gruppe"
+                                   Variant="Variant.Outlined"
+                                   Required="true">
+                            @foreach (var group in defaultGroups)
+                            {
+                                <MudSelectItem Value="@group.MemberGroupDefaultGroupsGUID">
+                                    @group.MemberGroupDefaultGroupsName
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" md="4">
+                        <MudSwitch T="bool" @bind-Checked="enableChecked"
+                                   Label="Aktiv"
+                                   Color="Color.Success" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="4">
+                        <MudSwitch T="bool" @bind-Checked="defaultChecked"
+                                   Label="Standard medlemskab"
+                                   Color="Color.Primary" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="4">
+                        <MudSwitch T="bool" @bind-Checked="vatChecked"
+                                   Label="Inkl. moms"
+                                   Color="Color.Info" />
+                    </MudItem>
+                </MudGrid>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Annuller</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="Submit"
+                   Disabled="@(!isValid || isSaving)">
+            @if (isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            @(IsEditMode ? "Gem" : "Opret")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public StaffPaymentGroupDTO? PaymentGroup { get; set; }
+
+    private MudForm form = default!;
+    private bool isValid;
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private bool IsEditMode => PaymentGroup != null;
+
+    private PaymentGroupModel model = new();
+    private List<PaymentProviderDTO> paymentProviders = new();
+    private List<MemberGroupDefaultDTO> defaultGroups = new();
+
+    // Backing fields for switches
+    private bool _enableChecked;
+    private bool _defaultChecked;
+    private bool _vatChecked;
+
+    // Helper properties to convert int to bool for switches
+    private bool enableChecked
+    {
+        get => _enableChecked;
+        set
+        {
+            _enableChecked = value;
+            model.MemberPaymentEnable = value ? 1 : 0;
+        }
+    }
+
+    private bool defaultChecked
+    {
+        get => _defaultChecked;
+        set
+        {
+            _defaultChecked = value;
+            model.MemberPaymentDefault = value ? 1 : 0;
+        }
+    }
+
+    private bool vatChecked
+    {
+        get => _vatChecked;
+        set
+        {
+            _vatChecked = value;
+            model.MemberPaymentPriceVAT = value ? 1 : 0;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsEditMode && PaymentGroup != null)
+        {
+            model.MemberPaymentGroupGUID = PaymentGroup.MemberPaymentGroupGUID;
+            model.MemberPaymentGroupName = PaymentGroup.MemberPaymentGroupName;
+            model.MemberPaymentGroupDescription = PaymentGroup.MemberPaymentGroupDescription;
+            model.MemberPaymentValidFrom = PaymentGroup.MemberPaymentValidFrom;
+            model.MemberPaymentValidTo = PaymentGroup.MemberPaymentValidTo;
+            model.MemberPaymentPrice = PaymentGroup.MemberPaymentPrice;
+            model.MemberPaymentPriceVAT = PaymentGroup.MemberPaymentPriceVAT;
+            model.MemberPaymentEnable = PaymentGroup.MemberPaymentEnable;
+            model.MemberPaymentDefault = PaymentGroup.MemberPaymentDefault;
+            model.PaymentProviderDataGUID = PaymentGroup.PaymentProviderDataGUID;
+            model.MemberPaymentPausePrice = PaymentGroup.MemberPaymentPausePrice;
+            model.MemberGroupDefaultGroupsGUID = PaymentGroup.MemberGroupDefaultGroupsGUID;
+            
+            // Set switch backing fields
+            _enableChecked = PaymentGroup.MemberPaymentEnable == 1;
+            _defaultChecked = PaymentGroup.MemberPaymentDefault == 1;
+            _vatChecked = PaymentGroup.MemberPaymentPriceVAT == 1;
+        }
+
+        await LoadDropdownData();
+        isLoading = false;
+    }
+
+    private async Task LoadDropdownData()
+    {
+        try
+        {
+            var providersTask = PaymentGroupService.GetPaymentProvidersAsync();
+            var groupsTask = PaymentGroupService.GetDefaultGroupsAsync();
+
+            await Task.WhenAll(providersTask, groupsTask);
+
+            paymentProviders = (await providersTask).PaymentProviders;
+            defaultGroups = (await groupsTask).MemberGroupDefaultGroups;
+
+            // Set defaults if available
+            if (!IsEditMode)
+            {
+                if (paymentProviders.Any())
+                    model.PaymentProviderDataGUID = paymentProviders.First().PaymentProviderDataGUID;
+                if (defaultGroups.Any())
+                    model.MemberGroupDefaultGroupsGUID = defaultGroups.First().MemberGroupDefaultGroupsGUID;
+                
+                model.MemberPaymentEnable = 1;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fejl ved indlæsning: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task Submit()
+    {
+        await form.Validate();
+        if (!isValid) return;
+
+        try
+        {
+            isSaving = true;
+
+            if (IsEditMode)
+            {
+                var updateDto = new StaffPaymentGroupUpdateDTO
+                {
+                    MemberPaymentGroupGUID = model.MemberPaymentGroupGUID,
+                    MemberPaymentGroupName = model.MemberPaymentGroupName,
+                    MemberPaymentGroupDescription = model.MemberPaymentGroupDescription,
+                    MemberPaymentValidFrom = model.MemberPaymentValidFrom,
+                    MemberPaymentValidTo = model.MemberPaymentValidTo,
+                    MemberPaymentPrice = model.MemberPaymentPrice,
+                    MemberPaymentPriceVAT = model.MemberPaymentPriceVAT == 1,
+                    MemberPaymentEnable = model.MemberPaymentEnable == 1,
+                    MemberPaymentDefault = model.MemberPaymentDefault == 1,
+                    PaymentProviderDataGUID = model.PaymentProviderDataGUID,
+                    MemberPaymentPausePrice = model.MemberPaymentPausePrice,
+                    MemberGroupDefaultGroupsGUID = model.MemberGroupDefaultGroupsGUID
+                };
+
+                await PaymentGroupService.UpdatePaymentGroupAsync(updateDto);
+                Snackbar.Add("Medlemskab opdateret", Severity.Success);
+            }
+            else
+            {
+                var createDto = new StaffPaymentGroupCreateDTO
+                {
+                    MemberPaymentGroupName = model.MemberPaymentGroupName,
+                    MemberPaymentGroupDescription = model.MemberPaymentGroupDescription,
+                    MemberPaymentValidFrom = model.MemberPaymentValidFrom,
+                    MemberPaymentValidTo = model.MemberPaymentValidTo,
+                    MemberPaymentPrice = model.MemberPaymentPrice,
+                    MemberPaymentPriceVAT = model.MemberPaymentPriceVAT == 1,
+                    MemberPaymentEnable = model.MemberPaymentEnable == 1,
+                    MemberPaymentDefault = model.MemberPaymentDefault == 1,
+                    PaymentProviderDataGUID = model.PaymentProviderDataGUID,
+                    MemberPaymentPausePrice = model.MemberPaymentPausePrice,
+                    MemberGroupDefaultGroupsGUID = model.MemberGroupDefaultGroupsGUID
+                };
+
+                await PaymentGroupService.CreatePaymentGroupAsync(createDto);
+                Snackbar.Add("Medlemskab oprettet", Severity.Success);
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fejl: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private class PaymentGroupModel
+    {
+        public string MemberPaymentGroupGUID { get; set; } = string.Empty;
+        public string MemberPaymentGroupName { get; set; } = string.Empty;
+        public string MemberPaymentGroupDescription { get; set; } = string.Empty;
+        public DateTime? MemberPaymentValidFrom { get; set; }
+        public DateTime? MemberPaymentValidTo { get; set; }
+        public decimal MemberPaymentPrice { get; set; }
+        public int MemberPaymentPriceVAT { get; set; }
+        public int MemberPaymentEnable { get; set; }
+        public int MemberPaymentDefault { get; set; }
+        public string PaymentProviderDataGUID { get; set; } = string.Empty;
+        public decimal? MemberPaymentPausePrice { get; set; }
+        public string MemberGroupDefaultGroupsGUID { get; set; } = string.Empty;
+    }
+}

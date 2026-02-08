@@ -1,0 +1,209 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Classes
+@using BlazorAdminTemplate.Domain.Entities
+@using BlazorAdminTemplate.Domain.Enums
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.FilterList" Class="mr-2" />
+            Filtre
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <div class="filters-dialog-content">
+            <!-- Date Selection Section -->
+            <MudText Typo="Typo.subtitle1" Class="mb-3">Dato</MudText>
+            <MudDatePicker @bind-Date="tempSelectedDate"
+                           Label="Vælg dato"
+                           Variant="Variant.Outlined"
+                           Culture="@danishCulture"
+                           Class="mb-4"
+                           Clearable="true" />
+
+            <MudDivider Class="my-4" />
+
+            <!-- Class Types Filter Section -->
+            <MudText Typo="Typo.subtitle1" Class="mb-3">Hold Typer</MudText>
+            @if (AvailableClassTypes?.Any() == true)
+            {
+                <MudStack Spacing="2" Class="mb-4">
+                    @foreach (var classType in AvailableClassTypes)
+                    {
+                        var filterItem = new FilterItem
+                        {
+                            Type = FilterType.ClassType,
+                            Guid = classType.TrainingClassTypesGUID,
+                            Name = classType.TrainingClassTypesName
+                        };
+                        var isSelected = tempSelectedFilters.Contains(filterItem);
+
+                        <MudCheckBox T="bool"
+                                     Value="@isSelected"
+                                     ValueChanged="@((bool value) => ToggleFilter(filterItem, value))"
+                                     Label="@classType.TrainingClassTypesName"
+                                     Color="Color.Primary" />
+                    }
+                </MudStack>
+            }
+            else
+            {
+                <MudText Typo="Typo.caption" Class="mud-text-secondary mb-4">Ingen hold typer tilgængelige</MudText>
+            }
+
+            <MudDivider Class="my-4" />
+
+            <!-- Organizations Filter Section -->
+            <MudText Typo="Typo.subtitle1" Class="mb-3">Centre</MudText>
+            @if (AvailableOrganizations?.Any() == true)
+            {
+                <MudStack Spacing="2" Class="mb-4">
+                    @foreach (var org in AvailableOrganizations)
+                    {
+                        var filterItem = new FilterItem
+                        {
+                            Type = FilterType.Organization,
+                            Guid = org.OrganisationSubGUID,
+                            Name = org.OrganisationSubName
+                        };
+                        var isSelected = tempSelectedFilters.Contains(filterItem);
+
+                        <MudCheckBox T="bool"
+                                     Value="@isSelected"
+                                     ValueChanged="@((bool value) => ToggleFilter(filterItem, value))"
+                                     Label="@org.OrganisationSubName"
+                                     Color="Color.Primary" />
+                    }
+                </MudStack>
+            }
+            else
+            {
+                <MudText Typo="Typo.caption" Class="mud-text-secondary mb-4">Ingen centre tilgængelige</MudText>
+            }
+
+            <!-- Active Filters Preview -->
+            @if (HasActiveFilters)
+            {
+                <MudDivider Class="my-4" />
+                <MudText Typo="Typo.subtitle1" Class="mb-3">Aktive filtre:</MudText>
+                <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap" Class="mb-3">
+                    @if (tempSelectedDate.HasValue)
+                    {
+                        <MudChip T="string"
+                                 Text="@($"Dato: {tempSelectedDate.Value:dd/MM/yyyy}")"
+                                 Color="Color.Info"
+                                 Size="Size.Small"
+                                 OnClose="@(() => tempSelectedDate = null)"
+                                 CloseIcon="@Icons.Material.Filled.Close" />
+                    }
+
+                    @foreach (var filter in tempSelectedFilters.Where(f => f.Type == FilterType.ClassType))
+                    {
+                        <MudChip T="string"
+                                 Text="@($"Type: {filter.Name}")"
+                                 Color="Color.Primary"
+                                 Size="Size.Small"
+                                 OnClose="@(() => RemoveFilter(filter))"
+                                 CloseIcon="@Icons.Material.Filled.Close" />
+                    }
+
+                    @foreach (var filter in tempSelectedFilters.Where(f => f.Type == FilterType.Organization))
+                    {
+                        <MudChip T="string"
+                                 Text="@($"Center: {filter.Name}")"
+                                 Color="Color.Secondary"
+                                 Size="Size.Small"
+                                 OnClose="@(() => RemoveFilter(filter))"
+                                 CloseIcon="@Icons.Material.Filled.Close" />
+                    }
+                </MudStack>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="ClearAllFilters"
+                   Variant="Variant.Text"
+                   Color="Color.Error"
+                   StartIcon="@Icons.Material.Filled.Clear"
+                   Disabled="@(!HasActiveFilters)">
+            Ryd alle
+        </MudButton>
+        <MudSpacer />
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Annuller</MudButton>
+        <MudButton OnClick="Apply" Variant="Variant.Filled" Color="Color.Primary">
+            Anvend filtre
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .filters-dialog-content {
+        min-height: 200px;
+        max-height: 600px;
+        overflow-y: auto;
+    }
+</style>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public List<ClassTypes>? AvailableClassTypes { get; set; }
+    [Parameter] public List<GuestTrainingClasses>? AvailableOrganizations { get; set; }
+    [Parameter] public DateTime? SelectedDate { get; set; }
+    [Parameter] public IReadOnlyCollection<FilterItem> SelectedFilters { get; set; } = new HashSet<FilterItem>();
+
+    private DateTime? tempSelectedDate;
+    private HashSet<FilterItem> tempSelectedFilters = new();
+    private readonly System.Globalization.CultureInfo danishCulture = new("da-DK");
+
+    private bool HasActiveFilters => tempSelectedDate.HasValue || tempSelectedFilters.Any();
+
+    protected override void OnInitialized()
+    {
+        // Initialize temporary values with current values
+        tempSelectedDate = SelectedDate;
+        tempSelectedFilters = new HashSet<FilterItem>(SelectedFilters ?? Enumerable.Empty<FilterItem>());
+    }
+
+    private void ToggleFilter(FilterItem filterItem, bool isSelected)
+    {
+        if (isSelected)
+        {
+            tempSelectedFilters.Add(filterItem);
+        }
+        else
+        {
+            tempSelectedFilters.Remove(filterItem);
+        }
+        StateHasChanged();
+    }
+
+    private void RemoveFilter(FilterItem filterItem)
+    {
+        tempSelectedFilters.Remove(filterItem);
+        StateHasChanged();
+    }
+
+    private void ClearAllFilters()
+    {
+        tempSelectedDate = null;
+        tempSelectedFilters.Clear();
+        StateHasChanged();
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void Apply()
+    {
+        // Return the filter results
+        var result = new FilterDialogResult
+        {
+            SelectedDate = tempSelectedDate,
+            SelectedFilters = tempSelectedFilters.ToList()
+        };
+
+        MudDialog.Close(DialogResult.Ok(result));
+    }
+}

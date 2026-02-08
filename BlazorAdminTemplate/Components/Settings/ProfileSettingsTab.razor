@@ -1,0 +1,555 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Authentication
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Components.Image
+@inject IJSRuntime JSRuntime
+@inject IProfileService ProfileService
+@inject IImageUploadService ImageUploadService
+@inject ISnackbar Snackbar
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+@if (isMobile)
+{
+    <!-- Mobile Layout -->
+    <div class="text-center">
+        <MudText Typo="Typo.h5" GutterBottom="true" Class="mb-4" Align="Align.Center">Profil Information</MudText>
+
+        <MudStack Spacing="3" AlignItems="AlignItems.Center">
+            <!-- Profile Image Card -->
+            <MudCard Elevation="2" Style="width: 100%; max-width: 400px;">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6" Align="Align.Center">Profil Billede</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent Class="text-center">
+                    <ImageUpload @bind-ImagePreviewUrl="profileImageUrl"
+                                 PreviewSize="Size.Large"
+                                 OnImageSelected="@OnImageSelected"
+                                 OnImageCleared="@OnImageCleared"
+                                 IsUploading="@isImageUploading"
+                                 MemberGuid="@Profile?.MemberGuid" />
+
+                    @if (!string.IsNullOrEmpty(profileImageUrl))
+                    {
+                        <div class="mt-3">
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                Tip: Klik på "Beskær" for at justere dit profilbillede perfekt!
+                            </MudText>
+                        </div>
+                    }
+                </MudCardContent>
+            </MudCard>
+
+            <!-- Personal Details Card -->
+            <MudCard Elevation="2" Style="width: 100%; max-width: 400px;">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6" Align="Align.Center">Personlige detaljer</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        @if (IsEditing)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Cancel"
+                                           Color="Color.Secondary"
+                                           OnClick="@CancelEditing"
+                                           Title="Anuller" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Save"
+                                           Color="Color.Primary"
+                                           OnClick="@SaveProfile"
+                                           Disabled="@IsSaving"
+                                           Title="Gem" />
+                        }
+                        else
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                           Color="Color.Primary"
+                                           OnClick="@StartEditing"
+                                           Title="Rediger" />
+                        }
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudStack Spacing="3">
+                        <MudTextField @bind-Value="EditableProfile.MemberFirstName"
+                                      Label="Fornavn"
+                                      Variant="Variant.Outlined"
+                                      ReadOnly="@(!IsEditing)" />
+
+                        <MudTextField @bind-Value="EditableProfile.MemberLastName"
+                                      Label="Efternavn"
+                                      Variant="Variant.Outlined"
+                                      ReadOnly="@(!IsEditing)" />
+
+                        <MudTextField @bind-Value="EditableProfile.MemberEmail"
+                                      Label="Email Adresse"
+                                      Variant="Variant.Outlined"
+                                      ReadOnly="@(!IsEditing)" />
+
+                        <MudTextField @bind-Value="EditableProfile.MemberPhonePrivate"
+                                      Label="Privat Telefon"
+                                      Variant="Variant.Outlined"
+                                      ReadOnly="@(!IsEditing)" />
+
+                        <MudTextField @bind-Value="EditableProfile.MemberPhoneWork"
+                                      Label="Arbejds Telefon"
+                                      Variant="Variant.Outlined"
+                                      ReadOnly="@(!IsEditing)" />
+
+                        @if (IsEditing)
+                        {
+                            <MudDatePicker @bind-Date="EditableProfile.MemberBirthday"
+                                           Label="Fødselsdag"
+                                           Variant="Variant.Outlined" />
+                        }
+                        else
+                        {
+                            <MudTextField Label="Fødselsdag"
+                                          Variant="Variant.Outlined"
+                                          Value="@GetDisplayDate(EditableProfile.MemberBirthday)"
+                                          ReadOnly />
+                        }
+
+                        <MudTextField @bind-Value="EditableProfile.MemberJobTitle"
+                                      Label="Job Titel"
+                                      Variant="Variant.Outlined"
+                                      ReadOnly="@(!IsEditing)" />
+
+                        <MudTextField @bind-Value="EditableProfile.MemberAddress"
+                                      Label="Adresse"
+                                      Variant="Variant.Outlined"
+                                      ReadOnly="@(!IsEditing)" />
+
+                        <MudTextField @bind-Value="EditableProfile.MemberCity"
+                                      Label="By"
+                                      Variant="Variant.Outlined"
+                                      ReadOnly="@(!IsEditing)" />
+
+                        <MudNumericField @bind-Value="EditableProfile.MemberZipCode"
+                                         Label="Postnummer"
+                                         Variant="Variant.Outlined"
+                                         ReadOnly="@(!IsEditing)"
+                                         HideSpinButtons="true" />
+
+                        <MudTextField @bind-Value="EditableProfile.MemberCPR"
+                                      Label="CPR Nummer"
+                                      Variant="Variant.Outlined"
+                                      ReadOnly="@(!IsEditing)" />
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+
+            <!-- Account Information Card -->
+            <MudCard Elevation="2" Style="width: 100%; max-width: 400px;">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6" Align="Align.Center">Konto Information</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudStack Spacing="2">
+                        <div class="d-flex justify-space-between align-center">
+                            <MudText Typo="Typo.body2">Medlem Status</MudText>
+                            <MudChip T="string" Color="@(Profile?.IsActive == true ? Color.Success : Color.Error)" Size="Size.Small">
+                                @(Profile?.IsActive == true ? "Active" : "Inactive")
+                            </MudChip>
+                        </div>
+                        <div class="d-flex justify-space-between align-center">
+                            <MudText Typo="Typo.body2">Medlem Type</MudText>
+                            <MudText Typo="Typo.body2">@GetDisplayValue(Profile?.MemberTypeName)</MudText>
+                        </div>
+                        <div class="d-flex justify-space-between align-center">
+                            <MudText Typo="Typo.body2">Medlem Siden</MudText>
+                            <MudText Typo="Typo.body2">@GetDisplayValue(Profile?.MemberCreated)</MudText>
+                        </div>
+                        <div class="d-flex justify-space-between align-center">
+                            <MudText Typo="Typo.body2">Sidst Set</MudText>
+                            <MudText Typo="Typo.body2">@GetDisplayValue(Profile?.MemberLastSeen)</MudText>
+                        </div>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudStack>
+    </div>
+}
+else
+{
+    <!-- Desktop Layout (Original) -->
+    <MudText Typo="Typo.h5" GutterBottom="true">Profil Information</MudText>
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Personlige detaljer</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        @if (IsEditing)
+                        {
+                            <MudButton Variant="Variant.Text"
+                                       Color="Color.Secondary"
+                                       StartIcon="@Icons.Material.Filled.Cancel"
+                                       OnClick="@CancelEditing"
+                                       Class="mr-2">
+                                Anuller
+                            </MudButton>
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Save"
+                                       OnClick="@SaveProfile"
+                                       Disabled="@IsSaving">
+                                @if (IsSaving)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Inherit" />
+                                    <span>Gemmer...</span>
+                                }
+                                else
+                                {
+                                    <span>Gem</span>
+                                }
+                            </MudButton>
+                        }
+                        else
+                        {
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Edit"
+                                       OnClick="@StartEditing">
+                                Rediger
+                            </MudButton>
+                        }
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="EditableProfile.MemberFirstName"
+                                          Label="Fornavn"
+                                          Variant="Variant.Outlined"
+                                          ReadOnly="@(!IsEditing)" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="EditableProfile.MemberLastName"
+                                          Label="Efternavn"
+                                          Variant="Variant.Outlined"
+                                          ReadOnly="@(!IsEditing)" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="EditableProfile.MemberEmail"
+                                          Label="Email Adresse"
+                                          Variant="Variant.Outlined"
+                                          ReadOnly="@(!IsEditing)" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="EditableProfile.MemberPhonePrivate"
+                                          Label="Privat Telefon"
+                                          Variant="Variant.Outlined"
+                                          ReadOnly="@(!IsEditing)" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="EditableProfile.MemberPhoneWork"
+                                          Label="Arbejds Telefon"
+                                          Variant="Variant.Outlined"
+                                          ReadOnly="@(!IsEditing)" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            @if (IsEditing)
+                            {
+                                <MudDatePicker @bind-Date="EditableProfile.MemberBirthday"
+                                               Label="Fødselsdag"
+                                               Variant="Variant.Outlined" />
+                            }
+                            else
+                            {
+                                <MudTextField Label="Fødselsdag"
+                                              Variant="Variant.Outlined"
+                                              Value="@GetDisplayDate(EditableProfile.MemberBirthday)"
+                                              ReadOnly />
+                            }
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="EditableProfile.MemberJobTitle"
+                                          Label="Job Titel"
+                                          Variant="Variant.Outlined"
+                                          ReadOnly="@(!IsEditing)" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="EditableProfile.MemberAddress"
+                                          Label="Adresse"
+                                          Variant="Variant.Outlined"
+                                          ReadOnly="@(!IsEditing)" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="EditableProfile.MemberCity"
+                                          Label="By"
+                                          Variant="Variant.Outlined"
+                                          ReadOnly="@(!IsEditing)" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudNumericField @bind-Value="EditableProfile.MemberZipCode"
+                                             Label="Postnummer"
+                                             Variant="Variant.Outlined"
+                                             ReadOnly="@(!IsEditing)"
+                                             HideSpinButtons="true" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="EditableProfile.MemberCPR"
+                                          Label="CPR Nummer"
+                                          Variant="Variant.Outlined"
+                                          ReadOnly="@(!IsEditing)" />
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Profil Billede</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <ImageUpload @bind-ImagePreviewUrl="profileImageUrl"
+                                 PreviewSize="Size.Large"
+                                 OnImageSelected="@OnImageSelected"
+                                 OnImageCleared="@OnImageCleared"
+                                 IsUploading="@isImageUploading"
+                                 MemberGuid="@Profile?.MemberGuid" />
+
+                    @if (!string.IsNullOrEmpty(profileImageUrl))
+                    {
+                        <div class="mt-3">
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                Tip: Klik på "Beskær" for at justere dit profilbillede perfekt!
+                            </MudText>
+                        </div>
+                    }
+
+                    <!-- ENHANCED: Debug information for troubleshooting -->
+                    @if (showDebugInfo)
+                    {
+                        <div class="mt-3 pa-2" style="background: #f5f5f5; border-radius: 4px;">
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                <strong>Debug Info:</strong><br />
+                                Profile GUID: @(Profile?.MemberGuid ?? "null")<br />
+                                Image URL: @(profileImageUrl ?? "null")<br />
+                                Is Uploading: @isImageUploading
+                            </MudText>
+                            <MudButton Size="Size.Small"
+                                       OnClick="@(async () => await TestCropper())"
+                                       Class="mt-1">
+                                Test Cropper
+                            </MudButton>
+                        </div>
+                    }
+                </MudCardContent>
+            </MudCard>
+
+            <MudCard Elevation="2" Class="mt-4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Konto Information</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudStack Spacing="2">
+                        <div class="d-flex justify-space-between align-center">
+                            <MudText Typo="Typo.body2">Medlem Status</MudText>
+                            <MudChip T="string" Color="@(Profile?.IsActive == true ? Color.Success : Color.Error)" Size="Size.Small">
+                                @(Profile?.IsActive == true ? "Active" : "Inactive")
+                            </MudChip>
+                        </div>
+                        <div class="d-flex justify-space-between align-center">
+                            <MudText Typo="Typo.body2">Medlem Type</MudText>
+                            <MudText Typo="Typo.body2">@GetDisplayValue(Profile?.MemberTypeName)</MudText>
+                        </div>
+                        <div class="d-flex justify-space-between align-center">
+                            <MudText Typo="Typo.body2">Medlem Siden</MudText>
+                            <MudText Typo="Typo.body2">@GetDisplayValue(Profile?.MemberCreated)</MudText>
+                        </div>
+                        <div class="d-flex justify-space-between align-center">
+                            <MudText Typo="Typo.body2">Sidst Set</MudText>
+                            <MudText Typo="Typo.body2">@GetDisplayValue(Profile?.MemberLastSeen)</MudText>
+                        </div>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public ProfileResponseDTO? Profile { get; set; }
+    [Parameter] public UpdateProfileRequestDTO EditableProfile { get; set; } = new();
+    [Parameter] public bool IsEditing { get; set; }
+    [Parameter] public bool IsSaving { get; set; }
+    [Parameter] public EventCallback OnStartEditing { get; set; }
+    [Parameter] public EventCallback OnCancelEditing { get; set; }
+    [Parameter] public EventCallback OnSaveProfile { get; set; }
+    [Parameter] public EventCallback<string?> OnImageUpdated { get; set; }
+
+    private string profileImageUrl = string.Empty;
+    private MemberImageUploadRequestDTO? selectedImageDto = null;
+    private bool isImageUploading = false;
+    private bool showDebugInfo = false;
+    private bool isMobile = false; // NEW: Mobile state
+
+    // NEW: Breakpoint change handler
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        isMobile = breakpoint <= Breakpoint.Sm;
+        StateHasChanged();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Profile != null && string.IsNullOrEmpty(profileImageUrl))
+        {
+            await LoadProfileImage();
+        }
+    }
+
+    private async Task LoadProfileImage()
+    {
+        try
+        {
+            if (Profile?.MemberGuid != null)
+            {
+                Console.WriteLine($"Loading profile image for: {Profile.MemberGuid}");
+                var imageUrl = await ProfileService.GetProfileImageUrlAsync();
+                if (!string.IsNullOrEmpty(imageUrl))
+                {
+                    profileImageUrl = imageUrl;
+                    // Notify parent component of the loaded image
+                    await OnImageUpdated.InvokeAsync(imageUrl);
+                    Console.WriteLine($"Profile image loaded: {imageUrl}");
+                    StateHasChanged();
+                }
+                else
+                {
+                    Console.WriteLine("No profile image found");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading profile image: {ex.Message}");
+        }
+    }
+
+    private async Task OnImageSelected(MemberImageUploadRequestDTO imageDto)
+    {
+        selectedImageDto = imageDto;
+
+        if (Profile?.MemberGuid != null)
+        {
+            await UploadProfileImage();
+        }
+    }
+
+    private async Task OnImageCleared()
+    {
+        selectedImageDto = null;
+        profileImageUrl = string.Empty;
+        // Notify parent that image was cleared
+        await OnImageUpdated.InvokeAsync(null);
+        StateHasChanged();
+    }
+
+    private async Task UploadProfileImage()
+    {
+        if (selectedImageDto == null || Profile?.MemberGuid == null)
+            return;
+
+        try
+        {
+            isImageUploading = true;
+            StateHasChanged();
+
+            Console.WriteLine($"Uploading profile image for: {Profile.MemberGuid}");
+            var result = await ImageUploadService.UploadMemberImageAsync(selectedImageDto);
+
+            if (!string.IsNullOrEmpty(result.ImageUrl))
+            {
+                profileImageUrl = result.ImageUrl;
+                // Notify parent component of the new image
+                await OnImageUpdated.InvokeAsync(result.ImageUrl);
+                Snackbar.Add("Profilbillede uploadet succesfuldt!", Severity.Success);
+                Console.WriteLine($"Profile image uploaded successfully: {result.ImageUrl}");
+            }
+            else
+            {
+                Snackbar.Add("Fejl ved upload af profilbillede.", Severity.Error);
+                Console.WriteLine($"Image upload failed: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error uploading profile image: {ex.Message}");
+            Snackbar.Add("Der opstod en fejl ved upload af billedet.", Severity.Error);
+        }
+        finally
+        {
+            isImageUploading = false;
+            StateHasChanged();
+        }
+    }
+
+    // ENHANCED: Test function for debugging cropper issues
+    private async Task TestCropper()
+    {
+        try
+        {
+            Console.WriteLine("=== TESTING CROPPER ===");
+            var result = await JSRuntime.InvokeAsync<object>("debugCropper");
+            Console.WriteLine("Cropper debug result:", result);
+            Snackbar.Add("Cropper debug info logged to console", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error testing cropper: {ex.Message}");
+            Snackbar.Add($"Cropper test error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task StartEditing()
+    {
+        await OnStartEditing.InvokeAsync();
+    }
+
+    private async Task CancelEditing()
+    {
+        await OnCancelEditing.InvokeAsync();
+    }
+
+    private async Task SaveProfile()
+    {
+        await OnSaveProfile.InvokeAsync();
+    }
+
+    private string GetDisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "Not provided" : value;
+
+    private string GetDisplayDate(DateTime? date) => date?.ToString("yyyy-MM-dd") ?? "Not provided";
+
+    private string GetInitials()
+    {
+        if (string.IsNullOrWhiteSpace(Profile?.MemberFirstName) || string.IsNullOrWhiteSpace(Profile?.MemberLastName))
+            return "U";
+
+        var initials = "";
+        initials += Profile.MemberFirstName.Trim()[0].ToString().ToUpper();
+
+        var lastNameParts = Profile.MemberLastName.Split(new char[] { '-', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var part in lastNameParts)
+        {
+            if (!string.IsNullOrWhiteSpace(part))
+            {
+                initials += part.Trim()[0].ToString().ToUpper();
+            }
+        }
+
+        return initials;
+    }
+}

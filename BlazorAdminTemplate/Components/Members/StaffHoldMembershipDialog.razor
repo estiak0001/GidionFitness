@@ -1,0 +1,130 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Memberships
+@using BlazorAdminTemplate.Infrastructure.Services
+@using MudBlazor
+@using System.Text
+@inject IMemberMembershipService MemberMembershipService
+@inject IStaffManagementService StaffManagementService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.PauseCircle" Class="mr-2" />
+            Hold medlemskab
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudContainer Class="py-4">
+            <MudText Class="mb-4">
+                Angiv perioden, hvor medlemskabet skal sættes på hold. I denne periode opkræves der ikke betaling.
+            </MudText>
+
+            <MudDatePicker @bind-Date="HoldStartDate"
+                           Label="Startdato for hold"
+                           MinDate="@DateTime.Today"
+                           Required="true"
+                           Class="mb-4" />
+
+            <MudDatePicker @bind-Date="HoldEndDate"
+                           Label="Slutdato for hold"
+                           MinDate="@(HoldStartDate ?? DateTime.Today)"
+                           Required="true"
+                           Class="mb-4" />
+
+            <MudTextField @bind-Value="HoldComment"
+                          Label="Kommentar (valgfri)"
+                          Variant="Variant.Outlined"
+                          Lines="3"
+                          Class="mb-4" />
+        </MudContainer>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Annuller</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Warning"
+                   Disabled="@(!IsValid || IsProcessing)"
+                   OnClick="ConfirmHold">
+            @if (IsProcessing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <span class="ms-2">Behandler...</span>
+            }
+            else
+            {
+                <span>Sæt på hold</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string MemberGuid { get; set; } = string.Empty;
+
+    private DateTime? HoldStartDate { get; set; } = DateTime.Today;
+    private DateTime? HoldEndDate { get; set; }
+    private string HoldComment { get; set; } = string.Empty;
+    private bool IsProcessing { get; set; }
+
+    private bool IsValid =>
+        HoldStartDate.HasValue &&
+        HoldEndDate.HasValue &&
+        HoldEndDate >= HoldStartDate;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task ConfirmHold()
+    {
+        if (!IsValid) return;
+
+        IsProcessing = true;
+
+        try
+        {
+            var request = new StaffHoldMemberSubscriptionDTO
+            {
+                MemberGuid = MemberGuid,
+                HoldStartDate = HoldStartDate!.Value,
+                HoldEndDate = HoldEndDate!.Value,
+                HoldComment = HoldComment ?? string.Empty
+            };
+
+            var response = await StaffManagementService.StaffHoldMemberSubscriptionAsync(request);
+
+            if (response.Success == true)
+            {
+                Snackbar.Add($"Medlemskab sat på hold fra {HoldStartDate:dd.MM.yyyy} til {HoldEndDate:dd.MM.yyyy}", Severity.Success);
+
+                // Show summary if available
+                if (response.PaymentRecordsCreated > 0 || response.Cost.TotalAmount != 0)
+                {
+                    var summary = new StringBuilder();
+                    summary.AppendLine($"Hold periode: {response.HoldPeriod.TotalDays} dage");
+                    if (!string.IsNullOrEmpty(response.Cost.Type))
+                        summary.AppendLine($"Omkostningstype: {response.Cost.Type}");
+                    if (!string.IsNullOrEmpty(response.Cost.FreePeriod))
+                        summary.AppendLine(response.Cost.FreePeriod);
+                    if (response.Cost.Breakdown.Any())
+                        summary.AppendLine(string.Join("\n", response.Cost.Breakdown));
+
+                    Snackbar.Add(summary.ToString(), Severity.Info);
+                }
+
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add(response.Message ?? "Der opstod en fejl ved hold af medlemskab.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Fejl: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
+    }
+}

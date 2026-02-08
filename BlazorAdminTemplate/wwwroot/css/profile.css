@@ -1,0 +1,161 @@
+﻿.profile-hero-banner {
+    margin-left: calc(-1 * var(--mud-drawer-width-left));
+    margin-right: calc(-1 * var(--mud-drawer-width-right));
+    margin-top: calc(-1 * var(--mud-appbar-height));
+    width: calc(100% + var(--mud-drawer-width-left) + var(--mud-drawer-width-right));
+}
+
+@media (max-width: 960px) {
+    .profile-hero-banner {
+        margin-left: 0;
+        margin-right: 0;
+        margin-top: calc(-1 * var(--mud-appbar-height));
+        width: 100%;
+    }
+}
+
+/* Mobile-specific styles */
+.mobile-profile-container {
+    width: 100%;
+    overflow-x: hidden;
+}
+
+.mobile-hero-banner {
+    margin-left: calc(-1 * var(--mud-drawer-width-left));
+    margin-right: calc(-1 * var(--mud-drawer-width-right));
+    margin-top: calc(-1 * var(--mud-appbar-height));
+    width: calc(100% + var(--mud-drawer-width-left) + var(--mud-drawer-width-right));
+    background-attachment: scroll !important; /* Better performance on mobile */
+}
+
+@media (max-width: 960px) {
+    .mobile-hero-banner {
+        margin-left: 0;
+        margin-right: 0;
+        margin-top: calc(-1 * var(--mud-appbar-height));
+        width: 100%;
+    }
+}
+
+/* Mobile tabs styling */
+.mobile-tabs .mud-tabs-toolbar {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+}
+
+    .mobile-tabs .mud-tabs-toolbar::-webkit-scrollbar {
+        display: none; /* Chrome/Safari */
+    }
+
+.mobile-tabs .mud-tab {
+    min-width: 100px !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    padding: 12px 16px !important;
+}
+
+    .mobile-tabs .mud-tab span {
+        font-size: 0.875rem !important;
+    }
+
+/* Center the tabs container for desktop */
+.centered-tabs .mud-tabs-toolbar {
+    justify-content: center !important;
+}
+
+.centered-tabs .mud-tab.mud-tab-active.mud-ripple.mud-tab-panel,
+.centered-tabs .mud-tab.mud-ripple.mud-tab-panel {
+    text-align: center !important;
+    justify-content: center !important;
+    align-items: center !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.centered-tabs .mud-tab .mud-icon-root.mud-icon-size-medium.mud-tab-icon-text {
+    margin: 0 auto 4px auto !important;
+    align-self: center !important;
+}
+
+.centered-tabs .mud-tab span {
+    text-align: center !important;
+    display: block !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+}
+
+.centered-tabs .mud-tooltip-root.mud-tooltip-inline {
+    text-align: center !important;
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+}
+
+.centered-tabs .mud-tab-active,
+.centered-tabs .mud-tab {
+    text-align: center !important;
+    justify-content: center !important;
+    align-items: center !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 600px) {
+    .mobile-tabs .mud-tab {
+        min-width: 90px !important;
+        padding: 10px 12px !important;
+    }
+
+        .mobile-tabs .mud-tab span {
+            font-size: 0.8rem !important;
+        }
+}
+
+/* Mobile training tab specific styles */
+@media (max-width: 600px) {
+    /* Center all content in mobile cards view */
+    .text-center {
+        text-align: center !important;
+    }
+    
+    /* Ensure proper spacing and alignment for mobile cards */
+    .training-mobile-card {
+        margin: 0 auto !important;
+        text-align: center !important;
+    }
+    
+    /* Mobile pagination styling */
+    .mobile-pagination {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        gap: 1rem !important;
+        margin-top: 1rem !important;
+    }
+    
+    .mobile-pagination .mud-button {
+        min-width: 40px !important;
+        padding: 8px !important;
+    }
+}
+
+/* General mobile content centering */
+@media (max-width: 600px) {
+    .d-flex.flex-column.align-center {
+        align-items: center !important;
+        text-align: center !important;
+    }
+    
+    .mud-card-content.text-center {
+        text-align: center !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+    }
+}

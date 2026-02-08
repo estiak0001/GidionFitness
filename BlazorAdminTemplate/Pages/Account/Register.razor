@@ -1,0 +1,1151 @@
+﻿@page "/register"
+@using System.Text.Json
+@inject IJSRuntime JSRuntime
+@using FluentValidation
+@using Blazored.FluentValidation
+@using BlazorAdminTemplate.Components
+@using Microsoft.AspNetCore.Components.Forms
+@inject IRegisterService RegisterService
+@inject IOrganisationService OrganisationService
+@inject ILanguageService LanguageService
+@inject IPaymentGroupService PaymentGroupService
+@inject IValidator<RegisterRequestDTO> RegisterValidator
+@inject IImageUploadService ImageUploadService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Member Registration</PageTitle>
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudCard Elevation="3">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <div class="d-flex align-center justify-center mb-4">
+                    <MudIcon Icon="Icons.Material.Filled.PersonAdd" Size="Size.Large" Color="Color.Primary" Class="mr-3" />
+                    <MudText Typo="Typo.h4" Color="Color.Primary">@organisationName Registration</MudText>
+                </div>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <EditForm Model="@registerRequest" OnValidSubmit="@HandleRegister">
+                <FluentValidationValidator @ref="fluentValidationValidator" />
+
+                @if (isMobile)
+                {
+                    <!-- Mobile Layout - Centered single column -->
+                    <div class="d-flex flex-column align-center">
+                        <!-- Personal Information Section -->
+                        <MudText Typo="Typo.h6" Class="mb-3" Align="Align.Center">Personal Information</MudText>
+
+                        <div style="width: 100%; max-width: 350px; margin: 0 auto;">
+                            <MudStack Spacing="3">
+                                <MudTextField @bind-Value="registerRequest.MemberFirstName"
+                                              Label="Navn"
+                                              Variant="Variant.Outlined"
+                                              Required="true"
+                                              For="@(() => registerRequest.MemberFirstName)" />
+
+                                <MudTextField @bind-Value="registerRequest.MemberLastName"
+                                              Label="Efternavn"
+                                              Variant="Variant.Outlined"
+                                              Required="true"
+                                              For="@(() => registerRequest.MemberLastName)" />
+
+                                <MudTextField @bind-Value="registerRequest.MemberEmail"
+                                              Label="Email Adresse"
+                                              Variant="Variant.Outlined"
+                                              InputType="InputType.Email"
+                                              Required="true"
+                                              For="@(() => registerRequest.MemberEmail)"
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="Icons.Material.Filled.Email" />
+
+                                @if (fieldSettings.ShowMemberCPR == 1)
+                                {
+                                    <MudTextField @bind-Value="registerRequest.MemberCPR"
+                                                  Label="CPR Nummer"
+                                                  Variant="Variant.Outlined"
+                                                  HelperText=""
+                                                  For="@(() => registerRequest.MemberCPR)"
+                                                  Adornment="Adornment.Start"
+                                                  AdornmentIcon="Icons.Material.Filled.Badge" />
+                                }
+
+                                <MudDatePicker @bind-Date="registerRequest.Birthday"
+                                               Label="Fødselsdag"
+                                               Variant="Variant.Outlined"
+                                               HelperText="Vælg hvornår du har fødselsdag"
+                                               For="@(() => registerRequest.Birthday)"
+                                               PickerVariant="PickerVariant.Dialog"
+                                               OpenTo="OpenTo.Year" />
+
+                                @if (fieldSettings.ShowMemberSex == 1)
+                                {
+                                    <MudSelect @bind-Value="registerRequest.MemberSex"
+                                               Label="Køn"
+                                               Variant="Variant.Outlined"
+                                               For="@(() => registerRequest.MemberSex)">
+                                        <MudSelectItem Value="0">Not Specified</MudSelectItem>
+                                        <MudSelectItem Value="1">Male</MudSelectItem>
+                                        <MudSelectItem Value="2">Female</MudSelectItem>
+                                    </MudSelect>
+                                }
+
+                                <!-- Profile Picture Upload Section -->
+                                <div class="mb-3">
+                                    <MudText Typo="Typo.subtitle1" Class="mb-2" Align="Align.Center">Profil billede</MudText>
+                                    <div class="d-flex align-center gap-4">
+                                        <div class="flex-shrink-0">
+                                            @if (!string.IsNullOrEmpty(selectedImagePreview))
+                                            {
+                                                <MudAvatar Size="Size.Large" Style="width: 80px; height: 80px;">
+                                                    <MudImage Src="@selectedImagePreview" Alt="Profile Preview" Style="width: 100%; height: 100%; object-fit: cover;" />
+                                                </MudAvatar>
+                                            }
+                                            else
+                                            {
+                                                <MudAvatar Size="Size.Large" Style="width: 80px; height: 80px;" Color="Color.Secondary">
+                                                    <MudIcon Icon="Icons.Material.Filled.Person" Size="Size.Large" />
+                                                </MudAvatar>
+                                            }
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="mb-2">
+                                                <InputFile OnChange="@OnImageSelected"
+                                                           accept="image/*"
+                                                           style="display: none;"
+                                                           id="imageFileInput" />
+                                                <MudButton Variant="Variant.Outlined"
+                                                           Color="Color.Primary"
+                                                           StartIcon="Icons.Material.Filled.CloudUpload"
+                                                           OnClick="@TriggerFileInput"
+                                                           Disabled="@isImageUploading"
+                                                           Class="mb-2">
+                                                    @if (isImageUploading)
+                                                    {
+                                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                                        <span>Processing...</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>Vælg billede</span>
+                                                    }
+                                                </MudButton>
+                                            </div>
+
+                                            @if (!string.IsNullOrEmpty(selectedImageFileName))
+                                            {
+                                                <div class="d-flex align-center justify-space-between mb-2">
+                                                    <MudText Typo="Typo.caption" Color="Color.Success">
+                                                        <MudIcon Icon="Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="mr-1" />
+                                                        @selectedImageFileName (@(selectedImageSize / 1024)KB)
+                                                    </MudText>
+                                                    <MudIconButton Icon="Icons.Material.Filled.Clear"
+                                                                   Size="Size.Small"
+                                                                   Color="Color.Error"
+                                                                   OnClick="@ClearSelectedImage"
+                                                                   Title="Fjern billede" />
+                                                </div>
+                                            }
+
+                                            @if (!string.IsNullOrEmpty(imageUploadError))
+                                            {
+                                                <MudAlert Severity="MudBlazor.Severity.Warning" Dense="true" Class="mb-2">
+                                                    @imageUploadError
+                                                </MudAlert>
+                                            }
+
+                                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                                Max file size: 5MB. Supported formats: JPEG, PNG, GIF, WebP
+                                            </MudText>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Contact Information -->
+                                <MudTextField @bind-Value="registerRequest.MemberPhonePrivate"
+                                              Label="Privat telefon"
+                                              Variant="Variant.Outlined"
+                                              InputType="InputType.Telephone"
+                                              For="@(() => registerRequest.MemberPhonePrivate)"
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="Icons.Material.Filled.Phone" />
+
+                                <MudTextField @bind-Value="registerRequest.MemberPhoneWork"
+                                              Label="Arbejds telefon"
+                                              Variant="Variant.Outlined"
+                                              InputType="InputType.Telephone"
+                                              For="@(() => registerRequest.MemberPhoneWork)"
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="Icons.Material.Filled.Work" />
+
+                                <DawaAddressAutocomplete @bind-AddressValue="registerRequest.MemberAddress"
+                                                         AddressSelected="OnDawaAddressSelected"
+                                                         Label="Adresse"
+                                                         Placeholder="Indtast din adresse"
+                                                         HelperText=""
+                                                         Variant="Variant.Outlined"
+                                                         For="@(() => registerRequest.MemberAddress)"
+                                                         Adornment="Adornment.Start"
+                                                         AdornmentIcon="Icons.Material.Filled.Home" />
+
+                                <MudTextField @bind-Value="registerRequest.MemberCity"
+                                              Label="By"
+                                              Variant="Variant.Outlined"
+                                              For="@(() => registerRequest.MemberCity)" />
+
+                                <MudNumericField @bind-Value="registerRequest.MemberZipCode"
+                                                 Label="Postnummer"
+                                                 Variant="Variant.Outlined"
+                                                 For="@(() => registerRequest.MemberZipCode)"
+                                                 HideSpinButtons="true"
+                                                 Min="0"
+                                                 Max="9999" />
+
+                                <!-- Professional Information -->
+                                <MudText Typo="Typo.h6" Class="mb-3 mt-4" Align="Align.Center">Professional Information</MudText>
+
+                                <MudTextField @bind-Value="registerRequest.MemberJobTitle"
+                                              Label="Job Titel"
+                                              Variant="Variant.Outlined"
+                                              For="@(() => registerRequest.MemberJobTitle)"
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="Icons.Material.Filled.WorkOutline" />
+
+                                @if (fieldSettings.ShowMemberHealthInsurance == 1)
+                                {
+                                    <MudField Label="Sygesikring"
+                                              Variant="Variant.Outlined"
+                                              InnerPadding="false"
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="Icons.Material.Filled.HealthAndSafety">
+                                        <MudSwitch @bind-Value="hasInsurance"
+                                                   Color="Color.Primary"
+                                                   Class="ma-2" />
+                                    </MudField>
+                                }
+
+                                <!-- Language Selection -->
+                                <MudText Typo="Typo.h6" Class="mb-3 mt-4" Align="Align.Center">Sprog</MudText>
+
+                                @if (availableLanguages?.Any() == true)
+                                {
+                                    <MudSelect @bind-Value="registerRequest.MemberLanguageGUID"
+                                               Label="Vælg et sprog"
+                                               Variant="Variant.Outlined"
+                                               Required="true"
+                                               For="@(() => registerRequest.MemberLanguageGUID)"
+                                               Adornment="Adornment.Start"
+                                               AdornmentIcon="Icons.Material.Filled.Language">
+                                        <MudSelectItem Value="@string.Empty">-- Vælg et sprog --</MudSelectItem>
+                                        @foreach (var language in availableLanguages)
+                                        {
+                                            <MudSelectItem Value="@language.MemberLanguageGUID">
+                                                @language.MemberLanguage
+                                            </MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                }
+                                else
+                                {
+                                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="56px" />
+                                }
+
+                                <!-- Organization Selection -->
+                                @if (subOrganisations?.Any() == true)
+                                {
+                                    <MudText Typo="Typo.h6" Class="mb-3 mt-4" Align="Align.Center">Select Center/Location</MudText>
+
+                                    <MudSelect Value="@registerRequest.OrganisationSubGUID"
+                                               ValueChanged="@(async (string value) => await OnSubOrgSelectionChanged(value))"
+                                               Label="Vælg et center"
+                                               Variant="Variant.Outlined"
+                                               Required="true"
+                                               For="@(() => registerRequest.OrganisationSubGUID)">
+                                        <MudSelectItem Value="@string.Empty"></MudSelectItem>
+                                        @foreach (var subOrg in subOrganisations)
+                                        {
+                                            <MudSelectItem Value="@subOrg.OrganisationSubGUID">
+                                                @subOrg.OrganisationSubName
+                                            </MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                }
+
+                                <!-- Payment Plan Selection -->
+                                @if (availablePaymentGroups?.Any() == true)
+                                {
+                                    <MudText Typo="Typo.h6" Class="mb-3 mt-4" Align="Align.Center">Vælg medlemsskab</MudText>
+
+                                    <MudRadioGroup @bind-Value="registerRequest.MemberPaymentGroupGUID"
+                                                   For="@(() => registerRequest.MemberPaymentGroupGUID)">
+                                        @foreach (var paymentGroup in availablePaymentGroups)
+                                        {
+                                            <MudCard Elevation="2"
+                                                     Class="mb-3 pa-4"
+                                                     Style="@($"min-height: 100px; {(registerRequest.MemberPaymentGroupGUID == paymentGroup.MemberPaymentGroupGUID ? "border: 2px solid var(--mud-palette-primary)" : "border: 1px solid var(--mud-palette-divider)")}")"
+                                                     @onclick="@(() => SelectPaymentGroup(paymentGroup.MemberPaymentGroupGUID))">
+                                                <div class="d-flex align-start" style="gap: 12px;">
+                                                    <MudRadio Value="@paymentGroup.MemberPaymentGroupGUID"
+                                                              Color="Color.Primary"
+                                                              Class="mt-1" />
+                                                    <div class="flex-grow-1" style="min-width: 0;">
+                                                        <div class="d-flex justify-space-between align-baseline mb-2" style="flex-wrap: wrap; gap: 8px;">
+                                                            <MudText Typo="Typo.h6" Class="mb-0" style="word-break: break-word;">
+                                                                <strong>@paymentGroup.MemberPaymentGroupName</strong>
+                                                            </MudText>
+                                                            <MudText Typo="Typo.h5" Color="Color.Primary" Class="mb-0" style="white-space: nowrap;">
+                                                                <strong>@paymentGroup.MemberPaymentPrice.ToString("C")</strong>
+                                                            </MudText>
+                                                        </div>
+                                                        @if (!string.IsNullOrEmpty(paymentGroup.MemberPaymentGroupDescription))
+                                                        {
+                                                            <MudText Typo="Typo.body2" Class="mud-text-secondary" style="line-height: 1.4; word-break: break-word;">
+                                                                @paymentGroup.MemberPaymentGroupDescription
+                                                            </MudText>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            </MudCard>
+                                        }
+                                    </MudRadioGroup>
+                                }
+
+                                <!-- Security -->
+                                <MudText Typo="Typo.h6" Class="mb-3 mt-4" Align="Align.Center">Security</MudText>
+
+                                <MudTextField @bind-Value="registerRequest.MemberPassword"
+                                              Label="Password"
+                                              Variant="Variant.Outlined"
+                                              InputType="@(showPassword? InputType.Text: InputType.Password)"
+                                              Required="true"
+                                              For="@(() => registerRequest.MemberPassword)"
+                                              Adornment="Adornment.End"
+                                              AdornmentIcon="@(showPassword? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                              OnAdornmentClick="@(() => showPassword = !showPassword)" />
+
+                                <MudTextField @bind-Value="confirmPassword"
+                                              Label="Confirm Password"
+                                              Variant="Variant.Outlined"
+                                              InputType="@(showConfirmPassword? InputType.Text: InputType.Password)"
+                                              Required="true"
+                                              Error="@(confirmPassword != registerRequest.MemberPassword && showValidation)"
+                                              ErrorText="Passwords do not match"
+                                              Adornment="Adornment.End"
+                                              AdornmentIcon="@(showConfirmPassword? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                              OnAdornmentClick="@(() => showConfirmPassword = !showConfirmPassword)" />
+
+                                <!-- Additional Information -->
+                                <MudText Typo="Typo.h6" Class="mb-3 mt-4" Align="Align.Center">Additional Information</MudText>
+
+                                <MudTextField @bind-Value="registerRequest.MemberComment"
+                                              Label="Kommentar"
+                                              Variant="Variant.Outlined"
+                                              Lines="3"
+                                              HelperText="Any additional comments or special requirements"
+                                              For="@(() => registerRequest.MemberComment)" />
+
+                                <!-- Submit Button -->
+                                <MudButton ButtonType="ButtonType.Submit"
+                                           Variant="Variant.Filled"
+                                           Color="Color.Primary"
+                                           FullWidth="true"
+                                           Disabled="@(isLoading || currentOrganisationDomain == null)"
+                                           Size="Size.Large"
+                                           Class="mt-4">
+                                    @if (isLoading)
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                        <MudText Class="ml-2">Creating Account...</MudText>
+                                    }
+                                    else
+                                    {
+                                        <MudIcon Icon="Icons.Material.Filled.PersonAdd" Class="mr-2" />
+                                        <span>Create Account</span>
+                                    }
+                                </MudButton>
+
+                                @if (!string.IsNullOrEmpty(errorMessage))
+                                {
+                                    <MudAlert Severity="MudBlazor.Severity.Error" ContentAlignment="HorizontalAlignment.Center" Class="mt-4">
+                                        @errorMessage
+                                    </MudAlert>
+                                }
+                            </MudStack>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <!-- Desktop Layout -->
+                    <!-- Personal Information Section -->
+                    <MudText Typo="Typo.h6" Class="mb-3">Personal Information</MudText>
+                    <MudGrid Class="mb-6">
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="registerRequest.MemberFirstName"
+                                          Label="Navn"
+                                          Variant="Variant.Outlined"
+                                          Required="true"
+                                          For="@(() => registerRequest.MemberFirstName)" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="registerRequest.MemberLastName"
+                                          Label="Efternavn"
+                                          Variant="Variant.Outlined"
+                                          Required="true"
+                                          For="@(() => registerRequest.MemberLastName)" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="registerRequest.MemberEmail"
+                                          Label="Email Adresse"
+                                          Variant="Variant.Outlined"
+                                          InputType="InputType.Email"
+                                          Required="true"
+                                          For="@(() => registerRequest.MemberEmail)"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="Icons.Material.Filled.Email" />
+                        </MudItem>
+
+                        @if (fieldSettings.ShowMemberCPR == 1)
+                        {
+                            <MudItem xs="12" md="6">
+                                <MudTextField @bind-Value="registerRequest.MemberCPR"
+                                              Label="CPR Nummer"
+                                              Variant="Variant.Outlined"
+                                              HelperText=""
+                                              For="@(() => registerRequest.MemberCPR)"
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="Icons.Material.Filled.Badge" />
+                            </MudItem>
+                        }
+
+                        <MudItem xs="12" md="6">
+                            <MudDatePicker @bind-Date="registerRequest.Birthday"
+                                           Label="Fødselsdag"
+                                           Variant="Variant.Outlined"
+                                           HelperText="Vælg hvornår du har fødselsdag"
+                                           For="@(() => registerRequest.Birthday)"
+                                           PickerVariant="PickerVariant.Dialog"
+                                           OpenTo="OpenTo.Year"
+                                           CloseOnSelection="true"
+                                           Class="w-100" />
+                        </MudItem>
+
+                        @if (fieldSettings.ShowMemberSex == 1)
+                        {
+                            <MudItem xs="12" md="6">
+                                <MudSelect @bind-Value="registerRequest.MemberSex"
+                                           Label="Køn"
+                                           Variant="Variant.Outlined"
+                                           For="@(() => registerRequest.MemberSex)">
+                                    <MudSelectItem Value="0">Not Specified</MudSelectItem>
+                                    <MudSelectItem Value="1">Male</MudSelectItem>
+                                    <MudSelectItem Value="2">Female</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                        }
+
+                        <!-- Profile Picture Upload Section -->
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.subtitle1" Class="mb-2">Profil billede</MudText>
+                            <div class="d-flex align-center gap-4">
+                                <div class="flex-shrink-0">
+                                    @if (!string.IsNullOrEmpty(selectedImagePreview))
+                                    {
+                                        <MudAvatar Size="Size.Large" Style="width: 80px; height: 80px;">
+                                            <MudImage Src="@selectedImagePreview" Alt="Profile Preview" Style="width: 100%; height: 100%; object-fit: cover;" />
+                                        </MudAvatar>
+                                    }
+                                    else
+                                    {
+                                        <MudAvatar Size="Size.Large" Style="width: 80px; height: 80px;" Color="Color.Secondary">
+                                            <MudIcon Icon="Icons.Material.Filled.Person" Size="Size.Large" />
+                                        </MudAvatar>
+                                    }
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="mb-2">
+                                        <InputFile OnChange="@OnImageSelected"
+                                                   accept="image/*"
+                                                   style="display: none;"
+                                                   id="imageFileInput" />
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Primary"
+                                                   StartIcon="Icons.Material.Filled.CloudUpload"
+                                                   OnClick="@TriggerFileInput"
+                                                   Disabled="@isImageUploading"
+                                                   Class="mb-2">
+                                            @if (isImageUploading)
+                                            {
+                                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                                <span>Processing...</span>
+                                            }
+                                            else
+                                            {
+                                                <span>Vælg billede</span>
+                                            }
+                                        </MudButton>
+                                    </div>
+
+                                    @if (!string.IsNullOrEmpty(selectedImageFileName))
+                                    {
+                                        <div class="d-flex align-center justify-space-between mb-2">
+                                            <MudText Typo="Typo.caption" Color="Color.Success">
+                                                <MudIcon Icon="Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="mr-1" />
+                                                @selectedImageFileName (@(selectedImageSize / 1024)KB)
+                                            </MudText>
+                                            <MudIconButton Icon="Icons.Material.Filled.Clear"
+                                                           Size="Size.Small"
+                                                           Color="Color.Error"
+                                                           OnClick="@ClearSelectedImage"
+                                                           Title="Fjern billede" />
+                                        </div>
+                                    }
+
+                                    @if (!string.IsNullOrEmpty(imageUploadError))
+                                    {
+                                        <MudAlert Severity="MudBlazor.Severity.Warning" Dense="true" Class="mb-2">
+                                            @imageUploadError
+                                        </MudAlert>
+                                    }
+
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                        Max file size: 5MB. Supported formats: JPEG, PNG, GIF, WebP
+                                    </MudText>
+                                </div>
+                            </div>
+                        </MudItem>
+                    </MudGrid>
+
+                    <!-- Contact Information Section -->
+                    <MudGrid Class="mb-6">
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="registerRequest.MemberPhonePrivate"
+                                          Label="Privat telefon"
+                                          Variant="Variant.Outlined"
+                                          InputType="InputType.Telephone"
+                                          For="@(() => registerRequest.MemberPhonePrivate)"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="Icons.Material.Filled.Phone" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="registerRequest.MemberPhoneWork"
+                                          Label="Arbejds telefon"
+                                          Variant="Variant.Outlined"
+                                          InputType="InputType.Telephone"
+                                          For="@(() => registerRequest.MemberPhoneWork)"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="Icons.Material.Filled.Work" />
+                        </MudItem>
+
+                        <!-- DAWA Address Autocomplete -->
+                        <MudItem xs="12">
+                            <DawaAddressAutocomplete @bind-AddressValue="registerRequest.MemberAddress"
+                                                     AddressSelected="OnDawaAddressSelected"
+                                                     Label="Adresse"
+                                                     Placeholder="Indtast din adresse"
+                                                     HelperText=""
+                                                     Variant="Variant.Outlined"
+                                                     For="@(() => registerRequest.MemberAddress)"
+                                                     Adornment="Adornment.Start"
+                                                     AdornmentIcon="Icons.Material.Filled.Home" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField @bind-Value="registerRequest.MemberCity"
+                                          Label="By"
+                                          Variant="Variant.Outlined"
+                                          For="@(() => registerRequest.MemberCity)" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudNumericField @bind-Value="registerRequest.MemberZipCode"
+                                             Label="Postnummer"
+                                             Variant="Variant.Outlined"
+                                             For="@(() => registerRequest.MemberZipCode)"
+                                             HideSpinButtons="true"
+                                             Min="0"
+                                             Max="9999" />
+                        </MudItem>
+                    </MudGrid>
+
+                    <!-- Professional Information Section -->
+                    <MudText Typo="Typo.h6" Class="mb-3">Professional Information</MudText>
+                    <MudGrid Class="mb-6">
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="registerRequest.MemberJobTitle"
+                                          Label="Job Titel"
+                                          Variant="Variant.Outlined"
+                                          For="@(() => registerRequest.MemberJobTitle)"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="Icons.Material.Filled.WorkOutline" />
+                        </MudItem>
+
+                        @if (fieldSettings.ShowMemberHealthInsurance == 1)
+                        {
+                            <MudItem xs="12" md="6">
+                                <MudField Label="Sygesikring"
+                                          Variant="Variant.Outlined"
+                                          InnerPadding="false"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="Icons.Material.Filled.HealthAndSafety">
+                                    <MudSwitch @bind-Value="hasInsurance"
+                                               Color="Color.Primary"
+                                               Class="ma-2" />
+                                </MudField>
+                            </MudItem>
+                        }
+                    </MudGrid>
+
+                    <!-- Language Selection Section -->
+                    <MudText Typo="Typo.h6" Class="mb-3">Sprog</MudText>
+                    <MudGrid Class="mb-6">
+                        <MudItem xs="12" md="6">
+                            @if (availableLanguages?.Any() == true)
+                            {
+                                <MudSelect @bind-Value="registerRequest.MemberLanguageGUID"
+                                           Label="Vælg et sprog"
+                                           Variant="Variant.Outlined"
+                                           Required="true"
+                                           For="@(() => registerRequest.MemberLanguageGUID)"
+                                           Adornment="Adornment.Start"
+                                           AdornmentIcon="Icons.Material.Filled.Language">
+                                    <MudSelectItem Value="@string.Empty">-- Vælg et sprog --</MudSelectItem>
+                                    @foreach (var language in availableLanguages)
+                                    {
+                                        <MudSelectItem Value="@language.MemberLanguageGUID">
+                                            @language.MemberLanguage
+                                        </MudSelectItem>
+                                    }
+                                </MudSelect>
+                            }
+                            else
+                            {
+                                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="56px" />
+                            }
+                        </MudItem>
+                    </MudGrid>
+
+                    <!-- Organization Selection Section -->
+                    @if (subOrganisations?.Any() == true)
+                    {
+                        <MudText Typo="Typo.h6" Class="mb-3">Select Center/Location</MudText>
+                        <MudGrid Class="mb-6">
+                            <MudItem xs="12">
+                                <MudSelect Value="@registerRequest.OrganisationSubGUID"
+                                           ValueChanged="@(async (string value) => await OnSubOrgSelectionChanged(value))"
+                                           Label="Vælg et center"
+                                           Variant="Variant.Outlined"
+                                           Required="true"
+                                           For="@(() => registerRequest.OrganisationSubGUID)">
+                                    <MudSelectItem Value="@string.Empty"></MudSelectItem>
+                                    @foreach (var subOrg in subOrganisations)
+                                    {
+                                        <MudSelectItem Value="@subOrg.OrganisationSubGUID">
+                                            @subOrg.OrganisationSubName
+                                        </MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                        </MudGrid>
+                    }
+
+                    <!-- Payment Plan Selection Section -->
+                    @if (availablePaymentGroups?.Any() == true)
+                    {
+                        <MudText Typo="Typo.h6" Class="mb-3">Vælg medlemsskab</MudText>
+                        <MudGrid Class="mb-6">
+                            <MudItem xs="12">
+                                <MudRadioGroup @bind-Value="registerRequest.MemberPaymentGroupGUID"
+                                               For="@(() => registerRequest.MemberPaymentGroupGUID)">
+                                    @foreach (var paymentGroup in availablePaymentGroups)
+                                    {
+                                        <MudCard Elevation="2"
+                                                 Class="mb-3 pa-4 ml-3"
+                                                 Style="@($"min-height: 100px; {(registerRequest.MemberPaymentGroupGUID == paymentGroup.MemberPaymentGroupGUID ? "border: 2px solid var(--mud-palette-primary)" : "border: 1px solid var(--mud-palette-divider)")}")"
+                                                 @onclick="@(() => SelectPaymentGroup(paymentGroup.MemberPaymentGroupGUID))">
+                                            <div class="d-flex align-start" style="gap: 12px;">
+                                                <MudRadio Value="@paymentGroup.MemberPaymentGroupGUID"
+                                                          Color="Color.Primary"
+                                                          Class="mt-1" />
+                                                <div class="flex-grow-1" style="min-width: 0;">
+                                                    <div class="d-flex justify-space-between align-baseline mb-2" style="flex-wrap: wrap; gap: 8px;">
+                                                        <MudText Typo="Typo.h6" Class="mb-0" style="word-break: break-word;">
+                                                            <strong>@paymentGroup.MemberPaymentGroupName</strong>
+                                                        </MudText>
+                                                        <MudText Typo="Typo.h5" Color="Color.Primary" Class="mb-0" style="white-space: nowrap;">
+                                                            <strong>@paymentGroup.MemberPaymentPrice.ToString("C")</strong>
+                                                        </MudText>
+                                                    </div>
+                                                    @if (!string.IsNullOrEmpty(paymentGroup.MemberPaymentGroupDescription))
+                                                    {
+                                                        <MudText Typo="Typo.body2" Class="mud-text-secondary" style="line-height: 1.4; word-break: break-word;">
+                                                            @paymentGroup.MemberPaymentGroupDescription
+                                                        </MudText>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </MudCard>
+                                    }
+                                </MudRadioGroup>
+                            </MudItem>
+                        </MudGrid>
+                    }
+                    else if (!string.IsNullOrEmpty(registerRequest.OrganisationSubGUID))
+                    {
+                        <MudText Typo="Typo.h6" Class="mb-3">Payment Plans</MudText>
+                        <MudGrid Class="mb-6">
+                            <MudItem xs="12">
+                                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="120px" Class="mb-3" />
+                                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="120px" />
+                            </MudItem>
+                        </MudGrid>
+                    }
+
+                    <!-- Security Section -->
+                    <MudText Typo="Typo.h6" Class="mb-3">Security</MudText>
+                    <MudGrid Class="mb-6">
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="registerRequest.MemberPassword"
+                                          Label="Password"
+                                          Variant="Variant.Outlined"
+                                          InputType="@(showPassword? InputType.Text: InputType.Password)"
+                                          Required="true"
+                                          For="@(() => registerRequest.MemberPassword)"
+                                          Adornment="Adornment.End"
+                                          AdornmentIcon="@(showPassword? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                          OnAdornmentClick="@(() => showPassword = !showPassword)" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="confirmPassword"
+                                          Label="Confirm Password"
+                                          Variant="Variant.Outlined"
+                                          InputType="@(showConfirmPassword? InputType.Text: InputType.Password)"
+                                          Required="true"
+                                          Error="@(confirmPassword != registerRequest.MemberPassword && showValidation)"
+                                          ErrorText="Passwords do not match"
+                                          Adornment="Adornment.End"
+                                          AdornmentIcon="@(showConfirmPassword? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                          OnAdornmentClick="@(() => showConfirmPassword = !showConfirmPassword)" />
+                        </MudItem>
+                    </MudGrid>
+
+                    <!-- Additional Information Section -->
+                    <MudText Typo="Typo.h6" Class="mb-3">Additional Information</MudText>
+                    <MudGrid Class="mb-6">
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="registerRequest.MemberComment"
+                                          Label="Kommentar"
+                                          Variant="Variant.Outlined"
+                                          Lines="3"
+                                          HelperText="Any additional comments or special requirements"
+                                          For="@(() => registerRequest.MemberComment)" />
+                        </MudItem>
+                    </MudGrid>
+
+                    <!-- Submit Button -->
+                    <MudItem xs="12">
+                        <MudButton ButtonType="ButtonType.Submit"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   FullWidth="true"
+                                   Disabled="@(isLoading || currentOrganisationDomain == null)"
+                                   Size="Size.Large"
+                                   Class="mt-4">
+                            @if (isLoading)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                <MudText Class="ml-2">Creating Account...</MudText>
+                            }
+                            else
+                            {
+                                <MudIcon Icon="Icons.Material.Filled.PersonAdd" Class="mr-2" />
+                                <span>Create Account</span>
+                            }
+                        </MudButton>
+                    </MudItem>
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <MudItem xs="12">
+                            <MudAlert Severity="MudBlazor.Severity.Error" ContentAlignment="HorizontalAlignment.Center" Class="mt-4">
+                                @errorMessage
+                            </MudAlert>
+                        </MudItem>
+                    }
+                }
+            </EditForm>
+        </MudCardContent>
+        <MudCardActions Class="justify-center pb-4">
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                Already have an account?
+                <MudLink Href="/login" Color="Color.Primary">Sign in here</MudLink>
+            </MudText>
+        </MudCardActions>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private RegisterRequestDTO registerRequest = new();
+    private FluentValidationValidator? fluentValidationValidator;
+    private OrganisationDomain? currentOrganisationDomain;
+    private List<SubOrganisation>? subOrganisations;
+    private List<Language>? availableLanguages;
+    private List<PaymentGroup>? availablePaymentGroups;
+    private bool isLoading = false;
+    private bool showPassword = false;
+    private bool showConfirmPassword = false;
+    private bool showValidation = false;
+    private string confirmPassword = string.Empty;
+    private string errorMessage = string.Empty;
+    private string organisationName = string.Empty;
+
+    private bool hasInsurance = false;
+
+    private OrganisationFieldSettings fieldSettings = new();
+
+    private MemberImageUploadRequestDTO? selectedImageDto = null;
+    private string selectedImagePreview = string.Empty;
+    private string selectedImageFileName = string.Empty;
+    private long selectedImageSize = 0;
+    private string imageUploadError = string.Empty;
+    private bool isImageUploading = false;
+
+    private bool isMobile = false;
+
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        isMobile = breakpoint <= Breakpoint.Sm;
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if user is already logged in
+        var uri = new Uri(Navigation.Uri);
+        var host = uri.Host;
+
+        // Load organisation info by domain
+        await Task.WhenAll(LoadOrganisationInfo(host), LoadAvailableLanguages());
+    }
+
+    private async Task OnImageSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        isImageUploading = true;
+        imageUploadError = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            // Validate file type first
+            if (!ImageUploadService.IsValidImageType(file.ContentType))
+            {
+                imageUploadError = "Please select a valid image file (JPEG, PNG, GIF, or WebP).";
+                return;
+            }
+
+            // Validate file size
+            if (file.Size > 5 * 1024 * 1024) // 5MB limit
+            {
+                imageUploadError = "File size must be less than 5MB.";
+                return;
+            }
+
+            // Prepare the image DTO
+            selectedImageDto = await ImageUploadService.PrepareImageFromBrowserFileAsync(file);
+            selectedImageFileName = file.Name;
+            selectedImageSize = file.Size;
+
+            // Create preview URL for display
+            selectedImagePreview = $"data:{file.ContentType};base64,{selectedImageDto.ImageFile}";
+
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error processing image: {ex.Message}");
+            imageUploadError = ex.Message;
+            ClearSelectedImage();
+        }
+        finally
+        {
+            isImageUploading = false;
+            StateHasChanged();
+        }
+    }
+    private async Task TriggerFileInput()
+    {
+        await JSRuntime.InvokeVoidAsync("eval", "document.getElementById('imageFileInput').click()");
+    }
+
+    private void ClearSelectedImage()
+    {
+        selectedImageDto = null;
+        selectedImageFileName = string.Empty;
+        selectedImageSize = 0;
+        selectedImagePreview = string.Empty;
+        imageUploadError = string.Empty;
+        StateHasChanged();
+    }
+
+    private async Task OnDawaAddressSelected(DawaAddressAutocomplete.DawaAddressResult result)
+    {
+        try
+        {
+            // Auto-populate city and zip code when address is selected
+            registerRequest.MemberCity = result.City;
+
+            if (int.TryParse(result.ZipCode, out var zipCode))
+            {
+                registerRequest.MemberZipCode = zipCode;
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error handling DAWA address selection: {ex.Message}");
+        }
+    }
+
+    private async Task LoadOrganisationInfo(string host)
+    {
+        try
+        {
+            currentOrganisationDomain = await OrganisationService.GetOrganisationByDomainAsync(host);
+            if (currentOrganisationDomain != null)
+            {
+
+                var currentOrganisationMainGUID = OrganisationService.GetCurrentMainOrganisationGUID();
+
+                organisationName = currentOrganisationDomain.OrganisationSite.OrganisationWebName;
+
+                // Set organisation GUIDs from domain lookup
+                registerRequest.OrganisationMainGUID = currentOrganisationDomain.OrganisationSite.OrganisationMainGUID;
+
+                ParseFieldSettings(currentOrganisationDomain.OrganisationSite.OrganisationSubJsonData);
+
+                // Load available sub-organisations
+                var subOrgResponse = await OrganisationService.GetSubOrganisationsAsync(currentOrganisationMainGUID);
+                subOrganisations = subOrgResponse.OrganisationSubs;
+
+            }
+            else
+            {
+                Console.WriteLine($"No organisation found for domain: {host}");
+                errorMessage = "No organisation found for this domain. Please contact support.";
+            }
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading organisation info: {ex.Message}");
+            errorMessage = "Error loading organisation information. Please try again.";
+            StateHasChanged();
+        }
+    }
+
+    private void ParseFieldSettings(string jsonData) 
+    {
+        try
+        {
+            
+
+            var settingsArray = JsonSerializer.Deserialize<OrganisationFieldSettings[]>(jsonData);
+            if (settingsArray != null && settingsArray.Length > 0)
+            {
+                fieldSettings = settingsArray[0];
+                
+
+            }else
+            {
+                
+                fieldSettings = new OrganisationFieldSettings(); // Default to empty settings
+            }
+        }catch(Exception ex)
+        {
+            
+            fieldSettings = new OrganisationFieldSettings(); // Default to empty settings on error
+        }
+    }
+
+    private async Task LoadAvailableLanguages()
+    {
+        try
+        {
+            var languageResponse = await LanguageService.GetAllLanguagesAsync();
+            availableLanguages = languageResponse.languages;
+
+           
+
+            if (availableLanguages?.Any() == true)
+            {
+                
+
+                // Set default language 
+                var defaultLanguage = availableLanguages.FirstOrDefault(l => l.MemberLanguage.ToLower().Contains("english") || l.MemberLanguage.ToLower().Contains("dansk"));
+                if (defaultLanguage != null)
+                {
+                    registerRequest.MemberLanguageGUID = defaultLanguage.MemberLanguageGUID;
+                    
+                }
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading available languages: {ex.Message}");
+        }
+    }
+
+    private async Task OnSubOrgSelectionChanged(string selectedValue)
+    {
+  
+        registerRequest.OrganisationSubGUID = selectedValue;
+
+        // Clear payment group selection when changing sub-org
+        registerRequest.MemberPaymentGroupGUID = string.Empty;
+        availablePaymentGroups = null;
+
+        // Load payment groups for the selected sub-organisation
+        if (!string.IsNullOrEmpty(selectedValue) && !string.IsNullOrEmpty(registerRequest.OrganisationMainGUID))
+        {
+            await LoadPaymentGroups(registerRequest.OrganisationMainGUID, selectedValue);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task LoadPaymentGroups(string mainOrgGuid, string subOrgGuid)
+    {
+        try
+        {
+
+            var paymentGroupResponse = await PaymentGroupService.GetPaymentGroupAsync(mainOrgGuid, subOrgGuid);
+            availablePaymentGroups = paymentGroupResponse.PaymentGroups;
+
+
+            if (availablePaymentGroups?.Any() == true)
+            {
+                
+
+                // Set default payment group 
+                var defaultPaymentGroup = availablePaymentGroups.OrderBy(p => p.MemberPaymentPrice).FirstOrDefault();
+                if (defaultPaymentGroup != null)
+                {
+                    registerRequest.MemberPaymentGroupGUID = defaultPaymentGroup.MemberPaymentGroupGUID;
+                   
+                }
+            }
+            else
+            {
+                Console.WriteLine("No payment groups found for this organization/sub-organization combination");
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading payment groups: {ex.Message}");
+            errorMessage = "Error loading payment plans. Please try again.";
+            StateHasChanged();
+        }
+    }
+
+    private void SelectPaymentGroup(string paymentGroupGUID)
+    {
+        registerRequest.MemberPaymentGroupGUID = paymentGroupGUID;
+
+        StateHasChanged();
+    }
+
+
+    private async Task HandleRegister()
+    {
+
+        if (fluentValidationValidator != null)
+        {
+            var isValid = fluentValidationValidator.Validate(options => options.IncludeAllRuleSets());
+
+            if (!isValid) 
+            {
+                errorMessage = "Please correct the validation errors before submitting.";
+                return;
+            }
+        }
+
+        if (confirmPassword != registerRequest.MemberPassword)
+        {
+            errorMessage = "Passwords do not match. Please check your entries.";
+            return;
+        }
+
+
+        if (currentOrganisationDomain == null)
+        {
+            errorMessage = "Organisation information is required. Please refresh the page.";
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+
+
+            if (fieldSettings.ShowMemberHealthInsurance == 1)
+            {
+                registerRequest.MemberHealthInsurance = (byte)(hasInsurance ? 1 : 0);
+            }
+
+
+
+            var result = await RegisterService.RegisterAsync(registerRequest);
+
+
+
+            if (!string.IsNullOrEmpty(result.MemberGUID))
+            {
+                if (selectedImageDto != null && ImageUploadService.HasValidImageData(selectedImageDto))
+                {
+                    try
+                    {
+                        Console.WriteLine("Uploading profile image");
+                        var imageUploadResult = await ImageUploadService.UploadMemberImageOnMemberGuidAsync(selectedImageDto, result.MemberGUID);
+
+
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error uploading profile image: {ex.Message}");
+                    }
+
+                }
+                Snackbar.Add("Your account has been created.", MudBlazor.Severity.Success);
+                Console.WriteLine($"Registration successful: {result.MemberName} ({result.MemberEmail})");
+                Navigation.NavigateTo("/login");
+            }
+            else
+            {
+                errorMessage = "Registration failed. Please check your information and try again.";
+                Snackbar.Add("Registration failed. Please try again.", MudBlazor.Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred during registration. Please try again.";
+            Snackbar.Add($"Registration failed: {ex.Message}", MudBlazor.Severity.Error);
+            Console.WriteLine($"Registration error: {ex}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    
+}

@@ -1,0 +1,53 @@
+﻿@using System.Globalization
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Class="mr-2" />
+            Vælg dato
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <div class="date-picker-dialog-content">
+            <MudDatePicker @bind-Date="tempSelectedDate"
+                           PickerVariant="PickerVariant.Static"
+                           AutoClose="false"
+                           Color="Color.Primary"
+                           Culture="@danishCulture"
+                           Class="full-width-date-picker" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Annuller</MudButton>
+        <MudButton OnClick="Confirm" Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!tempSelectedDate.HasValue)">
+            Vælg dato
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public DateTime SelectedDate { get; set; } = DateTime.Today;
+
+    private DateTime? tempSelectedDate;
+    private readonly CultureInfo danishCulture = new("da-DK");
+
+    protected override void OnInitialized()
+    {
+        tempSelectedDate = SelectedDate;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Confirm()
+    {
+        if (tempSelectedDate.HasValue)
+        {
+            MudDialog.Close(DialogResult.Ok(tempSelectedDate.Value));
+        }
+        else
+        {
+            MudDialog.Cancel();
+        }
+    }
+}

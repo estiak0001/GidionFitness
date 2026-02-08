@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BlazorAdminTemplate</title>
+    <base href="/" />
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link href="BlazorAdminTemplate.styles.css" rel="stylesheet" />
+    <link rel="stylesheet" href="lib/tabler/icons-webfont/dist/tabler-icons.min.css">
+    <link href="manifest.webmanifest" rel="manifest" />
+    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
+    <meta name="theme-color" content="#594AE2" />
+
+    <script src="https://cdn.dataforsyningen.dk/dawa/assets/dawa-autocomplete2/1.0.2/dawa-autocomplete2.min.js"></script>
+    <script src="https://cdn.dataforsyningen.dk/dawa/assets/dawa-autocomplete2/1.0.2/unfilled/dawa-autocomplete2.min.js"></script>
+
+    <!-- Cropper.js CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" />
+
+    <!-- Tizzani.MudBlazor.HtmlEditor -->
+    <link href="_content/Tizzani.MudBlazor.HtmlEditor/MudHtmlEditor.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app">
+        <svg class="loading-progress">
+            <circle r="40%" cx="50%" cy="50%" />
+            <circle r="40%" cx="50%" cy="50%" />
+        </svg>
+        <div class="loading-progress-text"></div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">🗙</span>
+    </div>
+    <script src="_framework/blazor.webassembly.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+
+    <!-- Cropper.js JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+
+    <!-- Tizzani.MudBlazor.HtmlEditor -->
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+    <script src="_content/Tizzani.MudBlazor.HtmlEditor/quill-blot-formatter.min.js"></script> <!-- optional; for image resize -->
+    <!-- Your custom scripts -->
+    <script src="js/camera-crop.js"></script>
+    <script src="js/quillInsert.js"></script>
+
+    <script>
+        navigator.serviceWorker.register('service-worker.js');
+
+        window.toggleDarkMode = (isDark) => {
+            if (isDark) {
+                document.body.classList.add('mud-theme-dark');
+            } else {
+                document.body.classList.remove('mud-theme-dark');
+            }
+        };
+
+        window.getWindowWidth = () => {
+            return window.innerWidth;
+        };
+
+        window.addResizeListener = (dotNetHelper) => {
+            const resizeHandler = () => {
+                dotNetHelper.invokeMethodAsync('OnWindowResize', window.innerWidth);
+            };
+
+            window.addEventListener('resize', resizeHandler);
+
+            // Return a cleanup function
+            return () => {
+                window.removeEventListener('resize', resizeHandler);
+            };
+        };
+
+        // Force close mobile menu function
+        window.closeMobileMenu = () => {
+            if (window.innerWidth < 960) {
+                // Find the drawer overlay and click it to close
+                const overlay = document.querySelector('.mud-overlay');
+                if (overlay) {
+                    overlay.click();
+                }
+
+                // Also try to find and click the drawer backdrop
+                const backdrop = document.querySelector('.mud-drawer-overlay');
+                if (backdrop) {
+                    backdrop.click();
+                }
+            }
+        };
+
+        // Auto-close mobile menu when navigation links are clicked
+        document.addEventListener('DOMContentLoaded', function () {
+            // Add event listener for navigation clicks
+            document.addEventListener('click', function (e) {
+                // Check if clicked element is a navigation link
+                const navLink = e.target.closest('.mud-nav-link');
+                if (navLink && window.innerWidth < 960) {
+                    console.log('Navigation link clicked on mobile, closing menu...');
+                    setTimeout(() => {
+                        window.closeMobileMenu();
+                    }, 100);
+                }
+            });
+        });
+
+        // DAWA Autocomplete functionality - Following GitHub example exactly
+        function loadDawaAutocomplete(elementId, dotNetReference) {
+            console.log('DAWA: Loading autocomplete for element:', elementId);
+
+            const element = document.getElementById(elementId);
+            if (!element) {
+                console.error('DAWA: Element not found:', elementId);
+                return false;
+            }
+
+            try {
+                // Check if DAWA library is loaded
+                if (typeof dawaAutocomplete === 'undefined') {
+                    console.error('DAWA: dawaAutocomplete library not loaded');
+                    return false;
+                }
+
+                console.log('DAWA: Initializing autocomplete...');
+
+                // Initialize using the exact GitHub example pattern
+                dawaAutocomplete.dawaAutocomplete(element, {
+                    select: function (selected) {
+                        console.log('DAWA: Address selected:', selected);
+                        if (dotNetReference) {
+                            // Extract the data exactly as the DAWA API provides it
+                            const addressData = {
+                                address: selected.tekst,
+                                city: selected.data && selected.data.postnrnavn ? selected.data.postnrnavn : '',
+                                zipCode: selected.data && selected.data.postnr ? selected.data.postnr : ''
+                            };
+
+                            console.log('DAWA: Calling .NET method with data:', addressData);
+                            dotNetReference.invokeMethodAsync('OnAddressSelectedInternal', addressData);
+                        }
+                    }
+                });
+
+                console.log('DAWA: Autocomplete initialized successfully');
+                return true;
+            } catch (error) {
+                console.error('DAWA: Error initializing autocomplete:', error);
+                return false;
+            }
+        }
+
+        // Expose the function globally so Blazor can call it
+        window.loadDawaAutocomplete = loadDawaAutocomplete;
+    </script>
+</body>
+
+</html>

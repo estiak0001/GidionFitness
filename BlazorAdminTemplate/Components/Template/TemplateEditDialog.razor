@@ -1,0 +1,291 @@
+﻿@using Tizzani.MudBlazor.HtmlEditor
+@using BlazorAdminTemplate.Application.DTOs.Templates
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@inject ITemplateService TemplateService
+
+<MudDialog>
+    <TitleContent>
+        @if (IsNew)
+        {
+            <MudText Typo="Typo.h6">Create New Template</MudText>
+        }
+        else
+        {
+            <MudText Typo="Typo.h6">Edit Template</MudText>
+        }
+    </TitleContent>
+
+    <DialogContent>
+        <MudContainer Style="max-height: 80vh; overflow-y: auto;">
+            <MudForm @ref="_form" Model="Template">
+                @if (IsNew)
+                {
+                    <MudTextField @bind-Value="Template.MailTemplateName"
+                                  Label="Template Name (unique identifier)"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  Class="mb-4" />
+
+                    <MudSelect @bind-Value="Template.MailTemplateType"
+                               Label="Template Type"
+                               Variant="Variant.Outlined"
+                               Required="true"
+                               Class="mb-4">
+                        <MudSelectItem Value="1">Welcome Email</MudSelectItem>
+                        <MudSelectItem Value="2">Password Reset</MudSelectItem>
+                        <MudSelectItem Value="3">Account Activation</MudSelectItem>
+                        <MudSelectItem Value="4">Notification</MudSelectItem>
+                        <!-- Add more types as needed -->
+                    </MudSelect>
+                }
+                else
+                {
+                    <MudTextField Value="Template.MailTemplateName"
+                                  Label="Template Name"
+                                  Variant="Variant.Outlined"
+                                  Disabled="true"
+                                  Class="mb-4" />
+                }
+
+                <MudTextField @bind-Value="Template.MailTemplateSubject"
+                              Label="Subject Line"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              Class="mb-4"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@Icons.Material.Filled.Subject" />
+
+                <MudTextField @bind-Value="Template.MailTemplateFromEmail"
+                              Label="From Email"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              Class="mb-4" />
+
+                <MudTextField @bind-Value="Template.MailTemplateFromName"
+                              Label="From Name"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              Class="mb-4" />
+
+                <MudTextField @bind-Value="Template.MailTemplateHelpText"
+                              Label="Help Text (optional description)"
+                              Variant="Variant.Outlined"
+                              Lines="3"
+                              Class="mb-4" />
+
+                <!-- Dynamic Placeholder Chips from API -->
+                @if (_loadingPlaceholders)
+                {
+                    <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="my-4" />
+                }
+                else if (_placeholders != null && _placeholders.Any())
+                {
+                    <MudPaper Class="pa-4 mb-4" Outlined="true" Elevation="2">
+                        <MudText Typo="Typo.subtitle1" Class="mb-3">
+                            <MudIcon Icon="@Icons.Material.Filled.Code" Class="mr-2" /> Available Placeholders
+                        </MudText>
+                        <MudChipSet T="MailTemplatePlaceholder" Class="flex-wrap">
+                            @foreach (var ph in _placeholders)
+                            {
+                                <MudChip Color="Color.Info"
+                                         Variant="Variant.Outlined"
+                                         OnClick="@(() => InsertPlaceholder(ph.MailTemplatePlaceholdersValue))"
+                                         Text="@ph.MailTemplatePlaceholdersValue">
+                                    @ph.MailTemplatePlaceholdersValue
+                                </MudChip>
+                            }
+                        </MudChipSet>
+                    </MudPaper>
+                }
+
+                <MudText Typo="Typo.h6" Class="mb-2">Email Body</MudText>
+                <MudPaper Outlined="true" Elevation="3" Class="pa-2">
+                    <MudHtmlEditor @ref="_htmlEditor"
+                                   id="email-body-editor"
+                                   @bind-Html="@Template.MailTemplateMessage"
+                                   Placeholder="Start writing your email content..." />
+                </MudPaper>
+            </MudForm>
+        </MudContainer>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="SaveAsync"
+                   Disabled="@(_saving || _loading)">
+            save
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string TemplateGuid { get; set; } = string.Empty; // "new" for create
+
+    private MudForm _form = default!;
+    private MudHtmlEditor _htmlEditor = default!;
+    private bool _saving = false;
+    private bool _loading = false;
+    private bool _loadingPlaceholders = false;
+
+    private MailTemplate Template = new();
+    private List<MailTemplatePlaceholder>? _placeholders;
+
+    private bool IsNew => string.IsNullOrEmpty(TemplateGuid) || TemplateGuid.Equals("new", StringComparison.OrdinalIgnoreCase);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            await LoadPlaceholdersAsync();
+
+            if (IsNew)
+            {
+                Template = new MailTemplate();
+            }
+            else
+            {
+                await LoadTemplateAsync();
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadPlaceholdersAsync()
+    {
+        _loadingPlaceholders = true;
+        try
+        {
+            var response = await TemplateService.StaffGetMailTemplatePlaceholdersAsync();
+            _placeholders = response?.TemplatesPlaceholders ?? new List<MailTemplatePlaceholder>();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load placeholders: {ex.Message}", Severity.Error);
+            _placeholders = new List<MailTemplatePlaceholder>();
+        }
+        finally
+        {
+            _loadingPlaceholders = false;
+        }
+    }
+
+    private async Task LoadTemplateAsync()
+    {
+        try
+        {
+            var response = await TemplateService.StaffGetMailTemplateAsync(TemplateGuid);
+            Template = response?.Template ?? new MailTemplate { MailTemplateGUID = TemplateGuid };
+
+            if (_htmlEditor != null)
+            {
+                await _htmlEditor.SetHtml(Template.MailTemplateMessage ?? string.Empty);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load template: {ex.Message}", Severity.Error);
+            Template = new MailTemplate { MailTemplateGUID = TemplateGuid };
+        }
+    }
+
+    private async Task InsertPlaceholder(string placeholderValue)
+    {
+        try
+        {
+            if (_htmlEditor == null)
+            {
+                Snackbar.Add("Editor not ready. Please try again.", Severity.Warning);
+                return;
+            }
+
+            // Give the editor a moment to be ready if needed
+            await Task.Delay(50);
+            
+            // Use JavaScript to insert at cursor position
+            var success = await JS.InvokeAsync<bool>("quillEditorHelpers.insertTextAtCursor", "email-body-editor", placeholderValue);
+            
+            if (success)
+            {
+                // Give the editor time to update
+                await Task.Delay(150);
+                Template.MailTemplateMessage = await _htmlEditor.GetHtml();
+            }
+            else
+            {
+                Console.WriteLine("JavaScript returned false - check browser console for details");
+                Snackbar.Add("Failed to insert placeholder. Check the browser console (F12) for details.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error inserting placeholder: {ex.Message}");
+            Snackbar.Add($"Failed to insert placeholder: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        await _form.Validate();
+        if (!_form.IsValid)
+        {
+            Snackbar.Add("Please correct the errors above.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var dto = new TemplateEditDTO
+            {
+                MailTemplateGUID = Template.MailTemplateGUID,
+                MailTemplateType = Template.MailTemplateType,
+                MailTemplateSubject = Template.MailTemplateSubject,
+                MailTemplateFromEmail = Template.MailTemplateFromEmail,
+                MailTemplateFromName = Template.MailTemplateFromName,
+                MailTemplateMessage = Template.MailTemplateMessage,
+                MailTemplateHelpText = Template.MailTemplateHelpText,
+
+            };
+
+            TemplateActionResponseDTO response = new TemplateActionResponseDTO();
+            if (IsNew)
+            {
+                // response = await Http.PostAsJsonAsync("api/staff/mailtemplates", dto);
+            }
+            else
+            {
+                response = await TemplateService.StaffEditMailTemplateAsync(dto);
+            }
+
+            if (response.Success)
+            {
+                Snackbar.Add("Template saved successfully!", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                var error = response.Message;
+                Snackbar.Add($"Save failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving template: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

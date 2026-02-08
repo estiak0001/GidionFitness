@@ -1,0 +1,24 @@
+﻿// File download utilities
+window.downloadFile = function (url, fileName) {
+    // Create a temporary anchor element and trigger download
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = fileName || 'download';
+
+    // Append to body, click, and remove
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+};
+
+window.downloadFromBlob = function (data, fileName, mimeType) {
+    // Create blob and download
+    const blob = new Blob([data], { type: mimeType || 'application/octet-stream' });
+    const url = window.URL.createObjectURL(blob);
+
+    downloadFile(url, fileName);
+
+    // Clean up the object URL
+    setTimeout(() => window.URL.revokeObjectURL(url), 100);
+};

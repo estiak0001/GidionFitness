@@ -1,0 +1,270 @@
+﻿@using System.Net.Http.Headers
+@using BlazorAdminTemplate.Application.DTOs.Payment
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService Dialog
+@inject ITokenService TokenService
+@inject IStaffManagementService StaffManagementService
+@inject IDialogService DialogService
+
+<MudPaper Class="pa-6" Elevation="2">
+    <MudStack Spacing="6">
+
+        <!-- CURRENT PAYMENT METHOD -->
+        @*<MudCard Elevation="3">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@Icons.Material.Filled.CreditCard" Class="mr-2" />
+                        Payment Method on File
+                    </MudText>
+                </CardHeaderContent>
+                <CardHeaderActions>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="() => changeCardOpen = true">
+                        Change Card
+                    </MudButton>
+                </CardHeaderActions>
+            </MudCardHeader>
+            <MudCardContent Class="pa-4">
+                @if (currentCard == null)
+                {
+                    <MudText Color="Color.Warning">No card on file</MudText>
+                }
+                else
+                {
+                    <MudGrid>
+                        <MudItem xs="12" sm="6">
+                            <MudText><strong>Card</strong>: •••• •••• •••• @currentCard.Last4 (@currentCard.Brand)</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudText><strong>Expires</strong>: @currentCard.ExpMonth.ToString("D2")/@currentCard.ExpYear</MudText>
+                        </MudItem>
+                    </MudGrid>
+                }
+            </MudCardContent>
+        </MudCard>*@
+        <MudGrid Justify="Justify.FlexEnd">
+            <MudItem>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenPaymentMethodsDialog">View Payment Methods</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary">Add Payment Method</MudButton>
+            </MudItem>
+        </MudGrid>
+
+        <!-- PAYMENT HISTORY -->
+        <div>
+            <MudText Typo="Typo.h5" Class="mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Class="mr-2" />
+                Payment History (@(paymentResponse?.Pagination.TotalRecords ?? 0))
+            </MudText>
+
+            @if (loading)
+            {
+                <MudProgressLinear Indeterminate="true" Class="my-4" />
+            }
+            @* else if (paymentResponse == null || !paymentResponse.Payments.Any())
+            {
+                <MudAlert Severity="Severity.Info" Class="mt-4">
+                    No payments found for this member.
+                </MudAlert>
+            } *@
+            else
+            {
+                <MudTable T="MemberPaymentDTO"
+                          ServerData="LoadPayments"
+                          Dense="true"
+                          Hover="true"
+                          Striped="true"
+                          Bordered="true"
+                          Elevation="2"
+                          @ref="table"
+                          RowsPerPage="10"
+                          TotalItems="totalItems"
+                          CurrentPage="currentPage">
+
+                    <HeaderContent>
+                        <MudTh>Date</MudTh>
+                        <MudTh>Amount</MudTh>
+                        <MudTh>Type</MudTh>
+                        <MudTh>Status</MudTh>
+                        <MudTh>Order #</MudTh>
+                        <MudTh Style="width:130px;">Actions</MudTh>
+                    </HeaderContent>
+
+                    <RowTemplate>
+                        <MudTd DataLabel="Date">
+                            @{
+                                if (DateTime.TryParse(context.MemberPaymentDataDate, out var d))
+                                {
+                                    @d.ToString("dd MMM yyyy HH:mm")
+                                }
+                                else
+                                {
+                                    @context.MemberPaymentDataDate
+                                }
+                            }
+                        </MudTd>
+
+                        <MudTd DataLabel="Amount">
+                            <strong class="@(context.MemberPaymentDataDirection == 1 ? "mud-success-text" : "mud-error-text")">
+                                @(context.MemberPaymentDataDirection == 1 ? "+" : "-")
+                                @context.MemberPaymentDataAmount.ToString("N2") DKK
+                            </strong>
+                        </MudTd>
+
+                        <MudTd DataLabel="Type">@GetPaymentType(context.MemberPaymentDataType)</MudTd>
+
+                        <MudTd DataLabel="Status">
+                            <MudChip T="int" Size="Size.Small" Color="@GetStatusColor(context.MemberPaymentDataStatus)">
+                                @GetStatusText(context.MemberPaymentDataStatus)
+                            </MudChip>
+                        </MudTd>
+
+                        <MudTd DataLabel="Order">#@context.MemberPaymentDataOrderNumber</MudTd>
+
+                        <MudTd DataLabel="Actions">
+                            <MudButtonGroup Size="Size.Small">
+                                <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                               Color="Color.Info"
+                                               OnClick="async () => await ViewPayment(context)"
+                                               Title="View" />
+
+                                @if (context.MemberPaymentDataDirection == 1 && context.MemberPaymentDataStatus == 1)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Replay"
+                                                   Color="Color.Error"
+                                                   OnClick="async () => await RefundPayment(context)"
+                                                   Title="Refund" />
+                                }
+                            </MudButtonGroup>
+                        </MudTd>
+                    </RowTemplate>
+
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new[] { 10, 25, 50, 100 }" />
+                    </PagerContent>
+
+                </MudTable>
+            }
+        </div>
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter] public string MemberGuid { get; set; } = string.Empty;
+
+    private MudTable<MemberPaymentDTO> table = default!;
+    private MemberPaymentListReponseDTO paymentResponse = new();
+    private bool loading = false;
+    private int totalItems = 0;
+    private int currentPage = 0;
+
+    private async Task<TableData<MemberPaymentDTO>> LoadPayments(TableState state, CancellationToken cancellationToken)
+    {
+        loading = true;
+        Console.WriteLine($"Loading payments: Page {state.Page + 1}, PageSize {state.PageSize}");
+
+        try
+        {
+            paymentResponse = await StaffManagementService.StaffGetMemberPaymentsAsync(
+                MemberGuid,
+                state.Page + 1,
+                state.PageSize);
+            totalItems = paymentResponse.Pagination.TotalRecords;
+
+            return new TableData<MemberPaymentDTO>
+            {
+                TotalItems = paymentResponse.Pagination.TotalRecords,
+                Items = paymentResponse.Payments ?? new List<MemberPaymentDTO>()
+            };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Failed to load payments: " + ex.Message, Severity.Error);
+
+            return new TableData<MemberPaymentDTO>
+            {
+                TotalItems = 0,
+                Items = new List<MemberPaymentDTO>()
+            };
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task ViewPayment(MemberPaymentDTO payment)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Payment", payment }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true
+        };
+
+        await DialogService.ShowAsync<PaymentDetailsDialog>("Payment Details", parameters, options);
+    }
+
+    private async Task OpenPaymentMethodsDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "MemberGuid", MemberGuid }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true
+        };
+
+        await DialogService.ShowAsync<MemberPaymentMethodsDialog>("Payment Methods", parameters, options);
+    }
+
+    private async Task RefundPayment(MemberPaymentDTO payment)
+    {
+        var confirm = await Dialog.ShowMessageBox(
+            "Refund Payment",
+            $"Refund {payment.MemberPaymentDataAmount:N2} DKK to member?",
+            yesText: "Yes, Refund", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            Snackbar.Add("Refund initiated!", Severity.Success);
+            await table.ReloadServerData();
+        }
+    }
+
+    // Helper methods
+    private string GetPaymentType(int type) => type switch
+    {
+        1 => "Membership",
+        2 => "Personal Training",
+        3 => "Product Sale",
+        4 => "Event",
+        _ => "Other"
+    };
+
+    private string GetStatusText(int status) => status switch
+    {
+        0 => "Pending",
+        1 => "Success",
+        2 => "Failed",
+        3 => "Refunded",
+        _ => "Unknown"
+    };
+
+    private Color GetStatusColor(int status) => status switch
+    {
+        1 => Color.Success,
+        2 => Color.Error,
+        3 => Color.Warning,
+        _ => Color.Default
+    };
+}

@@ -1,0 +1,214 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Notes
+@inject IStaffManagementService StaffManagementService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.EditNote" Class="mr-2" />
+            @DialogTitle
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <MudProgressCircular Class="mx-auto my-8" Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+        }
+        else
+        {
+            <MudContainer MaxWidth="MaxWidth.Large" Class="my-4">
+                <MudGrid Spacing="4">
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="noteText"
+                                      Label="Note Content"
+                                      Variant="Variant.Outlined"
+                                      Lines="8"
+                                      Disabled="@isReadOnly"
+                                      Immediate="true"
+                                      HelperText="@(isReadOnly ? "Read-only mode" : "Enter your note here...")" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudCheckBox T="bool" @bind-Checked="isVisible"
+                                     Label="Visible to Member"
+                                     Disabled="@isReadOnly"
+                                     Immediate="true" />
+                    </MudItem>
+                    <MudItem xs="6" Class="d-flex align-center">
+                        <MudText Typo="Typo.caption" Color="Color.Warning">
+                            Created: @createdDateDisplay
+                            @if (!string.IsNullOrEmpty(noteAuthor))
+                            {
+                                <span> by @noteAuthor</span>
+                            }
+                        </MudText>
+                    </MudItem>
+                </MudGrid>
+            </MudContainer>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => CloseDialog())">Cancel</MudButton>
+        @if (!isReadOnly)
+        {
+            <MudButton Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       StartIcon="@Icons.Material.Filled.Save"
+                       OnClick="SaveNote"
+                       Disabled="@(!HasChanges || isLoading)">
+                Save
+            </MudButton>
+        }
+        else
+        {
+            <MudButton Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       OnClick="@(() => CloseDialog())">
+                Close
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string MemberGuid { get; set; } = string.Empty;
+    [Parameter] public string NoteGuid { get; set; } = string.Empty;
+    [Parameter] public string Mode { get; set; } = "View"; // Add, Edit, View
+
+    private bool isLoading = false;
+    private bool isReadOnly = false;
+    private bool isNewNote = false;
+    private string noteText = string.Empty;
+    private string originalText = string.Empty;
+    private bool isVisible;
+    private bool originalVisibility;
+    private string noteAuthor = string.Empty;
+    private DateTime createdDate = DateTime.Now;
+
+    private string DialogTitle => Mode switch
+    {
+        "Add" => "New Note",
+        "Edit" => "Edit Note",
+        _ => "View Note"
+    };
+
+    private string createdDateDisplay => createdDate.ToString("dd MMM yyyy HH:mm");
+
+    protected override async Task OnInitializedAsync()
+    {
+        isReadOnly = Mode == "View";
+        isNewNote = Mode == "Add";
+
+        if (!isNewNote)
+        {
+            await LoadNote();
+        }
+        else
+        {
+            // New note setup
+            createdDate = DateTime.Now;
+            noteAuthor = "You";
+            isVisible = true;
+            originalVisibility = true;
+        }
+    }
+
+    private async Task LoadNote()
+    {
+        isLoading = true;
+        try
+        {
+            var response = await StaffManagementService.StaffGetMemberNoteAsync(NoteGuid);
+            
+            if (response.Note.MemberNotesGuid != Guid.Empty.ToString())
+            {
+                noteText = response.Note.MemberNotesText ?? string.Empty;
+                originalText = noteText;
+                isVisible = response.Note.MemberNotesVissible == 1 ? true : false;
+                originalVisibility = isVisible;
+                noteAuthor = response.Note.MemberName ?? string.Empty;
+                createdDate = response.Note.MemberNotesDate;
+            }
+            else
+            {
+                Snackbar.Add("Note not found.", Severity.Warning);
+                await CloseDialog();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load note: {ex.Message}", Severity.Error);
+            await CloseDialog();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private bool HasChanges => 
+        (originalVisibility != isVisible || 
+         !string.Equals(originalText?.Trim(), noteText?.Trim(), StringComparison.OrdinalIgnoreCase)) &&
+        !string.IsNullOrWhiteSpace(noteText?.Trim());
+
+    private async Task SaveNote()
+    {
+        if (string.IsNullOrWhiteSpace(noteText?.Trim()))
+        {
+            Snackbar.Add("Note content is required.", Severity.Warning);
+            return;
+        }
+
+        isLoading = true;
+        try
+        {
+            StaffMemberNoteActionsResponseDTO result;
+
+            if (isNewNote)
+            {
+                var addDto = new StaffAddMemberNoteDTO
+                {
+                    MemberGuid = MemberGuid,
+                    MemberNotesText = noteText.Trim(),
+                    MemberNoteVissible = isVisible
+                };
+
+                result = await StaffManagementService.StaffAddMemberNoteAsync(addDto);
+            }
+            else
+            {
+                var editDto = new StaffEditMemberNoteDTO
+                {
+                    MemberNotesGuid = NoteGuid,
+                    MemberNotesText = noteText.Trim(),
+                    MemberNoteVissible = isVisible
+                };
+
+                result = await StaffManagementService.StaffEditMemberNoteAsync(editDto);
+            }
+
+            if (result.Success)
+            {
+                Snackbar.Add(result.Message ?? (isNewNote ? "Note created successfully!" : "Note updated successfully!"), Severity.Success);
+                await CloseDialog(success: true);
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Operation failed.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Save failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CloseDialog(bool success = false)
+    {
+        MudDialog.Close(success ? DialogResult.Ok(true) : DialogResult.Cancel());
+    }
+}

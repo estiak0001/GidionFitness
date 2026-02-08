@@ -1,0 +1,55 @@
+﻿@inject IClassLocationService classLocationService
+@using BlazorAdminTemplate.Application.DTOs.Location
+
+
+<MudDialog>
+    <TitleContent>
+        Ny Lokation
+    </TitleContent>
+
+    <DialogContent>
+        <MudTextField @bind-Value="NewLocation.TrainingClassLocationName" Label="Navn" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">OK</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+
+    private bool isLoading = false;
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+   
+
+    public AddNewLocationDTO NewLocation { get; set; } = new AddNewLocationDTO();
+
+    private async Task Submit() 
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            StaffTrainingClassNewLocationResponseDTO response = await classLocationService.PostStaffTrainingClassNewLocationAsync(NewLocation);
+            MudDialog.Close(DialogResult.Ok(true));
+
+        }
+        catch (Exception ex)
+        {
+
+            Console.WriteLine($"Error during Add New location: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+  
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+}

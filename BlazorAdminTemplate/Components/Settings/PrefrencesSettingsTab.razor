@@ -1,0 +1,91 @@
+﻿<MudText Typo="Typo.h5" GutterBottom="true">Application Preferences</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">General Settings</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudStack Spacing="3">
+                    <MudTextField @bind-Value="SiteName" Label="Site Name" Variant="Variant.Outlined" />
+                    <MudTextField @bind-Value="SiteDescription" Label="Site Description" Lines="3" Variant="Variant.Outlined" />
+                    <MudSelect @bind-Value="SelectedLanguage" Label="Language" Variant="Variant.Outlined">
+                        <MudSelectItem Value="@("en")">English</MudSelectItem>
+                        <MudSelectItem Value="@("es")">Spanish</MudSelectItem>
+                        <MudSelectItem Value="@("fr")">French</MudSelectItem>
+                        <MudSelectItem Value="@("de")">German</MudSelectItem>
+                    </MudSelect>
+                    <MudSelect @bind-Value="SelectedTimezone" Label="Timezone" Variant="Variant.Outlined">
+                        <MudSelectItem Value="@("UTC")">UTC</MudSelectItem>
+                        <MudSelectItem Value="@("EST")">Eastern Time</MudSelectItem>
+                        <MudSelectItem Value="@("PST")">Pacific Time</MudSelectItem>
+                        <MudSelectItem Value="@("GMT")">Greenwich Mean Time</MudSelectItem>
+                    </MudSelect>
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Appearance</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudStack Spacing="3">
+                    <MudSelect @bind-Value="SelectedTheme" Label="Theme" Variant="Variant.Outlined">
+                        <MudSelectItem Value="@("light")">Light</MudSelectItem>
+                        <MudSelectItem Value="@("dark")">Dark</MudSelectItem>
+                        <MudSelectItem Value="@("auto")">Auto</MudSelectItem>
+                    </MudSelect>
+                    <MudColorPicker @bind-Value="PrimaryColor" Label="Primary Color" />
+                    <MudSlider @bind-Value="FontSize" Min="12" Max="20" Step="1" Color="Color.Info">
+                        Font Size: @FontSize px
+                    </MudSlider>
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<MudGrid Class="mt-4">
+    <MudItem xs="12">
+        <MudCard Elevation="2">
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.Save" OnClick="SavePreferences">
+                    Save Changes
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="Icons.Material.Filled.Refresh" OnClick="ResetToDefaults">
+                    Reset to Defaults
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter] public string SiteName { get; set; } = "Admin Dashboard";
+    [Parameter] public string SiteDescription { get; set; } = "A modern admin dashboard built with Blazor and MudBlazor";
+    [Parameter] public string SelectedLanguage { get; set; } = "en";
+    [Parameter] public string SelectedTimezone { get; set; } = "UTC";
+    [Parameter] public string SelectedTheme { get; set; } = "light";
+    [Parameter] public MudBlazor.Utilities.MudColor PrimaryColor { get; set; } = "#594AE2";
+    [Parameter] public double FontSize { get; set; } = 14;
+    [Parameter] public EventCallback OnSavePreferences { get; set; }
+    [Parameter] public EventCallback OnResetToDefaults { get; set; }
+
+    private async Task SavePreferences()
+    {
+        await OnSavePreferences.InvokeAsync();
+    }
+
+    private async Task ResetToDefaults()
+    {
+        await OnResetToDefaults.InvokeAsync();
+    }
+}

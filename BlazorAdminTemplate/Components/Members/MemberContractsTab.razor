@@ -1,0 +1,262 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Contracts
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Domain.Entities
+@using BlazorAdminTemplate.Components.PaginationComponents
+@using System.Text.Json
+@inject IStaffManagementService StaffManagementService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<HeadContent>
+    <script src="js/fileDownload.js"></script>
+</HeadContent>
+
+<MudCard Elevation="0">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.Description" Class="mr-2" />
+                Medlemskontrakter
+            </MudText>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+            @if (contractsResponse != null && (contractsResponse.SignedContracts?.Count ?? 0) > 0)
+            {
+                <!-- Summary Card -->
+                <MudCard Elevation="1" Class="mb-4">
+                    <MudCardContent>
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Assignment" Color="Color.Primary" Size="Size.Large" Class="mr-3" />
+                            <div>
+                                <MudText Typo="Typo.h6">@(contractsResponse.SignedContracts?.Count ?? 0)</MudText>
+                                <MudText Typo="Typo.caption">Underskrevne kontrakter</MudText>
+                            </div>
+                            @if (contractsResponse.Pagination.TotalRecords > (contractsResponse.SignedContracts?.Count ?? 0))
+                            {
+                                <div class="ml-auto">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        Viser @(contractsResponse.SignedContracts?.Count ?? 0) af @contractsResponse.Pagination.TotalRecords
+                                    </MudText>
+                                </div>
+                            }
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+
+                
+                <PaginatedList TItem="ContractsPdf"
+                               Items="@(contractsResponse.SignedContracts ?? new List<ContractsPdf>())"
+                               Pagination="@contractsResponse.Pagination"
+                               OnPageChanged="@OnPageChanged">
+                    <HeaderTemplate>
+                        <MudTh>Underskrevet dato</MudTh>
+                        <MudTh>Kontraktfil</MudTh>
+                        <MudTh>Handlinger</MudTh>
+                    </HeaderTemplate>
+                    <RowTemplate>
+                        <MudTd DataLabel="Underskrevet dato">
+                            <div>
+                                <MudText Typo="Typo.body2">
+                                    @context.MemberContractDataSignageDate.ToString("dd/MM/yyyy")
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @context.MemberContractDataSignageDate.ToString("HH:mm")
+                                </MudText>
+                            </div>
+                        </MudTd>
+                        <MudTd DataLabel="Kontraktfil">
+                            <div class="d-flex align-center">
+                                <MudIcon Icon="@Icons.Material.Filled.PictureAsPdf" Color="Color.Error" Class="mr-2" />
+                                <div>
+                                    <MudText Typo="Typo.body2">
+                                        @(!string.IsNullOrEmpty(context.MemberContractPDFFile) ? context.MemberContractPDFFile : "Kontrakt.pdf")
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        PDF dokument
+                                    </MudText>
+                                </div>
+                            </div>
+                        </MudTd>
+                        <MudTd DataLabel="Handlinger">
+                            <div class="d-flex gap-2">
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.Download"
+                                           Size="Size.Small"
+                                           OnClick="@(() => DownloadContract(context))"
+                                           Disabled="@(string.IsNullOrEmpty(context.PdfDownloadUrl) || downloadingContractId == GetContractId(context))">
+                                    @if (downloadingContractId == GetContractId(context))
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                                    }
+                                    Download
+                                </MudButton>
+
+                                @if (!string.IsNullOrEmpty(context.PdfDownloadUrl))
+                                {
+                                    <MudButton Variant="Variant.Text"
+                                               Color="Color.Secondary"
+                                               StartIcon="@Icons.Material.Filled.OpenInNew"
+                                               Size="Size.Small"
+                                               OnClick="@(() => ViewContractInNewTab(context.PdfDownloadUrl))">
+                                        Vis
+                                    </MudButton>
+                                }
+                            </div>
+                        </MudTd>
+                    </RowTemplate>
+                </PaginatedList>
+            }
+            else
+            {
+                <div class="text-center pa-8">
+                    <MudIcon Icon="@Icons.Material.Filled.AssignmentLate" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+                    <MudText Typo="Typo.body1">Ingen kontrakter fundet</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Default">Dette medlem har ikke underskrevet nogle kontrakter endnu</MudText>
+                </div>
+            }
+        
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter] public string MemberGuid { get; set; } = string.Empty;
+
+    private StaffShowSignedMemberContractResponseDTO? contractsResponse;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private string? downloadingContractId = null;
+    private string rawJsonResponse = "";
+
+    private const int PageSize = 10;
+    private int currentPage = 1;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(MemberGuid))
+        {
+            await LoadContracts();
+        }
+    }
+
+    private async Task LoadContracts()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            rawJsonResponse = "";
+            StateHasChanged();
+
+            
+
+           
+            contractsResponse = await StaffManagementService.StaffGetSignedMemberContracts(MemberGuid, currentPage, PageSize);
+
+           
+            try
+            {
+                var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+                var fullJson = JsonSerializer.Serialize(contractsResponse, jsonOptions);
+                rawJsonResponse = fullJson.Length > 500 ? fullJson.Substring(0, 500) + "..." : fullJson;
+            }
+            catch (Exception ex)
+            {
+                rawJsonResponse = $"Error serializing response: {ex.Message}";
+            }
+
+
+            if (contractsResponse?.SignedContracts != null)
+            {
+                
+                for (int i = 0; i < contractsResponse.SignedContracts.Count; i++)
+                {
+                    var contract = contractsResponse.SignedContracts[i];
+                    Console.WriteLine($"    Contract {i}: File='{contract.MemberContractPDFFile}', Date={contract.MemberContractDataSignageDate}, URL='{contract.PdfDownloadUrl}'");
+                }
+            }
+            else
+            {
+                Console.WriteLine("  - SignedContracts is null or empty");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading contracts: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            errorMessage = $"Fejl ved indlæsning af kontrakter: {ex.Message}";
+            rawJsonResponse = $"Exception: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnPageChanged(int newPage)
+    {
+        currentPage = newPage;
+        await LoadContracts();
+    }
+
+    private async Task DownloadContract(ContractsPdf contract)
+    {
+        if (string.IsNullOrEmpty(contract.PdfDownloadUrl))
+        {
+            Snackbar.Add("Download URL ikke tilgængelig for denne kontrakt", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            downloadingContractId = GetContractId(contract);
+            StateHasChanged();
+
+            
+            await JSRuntime.InvokeVoidAsync("downloadFile", contract.PdfDownloadUrl, GetFileName(contract));
+
+            Snackbar.Add("Download startet", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error downloading contract: {ex.Message}");
+            Snackbar.Add($"Fejl ved download: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            downloadingContractId = null;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ViewContractInNewTab(string downloadUrl)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("open", downloadUrl, "_blank");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error opening contract: {ex.Message}");
+            Snackbar.Add($"Kunne ikke åbne kontrakt: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private static string GetContractId(ContractsPdf contract)
+    {
+        return $"{contract.MemberContractDataSignageDate:yyyyMMddHHmmss}_{contract.MemberContractPDFFile}";
+    }
+
+    private static string GetFileName(ContractsPdf contract)
+    {
+        if (!string.IsNullOrEmpty(contract.MemberContractPDFFile))
+        {
+            return contract.MemberContractPDFFile;
+        }
+
+        var date = contract.MemberContractDataSignageDate.ToString("yyyy-MM-dd");
+        return $"Kontrakt_{date}.pdf";
+    }
+}

@@ -1,0 +1,495 @@
+﻿/* Mobile Dashboard Styles */
+.mobile-dashboard-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+    color: white;
+}
+
+.welcome-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.welcome-text {
+    font-weight: 600;
+    color: white;
+    margin-bottom: 4px;
+}
+
+.welcome-subtitle {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Mobile Alerts - Updated to red with white text */
+.mobile-alert {
+    border-radius: 12px;
+    background-color: #f44336 !important; /* Red background */
+    border: none !important;
+    color: white !important; /* White text */
+}
+
+.mobile-alert .mud-alert-message {
+    color: white !important;
+}
+
+.mobile-alert .mud-icon-root {
+    color: white !important;
+}
+
+.alert-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.alert-content > div {
+    flex: 1;
+}
+
+.alert-content .mud-text {
+    color: white !important;
+}
+
+.alert-content .mud-icon-button {
+    color: white !important;
+}
+
+.alert-content .mud-icon-button:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Quick Stats Cards - Updated to handle 4 cards */
+.quick-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 16px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: transform 0.2s ease;
+    cursor: pointer;
+    position: relative;
+    border: 2px solid transparent;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.stat-card:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card .mud-icon-root {
+    font-size: 1.5rem;
+}
+
+/* Active state styling */
+.stat-card-active {
+    background: linear-gradient(135deg, var(--mud-palette-primary) 0%, var(--mud-palette-primary-darken) 100%);
+    color: white;
+    border-color: var(--mud-palette-primary);
+    box-shadow: 0 4px 16px rgba(var(--mud-palette-primary-rgb), 0.4);
+}
+
+.stat-card-active .mud-typography {
+    color: white !important;
+}
+
+/* Active indicator */
+.active-indicator {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Ripple effect for better touch feedback */
+.stat-card::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.3s ease, height 0.3s ease;
+    pointer-events: none;
+}
+
+.stat-card:active::after {
+    width: 120%;
+    height: 120%;
+}
+
+/* Section Toggles - Updated to handle 4 buttons */
+.section-toggles {
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+}
+
+.mobile-section-toggle {
+    width: 100%;
+}
+
+.mobile-section-toggle .mud-button-group .mud-button {
+    flex: 1;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    padding: 6px 4px;
+}
+
+/* Content Sections */
+.mobile-dashboard-content {
+    min-height: 300px;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.loading-content,
+.empty-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--mud-palette-text-secondary);
+}
+
+/* Mobile Classes List */
+.mobile-classes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.mobile-class-card {
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mobile-class-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.mobile-class-card-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px !important;
+}
+
+.class-time-badge {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    text-align: center;
+    min-width: 50px;
+}
+
+.class-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.class-name {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--mud-palette-text-primary);
+}
+
+.class-details {
+    color: var(--mud-palette-text-secondary);
+    line-height: 1.3;
+}
+
+.class-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Mobile News List */
+.mobile-news-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mobile-news-card {
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.mobile-news-card:hover {
+    transform: translateY(-1px);
+}
+
+.mobile-news-card-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px !important;
+}
+
+.news-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background-color: rgba(33, 150, 243, 0.1);
+    border-radius: 8px;
+}
+
+.news-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.news-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--mud-palette-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.news-date {
+    color: var(--mud-palette-text-secondary);
+}
+
+/* Mobile Campaigns List */
+.mobile-campaigns-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mobile-campaign-card {
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.mobile-campaign-card:hover {
+    transform: translateY(-1px);
+}
+
+.mobile-campaign-card-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px !important;
+}
+
+.campaign-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background-color: rgba(156, 39, 176, 0.1);
+    border-radius: 8px;
+    margin-top: 4px;
+    flex-shrink: 0;
+}
+
+.campaign-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.campaign-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--mud-palette-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.campaign-description {
+    color: var(--mud-palette-text-secondary);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Mobile Appointments List */
+.mobile-appointments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mobile-appointment-card {
+    border-radius: 12px;
+}
+
+.mobile-appointment-card-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px !important;
+}
+
+.appointment-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background-color: rgba(76, 175, 80, 0.1);
+    border-radius: 8px;
+    margin-top: 4px;
+}
+
+.appointment-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.appointment-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--mud-palette-text-primary);
+}
+
+.appointment-details {
+    color: var(--mud-palette-text-secondary);
+    line-height: 1.4;
+}
+
+/* Mobile Pagination */
+.mobile-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    padding: 12px 0;
+}
+
+.pagination-info {
+    color: var(--mud-palette-text-secondary);
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+    .mobile-dashboard-header {
+        padding: 16px;
+        margin-bottom: 12px;
+    }
+
+    .quick-stats-grid {
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+    .stat-card {
+        padding: 12px 8px;
+    }
+
+        .stat-card .mud-icon-root {
+            font-size: 1.25rem;
+        }
+
+    .mobile-class-card-content,
+    .mobile-news-card-content,
+    .mobile-campaign-card-content,
+    .mobile-appointment-card-content {
+        padding: 10px !important;
+        gap: 10px;
+    }
+
+    .class-time-badge {
+        padding: 6px 8px;
+        min-width: 45px;
+    }
+
+    .section-header {
+        margin-bottom: 12px;
+    }
+
+    .mobile-section-toggle .mud-button {
+        font-size: 0.7rem;
+        padding: 6px 2px;
+    }
+}
+
+@media (max-width: 360px) {
+    .stat-card {
+        padding: 10px 6px;
+    }
+
+    .quick-stats-grid {
+        gap: 6px;
+    }
+
+    .mobile-section-toggle .mud-button {
+        font-size: 0.65rem;
+        padding: 4px 1px;
+    }
+}
+
+/* Dark theme support */
+.mud-theme-dark .stat-card-active {
+    background: linear-gradient(135deg, var(--mud-palette-primary-lighten) 0%, var(--mud-palette-primary) 100%);
+}
+
+.mud-theme-dark .stat-card:hover {
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+}
+
+/* Mobile touch improvements */
+@media (hover: none) and (pointer: coarse) {
+    .stat-card:hover {
+        transform: none;
+    }
+    
+    .stat-card:active {
+        transform: scale(0.98);
+        transition: transform 0.1s ease;
+    }
+}

@@ -1,0 +1,120 @@
+﻿@page "/home-old"
+
+<PageTitle>Dashboard</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Dashboard</MudText>
+
+<MudGrid>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Class="pa-4">
+            <MudCardContent>
+                <div class="d-flex justify-space-between">
+                    <div>
+                        <MudText Typo="Typo.h6">Total Users</MudText>
+                        <MudText Typo="Typo.h4" Color="Color.Primary">1,234</MudText>
+                    </div>
+                    <MudIcon Icon="Icons.Material.Filled.People" Size="Size.Large" Color="Color.Primary" />
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Class="pa-4">
+            <MudCardContent>
+                <div class="d-flex justify-space-between">
+                    <div>
+                        <MudText Typo="Typo.h6">Products</MudText>
+                        <MudText Typo="Typo.h4" Color="Color.Secondary">567</MudText>
+                    </div>
+                    <MudIcon Icon="Icons.Material.Filled.Inventory" Size="Size.Large" Color="Color.Secondary" />
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Class="pa-4">
+            <MudCardContent>
+                <div class="d-flex justify-space-between">
+                    <div>
+                        <MudText Typo="Typo.h6">Orders</MudText>
+                        <MudText Typo="Typo.h4" Color="Color.Success">89</MudText>
+                    </div>
+                    <MudIcon Icon="Icons.Material.Filled.ShoppingCart" Size="Size.Large" Color="Color.Success" />
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Class="pa-4">
+            <MudCardContent>
+                <div class="d-flex justify-space-between">
+                    <div>
+                        <MudText Typo="Typo.h6">Revenue</MudText>
+                        <MudText Typo="Typo.h4" Color="Color.Warning">$12,345</MudText>
+                    </div>
+                    <MudIcon Icon="Icons.Material.Filled.AttachMoney" Size="Size.Large" Color="Color.Warning" />
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<MudGrid Class="mt-4">
+    <MudItem xs="12" md="8">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Recent Activity</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudTimeline TimelineOrientation="TimelineOrientation.Vertical">
+                    <MudTimelineItem Color="Color.Success" Variant="Variant.Filled">
+                        <ItemContent>
+                            <MudText Typo="Typo.body1">New user registered</MudText>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">2 minutes ago</MudText>
+                        </ItemContent>
+                    </MudTimelineItem>
+                    <MudTimelineItem Color="Color.Info" Variant="Variant.Filled">
+                        <ItemContent>
+                            <MudText Typo="Typo.body1">Product updated</MudText>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">15 minutes ago</MudText>
+                        </ItemContent>
+                    </MudTimelineItem>
+                    <MudTimelineItem Color="Color.Warning" Variant="Variant.Filled">
+                        <ItemContent>
+                            <MudText Typo="Typo.body1">Order pending review</MudText>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">1 hour ago</MudText>
+                        </ItemContent>
+                    </MudTimelineItem>
+                </MudTimeline>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Quick Actions</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudStack Spacing="2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.Add" FullWidth="true">
+                        Add User
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="Icons.Material.Filled.Add" FullWidth="true">
+                        Add Product
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Info" StartIcon="Icons.Material.Filled.Analytics" FullWidth="true">
+                        View Reports
+                    </MudButton>
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>

@@ -1,0 +1,179 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Members
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Domain.Entities
+@using BlazorAdminTemplate.Components.Members
+@using Microsoft.AspNetCore.Authorization
+@inject IMemberService MemberService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Person" Class="mr-2" />
+            @if (memberDetails != null)
+            {
+                @($"{memberDetails.MemberFirstName} {memberDetails.MemberLastName}")
+            }
+            else
+            {
+                <span>Medlemsdetaljer</span>
+            }
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <div style="min-width: 700px; max-width: 1000px; max-height: 80vh; overflow-y: auto;">
+            @if (isLoading)
+            {
+                <div class="d-flex justify-center align-center pa-8">
+                    <MudProgressCircular Indeterminate="true" />
+                    <MudText Class="ml-3">Indlæser medlemsdetaljer...</MudText>
+                </div>
+            }
+            else if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">
+                    @errorMessage
+                </MudAlert>
+            }
+            else if (memberDetails != null)
+            {
+                <!-- Tabs Container -->
+                <MudTabs Elevation="1"
+                         Rounded="true"
+                         Color="Color.Transparent"
+                         PanelClass="pa-4"
+                         Class="member-details-tabs">
+
+                    <!-- General Details Tab -->
+                    <MudTabPanel Text="Generelle oplysninger"
+                                 Icon="@Icons.Material.Filled.Person">
+                        <MemberGeneralDetailsTab MemberDetails="memberDetails" />
+                    </MudTabPanel>
+
+                    <!-- Membership Info Tab -->
+                    <MudTabPanel Text="Medlemskab"
+                                 Icon="@Icons.Material.Filled.CardMembership">
+                        <MemberMembershipInfoTab MemberGuid="@MemberGuid" />
+                    </MudTabPanel>
+
+                    <!-- Payments Tab -->
+                    <MudTabPanel Text="Betalinger"
+                                 Icon="@Icons.Material.Filled.Payment">
+                        <MemberPaymentsTab MemberGuid="@MemberGuid" />
+                    </MudTabPanel>
+
+                    <!-- Training History Tab -->
+                    <MudTabPanel Text="Træningshistorik"
+                                 Icon="@Icons.Material.Filled.AccessTime">
+                        <MemberTrainingHistoryTab MemberGuid="@MemberGuid" />
+                    </MudTabPanel>
+
+                    <!-- Training Classes Tab -->
+                    <MudTabPanel Text="Træningshold"
+                                 Icon="@Icons.Material.Filled.FitnessCenter">
+                        <MemberTrainingClassesTab MemberGuid="@MemberGuid" />
+                    </MudTabPanel>
+                    <MudTabPanel Text="Kontrakter"
+                                 Icon="@Icons.Material.Filled.Article">
+                        <MemberContractsTab MemberGuid="@MemberGuid" />
+                    </MudTabPanel>
+
+                </MudTabs>
+            }
+        </div>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Variant="Variant.Text"
+                   OnClick="Close">
+            Luk
+        </MudButton>
+        
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .member-details-tabs .mud-tabs-panels {
+        min-height: 400px;
+    }
+
+    .member-details-tabs .mud-tab-panel {
+        padding: 16px !important;
+    }
+</style>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string MemberGuid { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnMemberUpdated { get; set; }
+
+    private StaffGetSpecificMemberResponseDTO? memberDetails;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(MemberGuid))
+        {
+            errorMessage = "Medlem ID mangler.";
+            isLoading = false;
+            return;
+        }
+
+        await LoadMemberDetails();
+    }
+
+    private async Task LoadMemberDetails()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            StateHasChanged();
+
+            Console.WriteLine($"Loading member details for GUID: {MemberGuid}");
+
+            memberDetails = await MemberService.GetSpecificMemberAsync(MemberGuid);
+
+            if (memberDetails == null || string.IsNullOrEmpty(memberDetails.MemberGUID))
+            {
+                errorMessage = "Kunne ikke indlæse medlemsdetaljer.";
+            }
+            else
+            {
+                Console.WriteLine($"Successfully loaded member: {memberDetails.MemberFirstName} {memberDetails.MemberLastName}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading member details: {ex.Message}");
+            errorMessage = $"Fejl ved indlæsning: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+
+    private async Task OnMemberEditComplete()
+    {
+        // Reload member details after edit
+        await LoadMemberDetails();
+
+        // Notify parent component
+        if (OnMemberUpdated.HasDelegate)
+        {
+            await OnMemberUpdated.InvokeAsync();
+        }
+    }
+
+    private void Close()
+    {
+        MudDialog.Close();
+    }
+}

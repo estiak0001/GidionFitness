@@ -1,0 +1,98 @@
+﻿@page "/membership-payment"
+@using BlazorAdminTemplate.Application.DTOs.Payment
+@inject IPaymentService PaymentService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<MudPaper Class="pa-6 mt-8" MaxWidth="MaxWidth.Small">
+    <MudText Typo="Typo.h5" GutterBottom="true">Membership Payment</MudText>
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+        <MudText Class="mt-4">Loading payment information...</MudText>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <MudAlert Severity="Severity.Error">@errorMessage</MudAlert>
+    }
+    else if (paymentInfo != null)
+    {
+        <MudCard Class="mb-4">
+            <MudCardContent>
+                <MudText Typo="Typo.h6">@paymentInfo.PriceName</MudText>
+                <MudText Typo="Typo.body2">Monthly Price: @paymentInfo.PriceMonth.ToString("C")</MudText>
+                <MudText Typo="Typo.body2">Daily Price: @paymentInfo.PriceDay.ToString("C")</MudText>
+                <MudText Typo="Typo.body2">Current Payment: <strong>@paymentInfo.PriceCurrent.ToString("C")</strong></MudText>
+                <MudText Typo="Typo.body2">Current Date: @paymentInfo.CurrentDay</MudText>
+                <MudText Typo="Typo.body2">Days in Month: @paymentInfo.DaysInCurrentMonth</MudText>
+                <MudText Typo="Typo.body2">Remaining Days: @paymentInfo.RemainingDaysInMonth</MudText>
+            </MudCardContent>
+        </MudCard>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@HandleAddCreditCard" Disabled="@isProcessing">
+            @if (isProcessing)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                
+            }
+            else
+            {
+               
+            }
+            Tilføj et betalingskort
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Warning" Disabled="@isProcessing">Anuller</MudButton>
+    }
+</MudPaper>
+
+@code {
+    private MemberPaymentInfoResponseDTO? paymentInfo;
+    private bool isLoading = true;
+    private bool isProcessing = false;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            paymentInfo = await PaymentService.MemberPaymentInfoAsync();
+            if (paymentInfo == null || string.IsNullOrWhiteSpace(paymentInfo.PriceName))
+            {
+                errorMessage = "Could not load payment information.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading payment info: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleAddCreditCard()
+    {
+        if (paymentInfo == null) return;
+        isProcessing = true;
+        errorMessage = string.Empty;
+        try
+        {
+            var request = new MemberPaymentCreateRequestDTO { Amount = paymentInfo.PriceCurrent };
+            var response = await PaymentService.MemberCreatePaymentAsync(request);
+            if (response != null && !string.IsNullOrEmpty(response.PaymentWindowLink))
+            {
+                Navigation.NavigateTo(response.PaymentWindowLink, forceLoad: true);
+                return;
+            }
+            errorMessage = "Could not get payment link.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error processing payment: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+}

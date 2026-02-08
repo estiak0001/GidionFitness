@@ -1,0 +1,249 @@
+﻿@inherits LayoutComponentBase
+@using BlazorAdminTemplate.Components.Settings
+@inject IJSRuntime JSRuntime
+@inject ILoginService LoginService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudButton Variant="Variant.Text" 
+                   Color="Color.Inherit" 
+                   OnClick="DrawerToggle"
+                   Class="@($"hamburger-menu-btn {(_drawerOpen ? "drawer-open" : "")}")"
+                   aria-label="Toggle navigation">
+            <div class="hamburger-icon">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </MudButton>
+        <MudSpacer />
+        <MudText Typo="Typo.h6" Class="d-none d-sm-flex">Admin Dashboard</MudText>
+        <MudText Typo="Typo.body1" Class="d-flex d-sm-none">Dashboard</MudText>
+        <MudSpacer />
+        <AuthorizeView Policy="StaffOnly">
+            <Authorized>
+                <OrganisationSwitcher />
+            </Authorized>
+        </AuthorizeView>
+        <MudButton Variant="Variant.Text" 
+                   Color="Color.Inherit" 
+                   OnClick="ToggleDarkMode"
+                   Class="theme-toggle-btn"
+                   aria-label="Toggle dark mode">
+            💡
+        </MudButton>
+        <AuthorizeView>
+            <Authorized>
+                <MudMenu Icon="@Icons.Material.Filled.AccountCircle"
+                 Color="Color.Inherit"
+                 Variant="Variant.Text"
+                 AnchorOrigin="Origin.BottomRight"
+                 TransformOrigin="Origin.TopRight"
+                 Class="user-account-btn"
+                 aria-label="User account menu">
+                <ChildContent>
+                    <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/profile"))"
+                             Icon="@Icons.Material.Filled.Person">
+                        <MudText>Profil</MudText>
+                    </MudMenuItem>
+
+                    <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/settings"))"
+                             Icon="@Icons.Material.Filled.Settings">
+                        <MudText>Indstillinger</MudText>
+                    </MudMenuItem>
+
+                <MudDivider />
+
+                    <MudMenuItem OnClick="LogOut"
+                             Icon="@Icons.Material.Filled.Logout">
+                        <MudText>Log ud</MudText>
+                    </MudMenuItem>
+                 </ChildContent>
+                </MudMenu>
+            </Authorized>
+        </AuthorizeView>
+        
+    </MudAppBar>
+    
+    <MudDrawer @bind-Open="_drawerOpen" 
+               Elevation="1"
+               Variant="@_drawerVariant"
+               ClipMode="@_clipMode"
+               OpenMiniOnHover="@_openMiniOnHover"
+               Width="280px"
+               MiniWidth="60px">
+        <MudDrawerHeader>
+            <div class="d-flex align-center">
+                <MudIcon Icon="Icons.Material.Filled.Dashboard" Class="mr-3" />
+                <MudText Typo="Typo.h6">Navigation</MudText>
+            </div>
+        </MudDrawerHeader>
+        <NavMenu OnNavigation="@OnNavMenuClick" />
+    </MudDrawer>
+    
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4 px-2 px-sm-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+    private bool _isDarkMode = false;
+    private DrawerVariant _drawerVariant = DrawerVariant.Responsive;
+    private DrawerClipMode _clipMode = DrawerClipMode.Always;
+    private bool _openMiniOnHover = false;
+    private DotNetObjectReference<MainLayout>? _dotNetHelper;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _dotNetHelper = DotNetObjectReference.Create(this);
+        await UpdateDrawerSettings();
+        await SetupResizeListener();
+        await base.OnInitializedAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await UpdateDrawerSettings();
+            StateHasChanged();
+        }
+    }
+
+    private async Task SetupResizeListener()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("addResizeListener", _dotNetHelper);
+        }
+        catch (Exception)
+        {
+            // Handle JS interop errors gracefully
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnWindowResize(int width)
+    {
+        await UpdateDrawerSettings(width);
+        StateHasChanged();
+    }
+
+    private async Task UpdateDrawerSettings(int? windowWidth = null)
+    {
+        try
+        {
+            var width = windowWidth ?? await JSRuntime.InvokeAsync<int>("getWindowWidth");
+            
+            if (width < 960) // Mobile/Tablet - overlay drawer
+            {
+                _drawerVariant = DrawerVariant.Temporary;
+                _drawerOpen = false;
+                _clipMode = DrawerClipMode.Never;
+                _openMiniOnHover = false;
+            }
+            else if (width < 1100) // Medium desktop - persistent but user can toggle
+            {
+                _drawerVariant = DrawerVariant.Persistent;
+                _drawerOpen = false; // Start closed on medium screens to save space
+                _clipMode = DrawerClipMode.Always;
+                _openMiniOnHover = false;
+            }
+            else // Large desktop - full persistent drawer always open
+            {
+                _drawerVariant = DrawerVariant.Persistent;
+                _drawerOpen = true;
+                _clipMode = DrawerClipMode.Always;
+                _openMiniOnHover = false;
+            }
+        }
+        catch (Exception)
+        {
+            // Fallback to default desktop settings if JS fails
+            _drawerVariant = DrawerVariant.Persistent;
+            _drawerOpen = true;
+            _clipMode = DrawerClipMode.Always;
+            _openMiniOnHover = false;
+        }
+    }
+
+    private void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    private async Task OnNavMenuClick()
+    {
+        Console.WriteLine($"OnNavMenuClick called - DrawerOpen: {_drawerOpen}, Variant: {_drawerVariant}");
+        
+        // Multi-approach solution to ensure mobile menu closes
+        var isMobile = false;
+        
+        try
+        {
+            var width = await JSRuntime.InvokeAsync<int>("getWindowWidth");
+            isMobile = width < 960;
+            Console.WriteLine($"Window width: {width}, isMobile: {isMobile}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"JS Error: {ex.Message}");
+            isMobile = true; // Assume mobile if detection fails
+        }
+        
+        if (isMobile || _drawerVariant == DrawerVariant.Temporary)
+        {
+            Console.WriteLine("Closing drawer using multiple methods...");
+            
+            // Method 1: Blazor state management
+            _drawerOpen = false;
+            StateHasChanged();
+            
+            // Method 2: JavaScript fallback
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("closeMobileMenu");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"JS closeMobileMenu error: {ex.Message}");
+            }
+            
+            // Method 3: Force update after delay
+            await Task.Delay(100);
+            _drawerOpen = false;
+            StateHasChanged();
+            
+            Console.WriteLine("Drawer close attempts completed");
+        }
+    }
+
+    private async Task ToggleDarkMode()
+    {
+        _isDarkMode = !_isDarkMode;
+        await JSRuntime.InvokeVoidAsync("toggleDarkMode", _isDarkMode);
+    }
+    private async Task LogOut()
+    {
+        await LoginService.LogoutAsync();
+        Navigation.NavigateTo("/login");
+        
+        
+       
+    }
+
+    public void Dispose()
+    {
+        _dotNetHelper?.Dispose();
+    }
+}

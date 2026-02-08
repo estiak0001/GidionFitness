@@ -1,0 +1,58 @@
+﻿@using static BlazorAdminTemplate.Pages.Access.AccessLog
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Access Event Details</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid Spacing="3">
+            <MudItem xs="12">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudText Typo="Typo.subtitle1"><strong>User:</strong> @Entry.UserName</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudText Typo="Typo.subtitle1"><strong>Door:</strong> @Entry.DoorName</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudText Typo="Typo.subtitle1"><strong>Timestamp:</strong> @Entry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudChip T="string" Size="Size.Medium" 
+                             Color="@(Entry.Status == "Granted" ? Color.Success : Color.Error)"
+                             Variant="Variant.Filled">
+                        @Entry.Status
+                    </MudChip>
+                    @if (!string.IsNullOrEmpty(Entry.Reason))
+                    {
+                        <MudText Class="ml-4" Typo="Typo.body1"><strong>Reason:</strong> @Entry.Reason</MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudText Typo="Typo.subtitle1"><strong>Card ID:</strong> @Entry.CardId</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="OnCloseClicked">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public AccessLogEntry Entry { get; set; } = new();
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+
+    private void OnCloseClicked()
+    {
+        MudDialog?.Cancel();
+    }
+}

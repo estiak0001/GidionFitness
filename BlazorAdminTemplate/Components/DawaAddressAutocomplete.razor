@@ -1,0 +1,105 @@
+﻿@using Microsoft.JSInterop
+@using System.Linq.Expressions
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<div class="autocomplete-container">
+    <MudTextField T="string"
+                  @bind-Value="AddressValue"
+                  @bind-Value:after="OnAddressChangedInternal"
+                  Label="@Label"
+                  Variant="@Variant"
+                  Placeholder="@Placeholder"
+                  HelperText="@HelperText"
+                  Required="@Required"
+                  Error="@Error"
+                  ErrorText="@ErrorText"
+                  For="@For"
+                  Adornment="@Adornment"
+                  AdornmentIcon="@AdornmentIcon"
+                  id="@elementId" />
+</div>
+
+@code {
+    [Parameter] public string? AddressValue { get; set; }
+    [Parameter] public EventCallback<string> AddressValueChanged { get; set; }
+    [Parameter] public EventCallback<DawaAddressResult> AddressSelected { get; set; }
+
+    // MudTextField parameters
+    [Parameter] public string? Label { get; set; } = "Address";
+    [Parameter] public Variant Variant { get; set; } = Variant.Outlined;
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public string? HelperText { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public bool Error { get; set; }
+    [Parameter] public string? ErrorText { get; set; }
+    [Parameter] public Expression<Func<string>>? For { get; set; }
+    [Parameter] public Adornment Adornment { get; set; } = Adornment.Start;
+    [Parameter] public string AdornmentIcon { get; set; } = Icons.Material.Filled.Home;
+
+    private string elementId = $"dawa-autocomplete-input-{Guid.NewGuid():N}";
+    private DotNetObjectReference<DawaAddressAutocomplete>? objRef;
+    private bool isInitialized = false;
+
+    // Following the GitHub example pattern
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !isInitialized)
+        {
+            try
+            {
+                objRef = DotNetObjectReference.Create(this);
+
+                // Wait for DOM to be ready
+                await Task.Delay(500);
+
+                Console.WriteLine("DAWA: Attempting to initialize...");
+
+                // Call the JavaScript function following the GitHub example
+                await JSRuntime.InvokeVoidAsync("loadDawaAutocomplete", elementId, objRef);
+
+                isInitialized = true;
+                Console.WriteLine($"DAWA autocomplete initialization completed for: {elementId}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error initializing DAWA autocomplete: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task OnAddressChangedInternal()
+    {
+        await AddressValueChanged.InvokeAsync(AddressValue);
+    }
+
+    [JSInvokable]
+    public async Task OnAddressSelectedInternal(DawaAddressResult result)
+    {
+        try
+        {
+            Console.WriteLine($"C# received DAWA selection: {result.Address}, {result.City}, {result.ZipCode}");
+
+            AddressValue = result.Address;
+            await AddressValueChanged.InvokeAsync(AddressValue);
+            await AddressSelected.InvokeAsync(result);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error handling DAWA address selection: {ex.Message}");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        objRef?.Dispose();
+    }
+
+    public class DawaAddressResult
+    {
+        public string Address { get; set; } = string.Empty;
+        public string City { get; set; } = string.Empty;
+        public string ZipCode { get; set; } = string.Empty;
+    }
+}

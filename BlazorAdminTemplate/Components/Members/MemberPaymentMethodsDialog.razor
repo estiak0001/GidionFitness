@@ -1,0 +1,135 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Payment
+@using MudBlazor
+@inject IStaffManagementService StaffManagementService
+
+
+<div class="pa-6">
+    <MudGrid Spacing="2" Justify="Justify.FlexEnd">
+        <MudItem>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       OnClick="RefreshCards"
+                       Disabled="@isLoading">
+                Refresh
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+
+    <MudProgressCircular Indeterminate="true"
+                         Color="Color.Primary"
+                         Size="Size.Large"
+                         Class="ma-4"
+                         Style="@(isLoading ? "" : "display:none;")" />
+
+    @if (!isLoading)
+    {
+        @if (!PaymentCards.Any())
+        {
+            <MudAlert Severity="Severity.Info" Class="mt-4">
+                <MudText Typo="Typo.body1">
+                    No payment cards found for this member.
+                </MudText>
+            </MudAlert>
+        }
+        else
+        {
+            <MudTable T="PaymentCards"
+                      Items="@PaymentCards"
+                      Dense="true"
+                      Hover="true"
+                      Bordered="true"
+                      Striped="true"
+                      Class="mt-4">
+                <HeaderContent>
+                    <MudTh>Masked PAN</MudTh>
+                    <MudTh>Expiry Date</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Type</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.MemberCardMaskedPan</MudTd>
+                    <MudTd>@context.MemberCardCardExpiryDate</MudTd>
+                    <MudTd>
+                        @if (context.MemberCardStatus == 1)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success">Active</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error">Inactive</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        @if (context.MemberCardCardType is null)
+                        {
+                            @context.MemberCardCardType
+                        }
+                        else
+                        {
+                            <span class="mud-text-secondary">N/A</span>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        <MudButtonGroup Variant="Variant.Text">
+                            <MudButton Color="Color.Primary" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.Visibility" />
+                            </MudButton>
+                            <MudButton Color="Color.Error" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.Delete" />
+                            </MudButton>
+                        </MudButtonGroup>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public string MemberGuid { get; set; } = string.Empty;
+
+    private IEnumerable<PaymentCards> PaymentCards = Enumerable.Empty<PaymentCards>();
+    private bool isLoading = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadPaymentCards();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPaymentCards();
+    }
+
+    private async Task LoadPaymentCards()
+    {
+        if (string.IsNullOrEmpty(MemberGuid))
+            return;
+
+        isLoading = true;
+        StateHasChanged(); // Show spinner immediately
+
+        try
+        {
+            var response = await StaffManagementService.StaffGetMemberPaymentCardsAsync(MemberGuid);
+            PaymentCards = response.PaymentCards ?? Enumerable.Empty<PaymentCards>();
+        }
+        catch (Exception ex)
+        {
+            // Optional: show error alert
+            PaymentCards = Enumerable.Empty<PaymentCards>();
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    public async Task RefreshCards()
+    {
+        await LoadPaymentCards();
+    }
+}

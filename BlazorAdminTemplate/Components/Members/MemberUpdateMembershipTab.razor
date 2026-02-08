@@ -1,0 +1,318 @@
+﻿@using BlazorAdminTemplate.Application.DTOs.Memberships
+@using BlazorAdminTemplate.Application.DTOs.Payment
+@using BlazorAdminTemplate.Application.Interfaces
+@using MudBlazor
+@inject IMemberMembershipService MemberMembershipService
+@inject IMembershipService MembershipService
+@inject ISnackbar Snackbar
+@inject IStaffManagementService StaffManagementService
+@inject IDialogService DialogService
+
+<MudPaper Class="pa-6" Elevation="2">
+    <MudText Typo="Typo.h6" Class="mb-6">
+        <MudIcon Icon="@Icons.Material.Filled.CardMembership" Color="Color.Primary" Class="mr-3" />
+        Medlemskabsstyring
+    </MudText>
+
+    @if (IsLoadingCurrent || IsLoadingPlans)
+    {
+        <div class="d-flex flex-column">
+            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+            <MudSkeleton SkeletonType="SkeletonType.Text" Height="40px" Class="mb-2" />
+            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="120px" />
+        </div>
+    }
+    else if (CurrentMembership != null)
+    {
+        <!-- Current Plan Card -->
+        <MudPaper Class="pa-4 mb-6" Elevation="1"
+                  Style="border-left: 5px solid var(--mud-palette-primary);">
+            <MudText Typo="Typo.subtitle1" Class="mb-1">
+                <strong>Nuværende medlemskab:</strong> @GetCurrentMembershipName()
+            </MudText>
+            <MudText Typo="Typo.body1">
+                Pris: <strong>@FormatPrice((decimal)CurrentMembership.PaymentInfo.MemberPaymentPrice)</strong> pr. år
+            </MudText>
+            @if (!string.IsNullOrEmpty(GetCurrentMembershipDescription()))
+            {
+                <MudText Typo="Typo.body2" Class="mt-2 text-medium-emphasis">
+                    @GetCurrentMembershipDescription()
+                </MudText>
+            }
+        </MudPaper>
+
+        <!-- Membership Actions -->
+        <div class="d-flex justify-space-between align-center mb-6">
+            <MudText Typo="Typo.h6" Class="mb-0">Medlemskabsændringer</MudText>
+            <div class="d-flex gap-3">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Warning"
+                           OnClick="OpenHoldMembershipDialog"
+                           StartIcon="@Icons.Material.Filled.PauseCircle">
+                    Hold medlemskab
+                </MudButton>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Error"
+                           OnClick="OpenCancelMembershipDialog"
+                           StartIcon="@Icons.Material.Filled.Cancel">
+                    Annuller medlemskab
+                </MudButton>
+            </div>
+        </div>
+
+        <!-- Plan Selection -->
+        <MudSelect T="string"
+                   Label="Vælg nyt medlemskab"
+                   @bind-Value="SelectedPlanId"
+                   Variant="Variant.Outlined"
+                   Adornment="Adornment.Start"
+                   AdornmentIcon="@Icons.Material.Filled.CardMembership"
+                   Placeholder="Vælg et medlemskab..."
+                   Class="mb-5">
+            @foreach (var plan in AvailablePlans)
+            {
+                bool isCurrent = plan.MemberPaymentGroupGUID == CurrentPlanId;
+                <MudSelectItem Value="@plan.MemberPaymentGroupGUID">
+                    @if (isCurrent)
+                    {
+                        <span>@plan.MemberPaymentGroupName <MudChip T="string" Size="Size.Small" Color="Color.Primary">Nuværende</MudChip></span>
+                    }
+                    else
+                    {
+                        <span>@plan.MemberPaymentGroupName</span>
+                    }
+                </MudSelectItem>
+            }
+        </MudSelect>
+
+        <!-- Simple change notice -->
+        @if (SelectedPlanId != null && SelectedPlanId != CurrentPlanId)
+        {
+            var selected = AvailablePlans.FirstOrDefault(p => p.MemberPaymentGroupGUID == SelectedPlanId);
+            if (selected != null)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="mb-5">
+                    Du skifter medlemskab til <strong>@selected.MemberPaymentGroupName</strong>.
+                    Den nye pris (@FormatPrice(selected.MemberPaymentPrice)/år) træder i kraft fra den valgte dato.
+                </MudAlert>
+            }
+        }
+
+        <!-- Success message after change -->
+        @if (ChangeResult != null && ChangeResult.Success)
+        {
+            var oldPlan = AvailablePlans.FirstOrDefault(p => p.MemberPaymentGroupGUID == ChangeResult.OldPaymentGroupGUID);
+            var newPlan = AvailablePlans.FirstOrDefault(p => p.MemberPaymentGroupGUID == ChangeResult.NewPaymentGroupGUID);
+
+            <MudAlert Severity="Severity.Success" Variant="Variant.Filled" Class="mb-5">
+                <MudAlertTitle>Medlemskab ændret succesfuldt!</MudAlertTitle>
+                <strong>Fra:</strong> @(oldPlan?.MemberPaymentGroupName ?? "Ukendt") (@FormatPrice(ChangeResult.OldAmount / 100m))/år<br />
+                <strong>Til:</strong> @(newPlan?.MemberPaymentGroupName ?? "Ukendt") (@FormatPrice(ChangeResult.NewAmount / 100m))/år<br />
+                <strong>Ikrafttrædelsesdato:</strong> @ChangeResult.ChangeDate:dd.MM.yyyy<br /><br />
+                @ChangeResult.Message
+            </MudAlert>
+        }
+
+        <!-- Effective Date -->
+        <MudDatePicker @bind-Date="EffectiveDate"
+                       Label="Ikrafttrædelsesdato (valgfri)"
+                       MinDate="@DateTime.Today"
+                       Placeholder="I dag (anbefalet)"
+                       Variant="Variant.Outlined"
+                       Class="mb-4" />
+
+        <!-- Confirmation -->
+        <MudCheckBox @bind-Checked="Confirmed" T="Boolean"
+                     Label="Jeg bekræfter ændringen af medlemskabet som vist ovenfor"
+                     Color="Color.Primary" />
+
+        <!-- Save Button -->
+        <div class="d-flex justify-end mt-6">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Large"
+                    
+                       OnClick="SaveMembershipChange"
+                       StartIcon="@Icons.Material.Filled.Save">
+                @if (IsSaving)
+                {
+                    <MudProgressCircular Class="ms-2" Size="Size.Small" Indeterminate="true" />
+                }
+                else
+                {
+                    @medlemskab
+                }
+            </MudButton>
+        </div>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Warning">
+            Kunne ikke indlæse nuværende medlemskab.
+        </MudAlert>
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public string MemberGuid { get; set; } = string.Empty;
+
+    private MemberPaymentMembershipInfoResponseDTO? CurrentMembership { get; set; }
+    private List<MembershipsDTO> AvailablePlans { get; set; } = new();
+    private string CurrentPlanId => CurrentMembership?.PaymentInfo.MemberPaymentGroupGUID ?? "";
+    private string? SelectedPlanId { get; set; }
+    private DateTime? EffectiveDate { get; set; } = DateTime.Today;
+    private bool Confirmed { get; set; }
+    private bool IsLoadingCurrent { get; set; } = true;
+    private bool IsLoadingPlans { get; set; } = true;
+    private bool IsSaving { get; set; }
+    private string medlemskab = "SKIFT MEDLEMSKAB";
+    
+    // New: result from the change operation
+    private StaffMemberMembershipChangeResponseDTO? ChangeResult { get; set; }
+
+    private bool CanSave => SelectedPlanId != null &&
+                            SelectedPlanId != CurrentPlanId &&
+                            Confirmed &&
+                            !IsSaving;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        IsLoadingCurrent = true;
+        IsLoadingPlans = true;
+        ChangeResult = null; // Clear previous success message
+
+        try
+        {
+            var currentTask = StaffManagementService.StaffGetMembershipInfo(MemberGuid);
+            var plansTask = MembershipService.GetMembershipListAsync();
+            await Task.WhenAll(currentTask, plansTask);
+
+            CurrentMembership = await currentTask;
+            AvailablePlans = (await plansTask).PaymentGroups
+                .OrderBy(p => p.MemberPaymentPrice)
+                .ToList();
+
+            SelectedPlanId = CurrentPlanId;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Fejl ved indlæsning af medlemskab: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            IsLoadingCurrent = false;
+            IsLoadingPlans = false;
+        }
+    }
+
+    private async Task SaveMembershipChange()
+    {
+        // if (!CanSave) return;
+
+        IsSaving = true;
+        ChangeResult = null;
+
+        try
+        {
+            var request = new StaffMemberMembershipChangeDTO
+            {
+                MemberGUID = MemberGuid,
+                MemberPaymentGroupGUID = SelectedPlanId!
+            };
+
+            // If your service allows passing effective date, add it here. Otherwise remove.
+            // Assuming the backend uses EffectiveDate = today if not provided.
+            var response = await StaffManagementService.StaffChangeMemberMembershipAsync(request);
+
+            ChangeResult = response;
+
+            if (response.Success)
+            {
+                Snackbar.Add("Medlemskab ændret!", Severity.Success);
+                await LoadDataAsync(); // Refresh to show new current membership
+            }
+            else
+            {
+                Snackbar.Add("Fejl: " + response.Message, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Fejl ved ændring af medlemskab: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private async Task OpenHoldMembershipDialog()
+    {
+        var parameters = new DialogParameters<StaffHoldMembershipDialog>
+        {
+            { x => x.MemberGuid, MemberGuid }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<StaffHoldMembershipDialog>("Hold medlemskab", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("Medlemskab er nu på hold.", Severity.Success);
+        }
+    }
+
+    private async Task OpenCancelMembershipDialog()
+    {
+        var parameters = new DialogParameters<StaffCancelMembershipDialog>
+        {
+            { x => x.MemberGuid, MemberGuid },
+        };
+        var dialog = await DialogService.ShowAsync<StaffCancelMembershipDialog>("Annuller medlemskab", parameters,
+            new DialogOptions { CloseOnEscapeKey = true });
+        var result = await dialog.Result;
+        
+        if (!result.Canceled && result.Data != null)
+        {
+            await LoadDataAsync();
+            Snackbar.Add("Medlemskab annulleret!", Severity.Success);
+        }
+    }
+
+    private string FormatPrice(decimal price) => price.ToString("N2") + " kr.";
+
+    private string GetCurrentMembershipName()
+    {
+        if (CurrentMembership == null) return "Ukendt";
+        
+        // Try to find the name from AvailablePlans first
+        var plan = AvailablePlans.FirstOrDefault(p => p.MemberPaymentGroupGUID == CurrentMembership.PaymentInfo.MemberPaymentGroupGUID);
+        if (plan != null)
+        {
+            return plan.MemberPaymentGroupName;
+        }
+        
+        // Fallback to the API response (might be GUID if API doesn't return name)
+        return CurrentMembership.PaymentInfo.MemberPaymentGroupName;
+    }
+
+    private string GetCurrentMembershipDescription()
+    {
+        if (CurrentMembership == null) return string.Empty;
+        
+        // Try to find the description from AvailablePlans first
+        var plan = AvailablePlans.FirstOrDefault(p => p.MemberPaymentGroupGUID == CurrentMembership.PaymentInfo.MemberPaymentGroupGUID);
+        if (plan != null && !string.IsNullOrEmpty(plan.MemberPaymentGroupDescription))
+        {
+            return plan.MemberPaymentGroupDescription;
+        }
+        
+        // Fallback to the API response
+        return CurrentMembership.PaymentInfo.MemberPaymentGroupDescription;
+    }
+}

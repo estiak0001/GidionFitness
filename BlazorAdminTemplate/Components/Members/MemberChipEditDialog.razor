@@ -1,0 +1,181 @@
+﻿@using MudBlazor
+@using BlazorAdminTemplate.Application.DTOs.Chips
+@inject IStaffManagementService StaffService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Contactless" Class="mr-2" />
+            @Title
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (IsEditMode)
+        {
+            <MudText Typo="Typo.body2" Color="Color.Tertiary" Class="mb-4">
+                Originally assigned on @ExistingChip!.MemberChipCreated.ToString("dd MMM yyyy HH:mm")
+            </MudText>
+        }
+
+        <MudTextField @bind-Value="ChipData"
+                      Label="Chip UID (Hex)"
+                      Placeholder="e.g. 04A1B2C3D4E5F6"
+                      HelperText="Full hexadecimal UID from the RFID/NFC chip"
+                      Class="mb-4"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Contactless"
+                      AutoFocus="true"
+                      Required="true"
+                      Immediate="true"
+                      Validation="@(new Func<string, IEnumerable<string>>(ValidateUid))" />
+
+        <MudSelect T="string"
+                   Label="Chip Type"
+                   @bind-Value="selectedChipTypeGuid"
+                   Required="true"
+                   Disabled="@isLoadingTypes"
+                   Immediate="true"
+                   ToStringFunc="@(guid => GetChipTypeName(guid))"
+                   Class="mb-4">
+            @if (isLoadingTypes)
+            {
+                <MudSelectItem Value="@("")"><em>Loading chip types...</em></MudSelectItem>
+            }
+            else if (!chipTypes.Any())
+            {
+                <MudSelectItem Value="@("")"><em>No chip types available</em></MudSelectItem>
+            }
+            else
+            {
+                foreach (var type in chipTypes)
+                {
+                    <MudSelectItem Value="@type.MemberChipTypeGUID">@type.MemberChipTypeName</MudSelectItem>
+                }
+            }
+        </MudSelect>
+
+        <MudTextField @bind-Value="Comment"
+                      Label="@(IsEditMode ? "Comment" : "Comment (optional)")"
+                      Lines="4"
+                      Immediate="true"
+                      Placeholder="@(IsEditMode ? "Update reason..." : "e.g. Issued new wristband, replaced lost chip...")" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@(string.IsNullOrWhiteSpace(ChipData) || string.IsNullOrWhiteSpace(selectedChipTypeGuid) || isLoadingTypes)"
+                   OnClick="SaveChip">
+            @ButtonText
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string MemberGuid { get; set; } = string.Empty;
+    [Parameter] public MemberChip? ExistingChip { get; set; }
+
+    private bool IsEditMode => ExistingChip != null;
+    private string Title => IsEditMode ? "Edit Chip" : "Assign New Chip";
+    private string ButtonText => IsEditMode ? "Save Changes" : "Assign Chip";
+
+    private string ChipData = "";
+    private string Comment = "";
+    private string selectedChipTypeGuid = "";
+    private List<ChipType> chipTypes = new();
+    private bool isLoadingTypes = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoadingTypes = true;
+        var response = await StaffService.StaffGetChipTypesAsync(); // <-- Add this method to your service
+        if (response?.ChipTypes != null)
+        {
+            chipTypes = response.ChipTypes;
+        }
+        isLoadingTypes = false;
+
+        if (IsEditMode && ExistingChip != null)
+        {
+            ChipData = ExistingChip.MemberChipData;
+            Comment = ExistingChip.MemberChipComment ?? "";
+            selectedChipTypeGuid = ExistingChip.MemberChipType ?? "";
+        }
+        else if (chipTypes.Any())
+        {
+            // Optional: default to first type when creating new
+            selectedChipTypeGuid = chipTypes.First().MemberChipTypeGUID;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SaveChip()
+    {
+        if (string.IsNullOrWhiteSpace(ChipData) || string.IsNullOrWhiteSpace(selectedChipTypeGuid))
+            return;
+
+        if (IsEditMode && ExistingChip != null)
+        {
+            var editDto = new StaffMemberChipEditDTO
+            {
+                MemberChipGUID = ExistingChip.MemberChipGUID,
+                MemberChipData = ChipData.Trim().ToUpperInvariant(),
+                MemberChipComment = Comment.Trim(),
+                MemberChipType = selectedChipTypeGuid
+            };
+
+            var result = await StaffService.StaffEditMemberChipAsync(editDto);
+            if (result.Success)
+            {
+                Snackbar.Add("Chip updated successfully!", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Failed to update chip", Severity.Error);
+            }
+        }
+        else
+        {
+            var createDto = new StaffMemberChipCreateDTO
+            {
+                MemberGUID = MemberGuid,
+                MemberChipData = ChipData.Trim().ToUpperInvariant(),
+                MemberChipComment = Comment.Trim(),
+                MemberChipType = selectedChipTypeGuid
+            };
+
+            var result = await StaffService.StaffCreateMemberChipAsync(createDto);
+            if (result.Success)
+            {
+                Snackbar.Add("New chip assigned successfully!", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Failed to assign chip", Severity.Error);
+            }
+        }
+    }
+
+    private IEnumerable<string> ValidateUid(string uid)
+    {
+        if (string.IsNullOrWhiteSpace(uid))
+            yield return "Chip UID is required";
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(uid.Trim(), "^[0-9A-Fa-f]+$"))
+            yield return "UID must contain only hexadecimal characters (0-9, A-F)";
+    }
+
+    private string GetChipTypeName(string guid)
+    {
+        if (string.IsNullOrWhiteSpace(guid))
+            return "Select chip type...";
+        
+        var chipType = chipTypes.FirstOrDefault(ct => ct.MemberChipTypeGUID == guid);
+        return chipType?.MemberChipTypeName ?? guid;
+    }
+}

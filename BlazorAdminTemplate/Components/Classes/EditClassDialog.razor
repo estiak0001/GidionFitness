@@ -1,0 +1,489 @@
+﻿@using MudBlazor
+@using BlazorAdminTemplate.Application.DTOs.Classes
+@using BlazorAdminTemplate.Application.DTOs.Location
+@using BlazorAdminTemplate.Application.DTOs.ClassTypes
+@using BlazorAdminTemplate.Application.DTOs.Memberships
+@inject IStaffManagementService StaffService
+@inject IMembershipService MembershipService
+@inject ITrainingClassesService TrainingClassesService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="Icons.Material.Filled.EditCalendar" Class="mr-2" />
+            @(isCreateMode ? "Create New Class" : "Edit Class")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@formValid">
+            <MudGrid Spacing="4">
+                <!-- Class Type -->
+                <MudItem xs="12">
+                    <MudSelect T="string"
+                               Label="Class Type"
+                               @bind-Value="model.TrainingClassTypesGUID"
+                               Required="true"
+                               Variant="Variant.Outlined">
+                        @foreach (var ct in classTypes)
+                        {
+                            <MudSelectItem Value="@ct.TrainingClassTypesGUID">
+                                @ct.TrainingClassTypesName (@ct.TrainingClassLocationName)
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <!-- Location -->
+                <MudItem xs="12">
+                    <MudSelect T="string"
+                               Label="Location"
+                               @bind-Value="model.TrainingClassLocationGUID"
+                               Required="true"
+                               Variant="Variant.Outlined">
+                        @foreach (var loc in locations)
+                        {
+                            <MudSelectItem Value="@loc.TrainingClassLocationGUID">
+                                @loc.TrainingClassLocationName
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <!-- Name -->
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="model.TrainingClassClassesName"
+                                  Label="Class Name"
+                                  Required="true"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <!-- Date + Start Time -->
+                <MudItem xs="12" md="6">
+                    <MudDatePicker @bind-Date="selectedDate"
+                                   Label="Date"
+                                   Required="true"
+                                   Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTimePicker @bind-Time="selectedTime"
+                                   Label="Start Time"
+                                   Required="true"
+                                   Variant="Variant.Outlined" />
+                </MudItem>
+
+                <!-- Duration -->
+                <MudItem xs="12" md="6">
+                    <MudNumericField @bind-Value="model.TrainingClassClassesDuration"
+                                     Label="Duration (minutes)"
+                                     Min="15"
+                                     Step="5"
+                                     Required="true"
+                                     Variant="Variant.Outlined" />
+                </MudItem>
+
+                <!-- Capacity -->
+                <MudItem xs="12" md="6">
+                    <MudNumericField @bind-Value="model.TrainingClassClassesMax"
+                                     Label="Max Participants"
+                                     Min="1"
+                                     Required="true"
+                                     Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudNumericField @bind-Value="model.TrainingClassClassesMin"
+                                     Label="Min Participants"
+                                     Min="0"
+                                     Variant="Variant.Outlined" />
+                </MudItem>
+
+                <!-- Description -->
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="model.TrainingClassClassesDescription"
+                                  Label="Description"
+                                  Lines="6"
+                                  Variant="Variant.Outlined"
+                                  Placeholder="Write a detailed description..." />
+                    @* Temporarily using regular textarea instead of HTML editor for testing
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">Description</MudText>
+                    <MudHtmlEditor @bind-Content="model.TrainingClassClassesDescription"
+                                   Style="height: 250px;"
+                                   Placeholder="Write a detailed description..."
+                                   Variant="Variant.Outlined" />
+                    *@
+                </MudItem>
+
+                <!-- Access Control -->
+                <MudItem xs="12">
+                    <MudCheckBox T="bool" @bind-Checked="allHaveAccess"
+                                 Label="All members can enroll (unrestricted access)"
+                                 Color="Color.Primary" />
+                    <MudText Typo="Typo.caption" Class="mt-1 mud-text-secondary">
+                        @if (allHaveAccess)
+                        {
+                            <span style="color: green;">✓ Any member can book this class</span>
+                        }
+                        else
+                        {
+                            <span style="color: orange;">⚠ Only selected membership groups can book</span>
+                        }
+                    </MudText>
+                </MudItem>
+
+                @if (!allHaveAccess)
+                {
+                    <MudItem xs="12">
+                        <MudSelect T="string"
+                                   Label="Allowed Membership Groups"
+                                   MultiSelection="true"
+                                   @bind-SelectedValues="selectedGroupGuids"
+                                   MultiSelectionTextFunc="@GetGroupDisplayText"
+                                   Required="true"
+                                   Variant="Variant.Outlined"
+                                   HelperText="Select at least one membership group">
+                            @foreach (var group in membershipGroups)
+                            {
+                                <MudSelectItem Value="@group.MemberPaymentGroupGUID">
+                                    @group.MemberPaymentGroupName (@group.MemberPaymentPrice:C)/month
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                        @if (selectedGroupGuids.Any())
+                        {
+                            <MudText Typo="Typo.body2" Class="mt-2 mud-text-secondary">
+                                Selected: @selectedGroupGuids.Count() group@(selectedGroupGuids.Count() == 1 ? "" : "s")
+                            </MudText>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2" Class="mt-2" Color="Color.Warning">
+                                ⚠ At least one group must be selected
+                            </MudText>
+                        }
+                    </MudItem>
+                }
+
+                <!-- Cancellation Settings -->
+                <MudItem xs="12" md="4">
+                    <MudNumericField @bind-Value="model.TrainingClassClassesMaxCancellationTime"
+                                     Label="Cancel allowed (min before class)"
+                                     Min="0"
+                                     Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudCheckBox T="bool" @bind-Checked="autoCancelEnabled"
+                                 Label="Auto-cancel if below min" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudCheckBox T="bool" @bind-Checked="applyFine"
+                                 Label="Apply fine on no-show/late cancel" />
+                </MudItem>
+
+                <!-- Trainer (Optional) -->
+                <MudItem xs="12">
+                    <MudSelect T="string"
+                               Label="Trainer (Optional)"
+                               @bind-Value="model.TrainingClassTemplateTrainerGUID"
+                               Clearable="true"
+                               Variant="Variant.Outlined"
+                               Placeholder="None">
+                        @foreach (var t in trainers)
+                        {
+                            <MudSelectItem Value="@t.MemberGUID">@t.TrainerName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Disabled="!formValid || isSaving"
+                   Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   StartIcon="@(isSaving ? Icons.Material.Filled.Sync : Icons.Material.Filled.Save)"
+                   OnClick="SaveAsync">
+            @(isSaving ? "Saving..." : "Save Class")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    // Accept the read DTO from the list page
+    [Parameter] public StaffTrainingClassGetResponseDTO? Class { get; set; }
+
+    private StaffTrainingClassEditDTO model = new();
+    private bool isCreateMode => string.IsNullOrEmpty(model.TrainingClassClassesGUID);
+
+    private MudForm? form;
+    private bool formValid = false;
+    private bool isSaving = false;
+
+    // UI helpers
+    private DateTime? selectedDate;
+    private TimeSpan? selectedTime;
+    private bool allHaveAccess = true;
+    private bool autoCancelEnabled = false;
+    private bool applyFine = false;
+    private IEnumerable<string> selectedGroupGuids = Enumerable.Empty<string>();
+
+    // Dropdown data
+    private List<StaffTrainingClassTypeDTO> classTypes = new();
+    private List<StaffTrainingClassLocationDTO> locations = new();
+    private List<MembershipsDTO> membershipGroups = new();
+    private List<StaffTrainerDTO> trainers = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Initialize model (create mode if no Class provided)
+        if (Class == null)
+        {
+            model = new StaffTrainingClassEditDTO
+            {
+                TrainingClassClassesDuration = 60,
+                TrainingClassClassesMax = 20,
+                TrainingClassClassesMin = 1
+            };
+            selectedDate = DateTime.Today;
+            selectedTime = new TimeSpan(18, 0, 0); // default 6 PM
+            
+            Console.WriteLine($"CREATE MODE - allHaveAccess initialized to: {allHaveAccess}");
+        }
+        else
+        {
+            // Map from read DTO to edit DTO
+            model = new StaffTrainingClassEditDTO
+            {
+                TrainingClassClassesGUID = Class.TrainingClassClassesGUID,
+                TrainingClassTypesGUID = Class.TrainingClassTypesGUID,
+                TrainingClassLocationGUID = Class.TrainingClassLocationGUID,
+                TrainingClassClassesName = Class.TrainingClassClassesName,
+                TrainingClassClassesDescription = Class.TrainingClassClassesDescription,
+                TrainingClassClassesAccess = Class.TrainingClassClassesAccess,
+                TrainingClassClassesMax = Class.TrainingClassClassesMax,
+                TrainingClassClassesMin = Class.TrainingClassClassesMin,
+                TrainingClassClassesAutomaticCancellation = Class.TrainingClassClassesAutomaticCancellation,
+                TrainingClassClassesMaxCancellationTime = Class.TrainingClassClassesMaxCancellationTime,
+                TrainingClassClassesFine = Class.TrainingClassClassesFine,
+                TrainingClassClassesStartDateTime = Class.TrainingClassClassesStartDateTime,
+                TrainingClassClassesDuration = Class.TrainingClassClassesDuration,
+                TrainingClassTemplateTrainerGUID = Class.TrainingClassTemplateTrainerGUID ?? string.Empty
+            };
+
+            // Split datetime for pickers
+            selectedDate = Class.TrainingClassClassesStartDateTime.Date;
+            selectedTime = Class.TrainingClassClassesStartDateTime.TimeOfDay;
+
+            // Access control: Access = 0 means all have access, Access = 1 means restricted
+            allHaveAccess = Class.TrainingClassClassesAccess == 0;
+            selectedGroupGuids = allHaveAccess ? Enumerable.Empty<string>() : (Class.TrainingClassClassesAccessGUIDs ?? Array.Empty<string>());
+
+            autoCancelEnabled = Class.TrainingClassClassesAutomaticCancellation == 1;
+            applyFine = Class.TrainingClassClassesFine == 1;
+        }
+
+        await LoadDropdownData();
+    }
+
+    private async Task LoadDropdownData()
+    {
+        await Task.WhenAll(
+            LoadClassTypes(),
+            LoadLocations(),
+            LoadMembershipGroups(),
+            LoadTrainers()
+        );
+    }
+
+    private async Task LoadClassTypes()
+    {
+        var resp = await StaffService.StaffGetClassTypesAsync(1, 200);
+        classTypes = resp.types ?? new();
+    }
+
+    private async Task LoadLocations()
+    {
+        var resp = await StaffService.StaffGetClassLocationsAsync(1, 100);
+        locations = resp.StaffTrainingClassLocations ?? new();
+    }
+
+    private async Task LoadMembershipGroups()
+    {
+        try
+        {
+            var resp = await MembershipService.GetMembershipListAsync();
+            membershipGroups = resp.PaymentGroups ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Failed to load membership groups: " + ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task LoadTrainers()
+    {
+        try
+        {
+            var resp = await TrainingClassesService.GetTrainerListAsync();
+            trainers = resp.Data ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Failed to load trainers: " + ex.Message, Severity.Error);
+        }
+    }
+
+    private string GetGroupDisplayText(List<string> guids)
+    {
+        if (guids == null || !guids.Any()) return "No groups selected";
+
+        var names = guids.Select(g =>
+        {
+            var group = membershipGroups.FirstOrDefault(x => x.MemberPaymentGroupGUID == g);
+            return group != null
+                ? $"{group.MemberPaymentGroupName} ({group.MemberPaymentPrice:C}/month)"
+                : "Unknown";
+        });
+
+        return names.Count() > 2
+            ? $"{names.Count()} groups selected"
+            : string.Join(", ", names);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (!formValid || isSaving) return;
+        if (!selectedDate.HasValue || !selectedTime.HasValue)
+        {
+            Snackbar.Add("Please select a date and start time.", Severity.Warning);
+            return;
+        }
+
+        // Debug logging for access control
+        Console.WriteLine($"=== ACCESS CONTROL DEBUG ===");
+        Console.WriteLine($"allHaveAccess checkbox value: {allHaveAccess}");
+        Console.WriteLine($"selectedGroupGuids count: {selectedGroupGuids.Count()}");
+        Console.WriteLine($"selectedGroupGuids: [{string.Join(", ", selectedGroupGuids)}]");
+
+        // Validate access control
+        if (!allHaveAccess && !selectedGroupGuids.Any())
+        {
+            Console.WriteLine($"VALIDATION FAILED: allHaveAccess={allHaveAccess}, groups={selectedGroupGuids.Count()}");
+            Snackbar.Add("Please select at least one membership group, or check 'All members can enroll'.", Severity.Warning);
+            return;
+        }
+        
+        Console.WriteLine($"Validation passed, proceeding with save...");
+
+        isSaving = true;
+        StateHasChanged();
+
+        try
+        {
+            // Combine date and time and convert to UTC
+            var localDateTime = selectedDate.Value.Date.Add(selectedTime.Value);
+            model.TrainingClassClassesStartDateTime = DateTime.SpecifyKind(localDateTime, DateTimeKind.Local).ToUniversalTime();
+            
+            Console.WriteLine($"Selected Date: {selectedDate.Value:yyyy-MM-dd}");
+            Console.WriteLine($"Selected Time: {selectedTime.Value}");
+            Console.WriteLine($"Combined Local: {localDateTime:yyyy-MM-dd HH:mm:ss}");
+            Console.WriteLine($"UTC DateTime: {model.TrainingClassClassesStartDateTime:yyyy-MM-ddTHH:mm:ss.fffZ}");
+
+            // Access control
+            // Access = 0 means ALL members can access (no restrictions)
+            // Access = 1 means RESTRICTED (requires group GUIDs)
+            Console.WriteLine($"BEFORE setting access: allHaveAccess={allHaveAccess}");
+            model.TrainingClassClassesAccess = allHaveAccess ? 0 : 1;
+            model.TrainingClassClassesAccessGUIDs = allHaveAccess
+                ? Array.Empty<string>()
+                : selectedGroupGuids.ToArray();
+            
+            Console.WriteLine($"AFTER setting access:");
+            Console.WriteLine($"  model.TrainingClassClassesAccess = {model.TrainingClassClassesAccess} (should be 0 for all members, 1 for restricted)");
+            Console.WriteLine($"  model.TrainingClassClassesAccessGUIDs.Length = {model.TrainingClassClassesAccessGUIDs.Length}");
+            Console.WriteLine($"  AccessGUIDs: [{string.Join(", ", model.TrainingClassClassesAccessGUIDs)}]");
+
+            // Flags
+            model.TrainingClassClassesAutomaticCancellation = autoCancelEnabled ? 1 : 0;
+            model.TrainingClassClassesFine = applyFine ? 1 : 0;
+
+            StaffTrainingClassActionResponseDTO result;
+
+            if (isCreateMode)
+            {
+                var addDto = new StaffTrainingClassAddDTO
+                {
+                    TrainingClassTypesGUID = model.TrainingClassTypesGUID,
+                    TrainingClassLocationGUID = model.TrainingClassLocationGUID,
+                    TrainingClassClassesName = model.TrainingClassClassesName,
+                    TrainingClassClassesDescription = model.TrainingClassClassesDescription,
+                    TrainingClassClassesAccess = model.TrainingClassClassesAccess,
+                    TrainingClassClassesAccessGUIDs = model.TrainingClassClassesAccessGUIDs,
+                    TrainingClassClassesMax = model.TrainingClassClassesMax,
+                    TrainingClassClassesMin = model.TrainingClassClassesMin,
+                    TrainingClassClassesAutomaticCancellation = model.TrainingClassClassesAutomaticCancellation,
+                    TrainingClassClassesMaxCancellationTime = model.TrainingClassClassesMaxCancellationTime,
+                    TrainingClassClassesFine = model.TrainingClassClassesFine,
+                    TrainingClassClassesStartDateTime = model.TrainingClassClassesStartDateTime,
+                    TrainingClassClassesDuration = model.TrainingClassClassesDuration,
+                    TrainingClassTemplateTrainerGUID = model.TrainingClassTemplateTrainerGUID
+                };
+
+                result = await TrainingClassesService.StaffCreateSingleClass(addDto);
+            }
+            else
+            {
+                result = await TrainingClassesService.StaffEditClass(model);
+            }
+
+            if (!result.Success)
+            {
+                // Parse and clean up error message
+                var errorMessage = result.Message;
+                
+                // Try to extract the actual error from JSON format
+                if (errorMessage.Contains("{\"message\":"))
+                {
+                    try
+                    {
+                        var startIndex = errorMessage.IndexOf("\"message\":\"") + 11;
+                        var endIndex = errorMessage.IndexOf("\"", startIndex);
+                        if (startIndex > 10 && endIndex > startIndex)
+                        {
+                            errorMessage = errorMessage.Substring(startIndex, endIndex - startIndex);
+                        }
+                    }
+                    catch { }
+                }
+                
+                // Remove technical prefixes
+                errorMessage = errorMessage.Replace("Request failed (BadRequest): ", "");
+                
+                // Make it more user-friendly
+                if (errorMessage.Contains("TrainingClassClassesAccessGUIDs is required"))
+                {
+                    errorMessage = "Access control error: Please ensure you've selected membership groups if access is restricted, or check 'All members can enroll'.";
+                }
+                
+                Snackbar.Add(errorMessage, Severity.Error);
+                return;
+            }
+
+            Snackbar.Add(isCreateMode ? "Class created successfully!" : "Class updated successfully!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true)); // Return success
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Error: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+}

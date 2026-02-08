@@ -1,0 +1,223 @@
+﻿@page "/TeamType"
+@inject IClassLocationService classLocation
+@inject IDialogService dialogService
+@using BlazorAdminTemplate.Application.DTOs
+@using BlazorAdminTemplate.Application.DTOs.Location
+@using BlazorAdminTemplate.Application.DTOs.ClassTypes
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Components.PaginationComponents
+@using BlazorAdminTemplate.Domain.Enums
+
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+<AuthorizeView Policy="StaffOnly">
+    <Authorized>
+
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+            <MudButton @onclick="NewType" Variant="Variant.Filled" Color="Color.Primary">
+                Ny Type
+            </MudButton>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudSelect T="int" Label="Items per page" Variant="Variant.Outlined" Value="pageSize" ValueChanged="OnPageSizeChanged"
+                           Dense="true" Style="width:120px" Immediate="true" Flex="0">
+                    @foreach (var size in pageSizeOptions)
+                    {
+                        <MudSelectItem Value="@size">@size</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudStack>
+
+        </MudStack>
+
+    </Authorized>
+
+</AuthorizeView>
+
+
+@if (currentView == ViewType.Cards)
+{
+    //Mobil
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (true)
+    {
+        //TODO
+    }
+    else
+    {
+        <MudText>Igen Type fånet.</MudText>
+    }
+}
+else
+{
+    //Desktop
+
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (trainingClassType != null && trainingClassType?.Data?.Count > 0)
+    {
+        <PaginatedList TItem="StaffTrainingClassTypeDTO"
+                       Items="trainingClassType.Data"
+                       Pagination="trainingClassType.Pagination"
+                       OnPageChanged="LoadLocation">
+
+
+            <HeaderTemplate>
+                <MudTh>Type</MudTh>
+                <MudTh>Location</MudTh>
+                <MudTh>Beskrivelse</MudTh>
+                <MudTh>Max Antal</MudTh>
+                <MudTh>Handlinger</MudTh>
+            </HeaderTemplate>
+
+            <RowTemplate>
+                <MudTd>@context.TrainingClassTypesName</MudTd>
+                <MudTd>@context.TrainingClassLocationName</MudTd>
+                <MudTd>@context.TrainingClassTypesDescription</MudTd>
+                <MudTd>@context.TrainingClassTypesMax</MudTd>
+                <MudTd DataLabel="Handlinger">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   OnClick="@(() => DeleteType(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Color="Color.Info"
+                                   Size="Size.Small"
+                                   OnClick="@(() => EditType(context))" />
+                </MudTd>
+            </RowTemplate>
+
+        </PaginatedList>
+    }
+
+}
+
+
+
+
+@code {
+    private ResponseDTO<List<StaffTrainingClassTypeDTO>> trainingClassType = new ResponseDTO<List<StaffTrainingClassTypeDTO>>();
+    private List<StaffTrainingClassLocationDTO> trainingClassLocationDTOs = new List<StaffTrainingClassLocationDTO>();
+    private bool isLoading = true;
+    private int currentPage = 1;
+    private ViewType currentView = ViewType.Table;
+
+    private int pageSize = 100; // default page size
+    private int dropdownSize = 99999;
+    private readonly int[] pageSizeOptions = new int[] { 5, 10, 15, 20, 50, 100 };
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadType(currentPage);
+        await LoadLocation(currentPage);
+    }
+
+
+    private async Task LoadType(int page)
+    {
+
+        isLoading = true;
+        trainingClassType = await classLocation.GetStaffTrainingClassTypeListAsync(page, pageSize);
+        currentPage = page;
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task OnPageSizeChanged(int newSize)
+    {
+        pageSize = newSize;
+        await LoadType(1); // reload from first page with new page size
+    }
+
+    private async Task ChangePage(int page)
+    {
+        await LoadType(page);
+    }
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        currentView = breakpoint <= Breakpoint.Sm ? ViewType.Cards : ViewType.Table;
+        StateHasChanged();
+    }
+
+
+    private async Task LoadLocation(int page)
+    {
+        var response = await classLocation.GetStaffTrainingClassLocationListAsync(page, dropdownSize);
+        trainingClassLocationDTOs = response.Data;
+    }
+
+    private async Task NewType()
+    {
+        DialogOptions options = new DialogOptions { CloseOnEscapeKey = true };
+
+        var parameters = new DialogParameters
+        {
+            { "ClassLocationList", trainingClassLocationDTOs }
+        };
+
+        IDialogReference dialog = await dialogService.ShowAsync<NewTypeDialog>("Ny Type", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadType(currentPage);
+        }
+
+    }
+
+
+    private async Task DeleteType(StaffTrainingClassTypeDTO type)
+    {
+        DialogParameters parameters = new DialogParameters
+        {
+            { "ContentText", $"Are you sure you want to delete '{type.TrainingClassTypesName}'?" },
+            { "ButtonText", "Yes" },
+            { "Color", Color.Error }
+        };
+
+        DialogOptions options = new DialogOptions { CloseOnEscapeKey = true };
+        IDialogReference dialog = await dialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await classLocation.DeleteStaffTrainingClassTypeAsync(type);
+            await LoadType(currentPage);
+        }
+
+
+    }
+
+    private async Task EditType(StaffTrainingClassTypeDTO type)
+    {
+        DialogParameters parameters = new DialogParameters
+        {
+            { "type",type},
+            { "location", trainingClassLocationDTOs } // Pass the selected location to the dialog
+        };
+        DialogOptions options = new DialogOptions { CloseOnEscapeKey = true };
+        IDialogReference dialog = await dialogService.ShowAsync<EditTypeDialog>("Rediger Type", parameters, options);
+
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            var updatedType = (StaffTrainingClassTypeDTO)result.Data;
+
+            // Update the location in your backend/service
+            await classLocation.UpdateStaffTrainingClassTypeAsync(updatedType);
+
+            // Reload the table
+            await LoadType(currentPage);
+        }
+
+    }
+
+
+}

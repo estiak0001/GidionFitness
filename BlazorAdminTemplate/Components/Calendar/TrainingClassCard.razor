@@ -1,0 +1,108 @@
+﻿@using BlazorAdminTemplate.Domain.Entities
+
+<MudCard Class="training-class-card" Elevation="2" Style="height: 100%;">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">@Class.TrainingClassClassesName</MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                @Class.TrainingClassTypesName
+            </MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudChip T="string"
+                     Color="@GetAvailabilityColor()"
+                     Size="Size.Small"
+                     Variant="Variant.Filled">
+                @GetAvailabilityText()
+            </MudChip>
+        </CardHeaderActions>
+    </MudCardHeader>
+
+    <MudCardContent>
+        <MudStack Spacing="2">
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Class="mr-2" />
+                <MudText Typo="Typo.body2">
+                    @Class.TrainingClassClassesStartDateTime.ToString("dd/MM/yyyy HH:mm") -
+                    @Class.TrainingClassClassesEndDateTime.ToString("HH:mm")
+                </MudText>
+            </div>
+
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-2" />
+                <MudText Typo="Typo.body2">@Class.TrainingClassClassesTrainerName</MudText>
+            </div>
+
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Small" Class="mr-2" />
+                <MudText Typo="Typo.body2">@Class.OrganisationSubName</MudText>
+            </div>
+
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.Groups" Size="Size.Small" Class="mr-2" />
+                <MudText Typo="Typo.body2">
+                    @Class.TrainingClassClassesCurrentEnrollment/@Class.TrainingClassClassesMax deltagere
+                </MudText>
+            </div>
+
+            @if (!string.IsNullOrEmpty(Class.TrainingClassClassesDescription))
+            {
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                    @Class.TrainingClassClassesDescription
+                </MudText>
+            }
+        </MudStack>
+    </MudCardContent>
+
+    <MudCardActions>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   FullWidth="true"
+                   Disabled="@(Class.TrainingClassClassesAvailableSlots == 0)"
+                   OnClick="OnBookClick">
+            @if (Class.TrainingClassClassesAvailableSlots == 0)
+            {
+                <text>Fuldt booket</text>
+            }
+            else
+            {
+                <text>Tilmeld dig</text>
+            }
+        </MudButton>
+    </MudCardActions>
+</MudCard>
+
+<style>
+    .training-class-card {
+        transition: transform 0.2s ease-in-out;
+    }
+
+        .training-class-card:hover {
+            transform: translateY(-2px);
+        }
+</style>
+
+@code {
+    [Parameter] public TrainingClasses Class { get; set; } = new();
+    [Parameter] public EventCallback OnBookClick { get; set; }
+
+    private Color GetAvailabilityColor()
+    {
+        if (Class.TrainingClassClassesAvailableSlots == 0)
+            return Color.Error;
+        else if (Class.TrainingClassClassesAvailableSlots <= 2)
+            return Color.Warning;
+        else
+            return Color.Success;
+    }
+
+    private string GetAvailabilityText()
+    {
+        if (Class.TrainingClassClassesAvailableSlots == 0)
+            return "Fuldt";
+        else if (Class.TrainingClassClassesAvailableSlots <= 2)
+            return $"{Class.TrainingClassClassesAvailableSlots} ledige";
+        else
+            return "Ledige pladser";
+    }
+}

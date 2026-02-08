@@ -1,0 +1,289 @@
+﻿@page "/classes/planned"
+@using BlazorAdminTemplate.Application.DTOs.Classes
+@using BlazorAdminTemplate.Application.DTOs.Location
+@using BlazorAdminTemplate.Application.DTOs.ClassTypes
+@using BlazorAdminTemplate.Application.DTOs.Pagination
+@using BlazorAdminTemplate.Components.Classes
+@using MudBlazor
+@inject ITrainingClassesService TrainingClassesService
+@inject IClassLocationService LocationService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IStaffManagementService StaffManagementService
+
+<PageTitle>Planned Classes</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudPaper Class="pa-6" Elevation="2">
+        <MudStack Spacing="4">
+            <MudGrid Spacing="3">
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h5">
+                        <MudIcon Icon="@Icons.Material.Filled.EventAvailable" Class="mr-3" />
+                        Planned Classes (@(tableData?.TotalItems ?? 0))
+                    </MudText>
+                </MudItem>
+
+                <!-- Filters Row -->
+                <MudItem xs="12" md="4">
+                    <MudSelect T="string"
+                               Label="Class Type"
+                               @bind-Value="filters.TrainingClassTypesGUID"
+                               Clearable="true"
+                               Placeholder="All Types"
+                               AdornmentIcon="@Icons.Material.Filled.FilterList"
+                               OnClearButtonClick="OnFiltersChanged">
+                        @foreach (var type in classTypes)
+                        {
+                            <MudSelectItem Value="@type.TrainingClassTypesGUID">
+                                @type.TrainingClassTypesName (@type.TrainingClassLocationName)
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudSelect T="string"
+                               Label="Location"
+                               @bind-Value="filters.TrainingClassLocationGUID"
+                               Clearable="true"
+                               Placeholder="All Locations"
+                               AdornmentIcon="@Icons.Material.Filled.LocationOn"
+                               OnClearButtonClick="OnFiltersChanged">
+                        @foreach (var loc in locations)
+                        {
+                            <MudSelectItem Value="@loc.TrainingClassLocationGUID">
+                                @loc.TrainingClassLocationName
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudDateRangePicker Label="Date Range"
+                                        @bind-DateRange="dateRange"
+                                        AutoClose="true"
+                                        PickerVariant="PickerVariant.Dialog"
+                                        MaxDate="DateTime.Today.AddYears(2)"
+                                        MinDate="DateTime.Today.AddMonths(-3)">
+                        <PickerActions>
+                            <MudButton Class="mr-auto" OnClick="ClearDateRange">Clear</MudButton>
+                            <MudButton Color="Color.Primary" OnClick="ApplyDateRange">Apply</MudButton>
+                        </PickerActions>
+                        @* <QuickSelects>
+                            <MudItem Value="new DateRange(DateTime.Today, DateTime.Today.AddDays(6))">Next 7 days</MudItem>
+                            <MudItem Value="new DateRange(DateTime.Today, DateTime.Today.AddDays(29))">Next 30 days</MudItem>
+                            <MudItem Value="new DateRange(DateTime.Today, DateTime.Today.AddMonths(3).AddDays(-1))">Next 3 months</MudItem>
+                            <MudItem Value="new DateRange(DateTime.Today, DateTime.Today.AddMonths(6).AddDays(-1))">Next 6 months</MudItem>
+                        </QuickSelects> *@
+                    </MudDateRangePicker>
+                </MudItem>
+            </MudGrid>
+
+            <MudTable @ref="table"
+                      T="StaffTrainingClassGetResponseDTO"
+                      ServerData="ServerReload"
+                      Loading="@isLoading"
+                      Hover="true"
+                      Striped="true"
+                      Bordered="true"
+                      Dense="true"
+                      Elevation="0">
+                <HeaderContent>
+                    <MudTh><MudTableSortLabel SortBy="new Func<StaffTrainingClassGetResponseDTO, object>(x => x.TrainingClassClassesName)">Class Name</MudTableSortLabel></MudTh>
+                    <MudTh><MudTableSortLabel SortBy="new Func<StaffTrainingClassGetResponseDTO, object>(x => x.TrainingClassTypesName)">Type</MudTableSortLabel></MudTh>
+                    <MudTh><MudTableSortLabel SortBy="new Func<StaffTrainingClassGetResponseDTO, object>(x => x.TrainerName)">Trainer</MudTableSortLabel></MudTh>
+                    <MudTh><MudTableSortLabel SortBy="new Func<StaffTrainingClassGetResponseDTO, object>(x => x.TrainingClassLocationName)">Location</MudTableSortLabel></MudTh>
+                    <MudTh><MudTableSortLabel SortBy="new Func<StaffTrainingClassGetResponseDTO, object>(x => x.TrainingClassClassesStartDateTime)">Start Date</MudTableSortLabel></MudTh>
+                    <MudTh Style="width:120px;">Duration (min)</MudTh>
+                    <MudTh Style="width:140px;">Enrolled / Max</MudTh>
+                    <MudTh Style="width:100px;">Status</MudTh>
+                    <MudTh Style="width:160px;">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Class Name"><strong>@context.TrainingClassClassesName</strong></MudTd>
+                    <MudTd DataLabel="Type">@context.TrainingClassTypesName</MudTd>
+                    <MudTd DataLabel="Trainer">@context.TrainerName</MudTd>
+                    <MudTd DataLabel="Location">@context.TrainingClassLocationName</MudTd>
+                    <MudTd DataLabel="Start Date">@context.TrainingClassClassesStartDateTime.ToString("ddd, dd MMM yyyy HH:mm")</MudTd>
+                    <MudTd DataLabel="Duration">@context.TrainingClassClassesDuration</MudTd>
+                    <MudTd DataLabel="Enrolled">@context.CurrentEnrollment / @context.TrainingClassClassesMax</MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Color="@(context.AvailableSlots > 0 ? Color.Success : Color.Error)"
+                                 Variant="Variant.Filled"
+                                 Size="Size.Small">
+                            @(context.AvailableSlots > 0 ? "Open" : "Full")
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined">
+                            <MudIconButton Icon="ti ti-edit" Color="Color.Primary" OnClick="@(() => OpenEditDialog(context))" Title="Edit" />
+                            <MudIconButton Icon="ti ti-x" Color="Color.Warning" OnClick="@(() => OpenCancelDialog(context))" Title="Cancel" />
+                            <MudIconButton Icon="ti ti-trash" Color="Color.Error" OnClick="@(() => OpenDeleteDialog(context))" Title="Delete" />
+                        </MudButtonGroup>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new[] { 10, 25, 50, 100 }" />
+                </PagerContent>
+                <NoRecordsContent>
+                    <MudAlert Severity="Severity.Info" Class="mx-4 my-4">
+                        No planned classes found matching the current filters.
+                    </MudAlert>
+                </NoRecordsContent>
+                <LoadingContent>
+                    <MudProgressLinear Indeterminate="true" Class="my-8" />
+                    <MudText Align="Align.Center">Loading classes...</MudText>
+                </LoadingContent>
+            </MudTable>
+        </MudStack>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private MudTable<StaffTrainingClassGetResponseDTO> table = new();
+    private TableData<StaffTrainingClassGetResponseDTO> tableData = new();
+    private bool isLoading = false;
+
+    private StaffTrainingClassGetDTO filters = new();
+    private DateRange dateRange = new(DateTime.Today, DateTime.Today.AddMonths(3).AddDays(-1)); // Default: next 3 months
+
+    private List<StaffTrainingClassTypeDTO> classTypes = new();
+    private List<StaffTrainingClassLocationDTO> locations = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFilterOptions();
+        // Initial load will happen via OnAfterRenderAsync
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await ApplyDateRange(); // Triggers initial load with default range
+        }
+    }
+
+    private async Task LoadFilterOptions()
+    {
+        try
+        {
+            // Assuming you have services to fetch these
+            var classTypesResponse = await StaffManagementService.StaffGetClassTypesAsync(1, 100);
+            classTypes = classTypesResponse.types;
+            var locationsResponse = await StaffManagementService.StaffGetClassLocationsAsync(1, 100);
+            locations = locationsResponse.StaffTrainingClassLocations;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load filters: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OnFiltersChanged()
+    {
+        await table.ReloadServerData();
+    }
+
+    private async Task ApplyDateRange()
+    {
+        if (dateRange.Start.HasValue)
+            filters.StartDate = dateRange.Start.Value.Date;
+
+        if (dateRange.End.HasValue)
+            filters.EndDate = dateRange.End.Value.Date.AddDays(1).AddTicks(-1); // Include full end day
+
+        await table.ReloadServerData();
+    }
+
+    private async Task ClearDateRange()
+    {
+        dateRange = null;
+        filters.StartDate = null;
+        filters.EndDate = null;
+        await table.ReloadServerData();
+    }
+
+    private async Task<TableData<StaffTrainingClassGetResponseDTO>> ServerReload(TableState state, CancellationToken token)
+    {
+        isLoading = true;
+        try
+        {
+            var request = new StaffTrainingClassGetDTO
+            {
+                Page = state.Page + 1,
+                PageSize = state.PageSize,
+                // SortBy = state.SortLabel,
+                // SortDirection = state.SortDirection == SortDirection.Ascending ? "ASC" : "DESC",
+
+                // Filters
+                TrainingClassTypesGUID = filters.TrainingClassTypesGUID,
+                TrainingClassLocationGUID = filters.TrainingClassLocationGUID,
+                StartDate = filters.StartDate,
+                EndDate = filters.EndDate
+            };
+
+            var response = await TrainingClassesService.StaffGetClassListAsync(request);
+
+            tableData = new TableData<StaffTrainingClassGetResponseDTO>
+            {
+                TotalItems = response.Pagination?.TotalRecords ?? response.Classes.Count,
+                Items = response.Classes
+            };
+
+            return tableData;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading classes: {ex.Message}", Severity.Error);
+            return new TableData<StaffTrainingClassGetResponseDTO>
+            {
+                TotalItems = 0,
+                Items = new List<StaffTrainingClassGetResponseDTO>()
+            };
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    // Dialog methods remain the same
+    private async Task OpenEditDialog(StaffTrainingClassGetResponseDTO cls)
+    {
+        var parameters = new DialogParameters<EditClassDialog> { { x => x.Class, cls } };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<EditClassDialog>("Edit Class", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled) await table.ReloadServerData();
+    }
+
+    private async Task OpenCancelDialog(StaffTrainingClassGetResponseDTO cls)
+    {
+        var parameters = new DialogParameters<CancelClassDialog> { { x => x.Class, cls } };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CancelClassDialog>("Cancel Class", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            // TODO: Call cancel API
+            Snackbar.Add($"Class '{cls.TrainingClassClassesName}' cancelled.", Severity.Warning);
+            await table.ReloadServerData();
+        }
+    }
+
+    private async Task OpenDeleteDialog(StaffTrainingClassGetResponseDTO cls)
+    {
+        var parameters = new DialogParameters<DeleteClassDialog> { { x => x.Class, cls } };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<DeleteClassDialog>("Delete Class", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            // TODO: Call delete API
+            Snackbar.Add($"Class '{cls.TrainingClassClassesName}' deleted.", Severity.Error);
+            await table.ReloadServerData();
+        }
+    }
+}
