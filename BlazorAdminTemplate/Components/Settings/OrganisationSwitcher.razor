@@ -31,16 +31,33 @@
         }
         else if (availableOrganisations != null && availableOrganisations.Any())
         {
-            <MudText Typo="Typo.caption" Class="px-4 pt-2 pb-1" Style="color: var(--mud-palette-text-secondary);">
-                Skift til:
-            </MudText>
-            @foreach (var org in availableOrganisations.Where(o => o.OrganisationSubGUID != currentOrganisationGuid))
+            // Filter out current org and default org (API doesn't allow switching to default org)
+            var switchableOrgs = availableOrganisations
+                .Where(o => o.OrganisationSubGUID != currentOrganisationGuid && 
+                           o.OrganisationSubGUID != defaultOrganisationGuid)
+                .ToList();
+            
+            @if (switchableOrgs.Any())
             {
-                <MudMenuItem OnClick="@(() => SwitchOrganisation(org.OrganisationSubGUID, org.OrganisationSubName))" Disabled="isSwitching">
-                    <div class="d-flex align-center">
-                        <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Small" Class="mr-2" />
-                        <span>@org.OrganisationSubName</span>
-                    </div>
+                <MudText Typo="Typo.caption" Class="px-4 pt-2 pb-1" Style="color: var(--mud-palette-text-secondary);">
+                    Skift til:
+                </MudText>
+                @foreach (var org in switchableOrgs)
+                {
+                    <MudMenuItem OnClick="@(() => SwitchOrganisation(org.OrganisationSubGUID, org.OrganisationSubName))" Disabled="isSwitching">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Small" Class="mr-2" />
+                            <span>@org.OrganisationSubName</span>
+                        </div>
+                    </MudMenuItem>
+                }
+            }
+            else
+            {
+                <MudMenuItem Disabled="true">
+                    <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
+                        Ingen andre centre tilgængelige
+                    </MudText>
                 </MudMenuItem>
             }
         }
@@ -58,6 +75,7 @@
 @code {
     private List<SubOrganisation>? availableOrganisations;
     private string currentOrganisationGuid = string.Empty;
+    private string defaultOrganisationGuid = string.Empty;
     private string CurrentOrganisationName = "Indlæser...";
     private bool isLoading = true;
     private bool isSwitching = false;
@@ -78,6 +96,7 @@
             if (!string.IsNullOrEmpty(token))
             {
                 currentOrganisationGuid = GetClaimFromToken(token, "OrganisationSubGUID");
+                defaultOrganisationGuid = GetClaimFromToken(token, "DefaultOrganisationSubGUID");
                 var mainOrgGuid = GetClaimFromToken(token, "OrganisationMainGUID");
                 
                 if (!string.IsNullOrEmpty(mainOrgGuid))

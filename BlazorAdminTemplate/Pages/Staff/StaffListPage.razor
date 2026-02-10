@@ -1,0 +1,60 @@
+@page "/staff-management"
+@using BlazorAdminTemplate.Application.DTOs.Authentication
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Components.Staff
+@inject IRegisterService RegisterService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Personale - Administration</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <div class="d-flex justify-space-between align-center mb-4">
+        <MudText Typo="Typo.h4">
+            <MudIcon Icon="@Icons.Material.Filled.Group" Class="mr-2" />
+            Personale
+        </MudText>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                   OnClick="OpenCreateStaffDialog">
+            Opret personale
+        </MudButton>
+    </div>
+
+    <MudPaper Elevation="2" Class="pa-8">
+        <MudStack Spacing="4" AlignItems="AlignItems.Center" Class="py-8">
+            <MudIcon Icon="@Icons.Material.Filled.PeopleAlt" Size="Size.Large" Color="Color.Primary" Style="font-size: 4rem;" />
+            <MudText Typo="Typo.h5" Align="Align.Center">Personaleliste</MudText>
+            <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary">
+                Personaleliste vil blive implementeret i næste version
+            </MudText>
+            <MudChip T="string" Icon="@Icons.Material.Filled.Schedule" Color="Color.Info" Size="Size.Small">
+                Kommer snart
+            </MudChip>
+        </MudStack>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private async Task OpenCreateStaffDialog()
+    {
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseButton = true,
+            Position = DialogPosition.Center
+        };
+
+        var dialog = await DialogService.ShowAsync<CreateStaffDialog>("Opret personale", options);
+        
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            Snackbar.Add("Personale oprettet succesfuldt", Severity.Success);
+            // Reload list if needed
+        }
+    }
+}

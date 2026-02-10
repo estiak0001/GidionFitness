@@ -115,8 +115,12 @@
 
                 <!-- Access Control -->
                 <MudItem xs="12">
-                    <MudCheckBox T="bool" @bind-Checked="allHaveAccess"
-                                 Label="All members can enroll (unrestricted access)"
+                    <MudText Typo="Typo.caption" Class="mb-2">
+                        Debug: allHaveAccess = @allHaveAccess, model.TrainingClassClassesAccess = @model.TrainingClassClassesAccess
+                    </MudText>
+                    <MudCheckBox T="bool" 
+                                 @bind-Value="allHaveAccess"
+                                 Label="All members can enroll"
                                  Color="Color.Primary" />
                     <MudText Typo="Typo.caption" Class="mt-1 mud-text-secondary">
                         @if (allHaveAccess)
@@ -133,6 +137,9 @@
                 @if (!allHaveAccess)
                 {
                     <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Class="mb-2">
+                            Debug: membershipGroups.Count = @membershipGroups.Count, selectedGroupGuids.Count = @selectedGroupGuids.Count()
+                        </MudText>
                         <MudSelect T="string"
                                    Label="Allowed Membership Groups"
                                    MultiSelection="true"
@@ -144,7 +151,7 @@
                             @foreach (var group in membershipGroups)
                             {
                                 <MudSelectItem Value="@group.MemberPaymentGroupGUID">
-                                    @group.MemberPaymentGroupName (@group.MemberPaymentPrice:C)/month
+                                    @group.MemberPaymentGroupName (@group.MemberPaymentPrice.ToString("0.00"))/month
                                 </MudSelectItem>
                             }
                         </MudSelect>
@@ -228,6 +235,7 @@
     private bool autoCancelEnabled = false;
     private bool applyFine = false;
     private IEnumerable<string> selectedGroupGuids = Enumerable.Empty<string>();
+    private string? lastLoadedClassGuid = null;
 
     // Dropdown data
     private List<StaffTrainingClassTypeDTO> classTypes = new();
@@ -237,6 +245,20 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        var currentClassGuid = Class?.TrainingClassClassesGUID ?? string.Empty;
+        Console.WriteLine($"=== OnParametersSetAsync called, currentClass={currentClassGuid}, lastLoaded={lastLoadedClassGuid} ===");
+        
+        // Only reinitialize if the class has changed
+        if (lastLoadedClassGuid == currentClassGuid && !string.IsNullOrEmpty(lastLoadedClassGuid))
+        {
+            Console.WriteLine("Same class already loaded, skipping...");
+            return;
+        }
+        
+        // Load dropdown data first
+        await LoadDropdownData();
+        Console.WriteLine($"Loaded {membershipGroups.Count} membership groups");
+
         // Initialize model (create mode if no Class provided)
         if (Class == null)
         {
@@ -278,13 +300,36 @@
 
             // Access control: Access = 0 means all have access, Access = 1 means restricted
             allHaveAccess = Class.TrainingClassClassesAccess == 0;
-            selectedGroupGuids = allHaveAccess ? Enumerable.Empty<string>() : (Class.TrainingClassClassesAccessGUIDs ?? Array.Empty<string>());
+            
+            Console.WriteLine($"=== EDIT MODE - Loading Class Data ===");
+            Console.WriteLine($"Class.TrainingClassClassesAccess = {Class.TrainingClassClassesAccess}");
+            Console.WriteLine($"Calculated allHaveAccess = {allHaveAccess}");
+            Console.WriteLine($"AccessGUIDs count = {Class.TrainingClassClassesAccessGUIDs?.Length ?? 0}");
+            
+            // Set selected groups - convert array to enumerable
+            if (!allHaveAccess && Class.TrainingClassClassesAccessGUIDs != null && Class.TrainingClassClassesAccessGUIDs.Length > 0)
+            {
+                selectedGroupGuids = Class.TrainingClassClassesAccessGUIDs.ToList();
+                Console.WriteLine($"EDIT MODE - Loaded {selectedGroupGuids.Count()} access groups: [{string.Join(", ", selectedGroupGuids)}]");
+            }
+            else
+            {
+                selectedGroupGuids = Enumerable.Empty<string>();
+                Console.WriteLine($"EDIT MODE - No access groups (allHaveAccess={allHaveAccess})");
+            }
 
             autoCancelEnabled = Class.TrainingClassClassesAutomaticCancellation == 1;
             applyFine = Class.TrainingClassClassesFine == 1;
+            
+            Console.WriteLine($"Membership groups loaded: {membershipGroups.Count}");
+            Console.WriteLine($"=== End Loading Class Data ===");
         }
-
-        await LoadDropdownData();
+        
+        // Mark this class as loaded
+        lastLoadedClassGuid = currentClassGuid;
+        
+        // Force UI update after initialization
+        StateHasChanged();
     }
 
     private async Task LoadDropdownData()
@@ -343,7 +388,7 @@
         {
             var group = membershipGroups.FirstOrDefault(x => x.MemberPaymentGroupGUID == g);
             return group != null
-                ? $"{group.MemberPaymentGroupName} ({group.MemberPaymentPrice:C}/month)"
+                ? $"{group.MemberPaymentGroupName} ({group.MemberPaymentPrice.ToString("0.00")}/month)"
                 : "Unknown";
         });
 

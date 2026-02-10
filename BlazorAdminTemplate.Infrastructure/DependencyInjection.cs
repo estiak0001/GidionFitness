@@ -39,6 +39,7 @@ namespace BlazorAdminTemplate.Infrastructure
             services.AddScoped<IClassLocationService, ClassLocationService>();
             services.AddScoped<IMembershipService, MembershipService>();
             services.AddScoped<ITemplateService, TemplateService>();
+            services.AddScoped<IAccessControlService, AccessControlService>();
 
             services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
 

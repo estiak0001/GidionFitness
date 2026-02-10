@@ -69,21 +69,21 @@ namespace BlazorAdminTemplate.Infrastructure.Services
                 {
                     var result = await response.Content.ReadFromJsonAsync<RegisterResponseDTO>();
                     RegistrationCompleted?.Invoke(true);
-                    return result;
+                    return result ?? new RegisterResponseDTO { ErrorMessage = "Tom respons fra server" };
                 }
                 else
                 {
                     var errorMessage = await response.Content.ReadAsStringAsync();
-                    Console.WriteLine(errorMessage);
+                    Console.WriteLine($"API Error: {errorMessage}");
                     RegistrationCompleted?.Invoke(false);
-                    return new RegisterResponseDTO();
+                    return new RegisterResponseDTO { ErrorMessage = $"API fejl: {response.StatusCode} - {errorMessage}" };
                 }
             }
             catch (Exception ex)
             {
                 RegistrationCompleted?.Invoke(false);
                 Console.WriteLine($"Staff registration failed: {ex.Message}");
-                return new RegisterResponseDTO();
+                return new RegisterResponseDTO { ErrorMessage = ex.Message };
             }
         }
 

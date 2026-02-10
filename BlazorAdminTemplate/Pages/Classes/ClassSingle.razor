@@ -95,7 +95,7 @@
                                 @foreach (var group in membershipGroups)
                                 {
                                     <MudSelectItem Value="@group.MemberPaymentGroupGUID">
-                                        @group.MemberPaymentGroupName (@group.MemberPaymentPrice:C)/month
+                                        @group.MemberPaymentGroupName (@group.MemberPaymentPrice.ToString("0.00"))/month
                                     </MudSelectItem>
                                 }
                             </MudSelect>
@@ -228,8 +228,8 @@
 
         dto.TrainingClassClassesStartDateTime = selectedDate.Value.Date.Add(selectedTime.Value);
 
-        // Access logic
-        dto.TrainingClassClassesAccess = allHaveAccess ? 1 : 0;
+        // Access logic - 0 = All have access, 1 = Restricted to specific groups
+        dto.TrainingClassClassesAccess = allHaveAccess ? 0 : 1;
         dto.TrainingClassClassesAccessGUIDs = allHaveAccess
             ? Array.Empty<string>()
             : selectedGroupGuids.ToArray();
@@ -268,7 +268,7 @@
             {
                 var group = membershipGroups.FirstOrDefault(g => g.MemberPaymentGroupGUID == guid);
                 return group != null
-                    ? $"{group.MemberPaymentGroupName} ({group.MemberPaymentPrice:C}/month)"
+                    ? $"{group.MemberPaymentGroupName} ({group.MemberPaymentPrice.ToString("0.00")}/month)"
                     : guid; // fallback for unmatched GUID
             })
             .ToList();

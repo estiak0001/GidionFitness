@@ -86,10 +86,10 @@ namespace BlazorAdminTemplate.Application.Validators
                 .When(x => !string.IsNullOrEmpty(x.MemberCPR));
 
             // Birthday validation
-            RuleFor(x => x.Birthday)
+            RuleFor(x => x.MemberBirthday)
                 .Must(BeValidDate).WithMessage("Please enter a valid date")
                 .Must(BeReasonableAge).WithMessage("Please enter a valid birthday")
-                .When(x => x.Birthday.HasValue);
+                .When(x => x.MemberBirthday.HasValue);
 
             RuleFor(x => x.MemberComment)
                 .MaximumLength(500).WithMessage("Comments must not exceed 500 characters")

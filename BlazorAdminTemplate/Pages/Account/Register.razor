@@ -73,11 +73,11 @@
                                                   AdornmentIcon="Icons.Material.Filled.Badge" />
                                 }
 
-                                <MudDatePicker @bind-Date="registerRequest.Birthday"
+                                <MudDatePicker @bind-Date="registerRequest.MemberBirthday"
                                                Label="Fødselsdag"
                                                Variant="Variant.Outlined"
                                                HelperText="Vælg hvornår du har fødselsdag"
-                                               For="@(() => registerRequest.Birthday)"
+                                               For="@(() => registerRequest.MemberBirthday)"
                                                PickerVariant="PickerVariant.Dialog"
                                                OpenTo="OpenTo.Year" />
 
@@ -422,11 +422,11 @@
                         }
 
                         <MudItem xs="12" md="6">
-                            <MudDatePicker @bind-Date="registerRequest.Birthday"
+                            <MudDatePicker @bind-Date="registerRequest.MemberBirthday"
                                            Label="Fødselsdag"
                                            Variant="Variant.Outlined"
                                            HelperText="Vælg hvornår du har fødselsdag"
-                                           For="@(() => registerRequest.Birthday)"
+                                           For="@(() => registerRequest.MemberBirthday)"
                                            PickerVariant="PickerVariant.Dialog"
                                            OpenTo="OpenTo.Year"
                                            CloseOnSelection="true"
@@ -1099,7 +1099,7 @@
 
             if (fieldSettings.ShowMemberHealthInsurance == 1)
             {
-                registerRequest.MemberHealthInsurance = (byte)(hasInsurance ? 1 : 0);
+                registerRequest.MemberHealthInsurance = hasInsurance ? "1" : "0";
             }
 
 

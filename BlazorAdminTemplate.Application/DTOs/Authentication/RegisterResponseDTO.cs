@@ -14,5 +14,6 @@ namespace BlazorAdminTemplate.Application.DTOs.Authentication
         public string MemberType { get; set; } = string.Empty;
         public string MemberCreated { get; set; } = string.Empty;
         public bool IsActive { get; set; } = true;
+        public string ErrorMessage { get; set; } = string.Empty;
     }
 }

@@ -25,7 +25,7 @@ namespace BlazorAdminTemplate.Infrastructure.Services
         private const string TrainingClassesCancelEndpoint = "/MemberClassesCancelClass";
         private const string MyClassesListEndpoint = "/MemberClassesListMyClasses";
         private const string StaffCreateSingleClassEndpoint = "/StaffTrainingClassCreateSingle/CreateSingleClass";
-        private const string StaffCreateMultipleClassesEndpoint = "/StaffTrainingClassCreateMultible/CreateMultibleClass";
+        private const string StaffCreateMultipleClassesEndpoint = "/StaffTrainingClassCreateMultiple/CreateMultipleClass";
         private const string StaffEditClassEndpoint = "/StaffTrainingClassCreateSingle/UpdateSingleClass";
         private const string StaffDeleteClassEndpoint = "/StaffTrainingClassCreateSingle/DeleteSingleClass";
         private const string StaffGetClassListEndpoint = "/StaffTrainingClassCreateSingle/ListClasses";

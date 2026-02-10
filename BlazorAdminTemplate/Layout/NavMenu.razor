@@ -1,7 +1,10 @@
 ﻿@implements IDisposable
 @using Vizor.Icons.Tabler
+@using BlazorAdminTemplate.Application.Interfaces
+@inject IAccessControlService AccessControlService
 
 <MudNavMenu>
+    <!-- Dashboard - Access Level 1 (Always visible to authenticated users) -->
     <AuthorizeView>
         <Authorized>
             <MudNavLink Href="/"
@@ -26,7 +29,7 @@
         </Authorized>
     </AuthorizeView> *@
 
-    <!-- Staff-only Members link -->
+    <!-- Medlemmer - Access Level 2 -->
     <AuthorizeView Policy="StaffOnly">
         <Authorized>
             <MudNavLink Href="/members"
@@ -39,7 +42,7 @@
         </Authorized>
     </AuthorizeView>
 
-    <!-- Staff-only Memberships link -->
+    <!-- Medlemskaber - Access Level 3 -->
     <AuthorizeView Policy="StaffOnly">
         <Authorized>
             <MudNavLink Href="/staff/memberships"
@@ -48,6 +51,19 @@
                         IconColor="Color.Inherit"
                         OnClick="@HandleNavClick">
                         Medlemskaber
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+
+    <!-- Personale - Access Level 4 -->
+    <AuthorizeView Policy="StaffOnly">
+        <Authorized>
+            <MudNavLink Href="/staff-management"
+                        Match="NavLinkMatch.Prefix"
+                        Icon="ti ti-users-group"
+                        IconColor="Color.Inherit"
+                        OnClick="@HandleNavClick">
+                        Personale
             </MudNavLink>
         </Authorized>
     </AuthorizeView>
@@ -76,6 +92,7 @@
         </Authorized>
     </AuthorizeView> *@
 
+    <!-- Hold træninger - Access Level 5 -->
     <AuthorizeView>
         <Authorized>
             <MudNavLink Href="/training-classes"
@@ -99,6 +116,8 @@
             </MudNavLink>
         </Authorized>
     </AuthorizeView> *@
+    
+    <!-- Payments - Access Level 6 -->
     <AuthorizeView>
         <Authorized>
             <MudNavLink Href="/payment-list"
@@ -110,6 +129,8 @@
             </MudNavLink>
         </Authorized>
     </AuthorizeView>
+    
+    <!-- Templates - Access Level 7 -->
     <AuthorizeView>
         <Authorized>
             <MudNavLink Href="/templates"
@@ -121,6 +142,8 @@
             </MudNavLink>
         </Authorized>
     </AuthorizeView>
+    
+    <!-- Door Access Logs - Access Level 8 -->
     <AuthorizeView>
         <Authorized>
             <MudNavLink Href="/access-log"
@@ -132,6 +155,8 @@
             </MudNavLink>
         </Authorized>
     </AuthorizeView>
+    
+    <!-- Access Controller Groups - Access Level 9 -->
     <AuthorizeView>
         <Authorized>
             <MudNavLink Href="/access-controller-groups/list"
@@ -143,6 +168,8 @@
             </MudNavLink>
         </Authorized>
     </AuthorizeView>
+    
+    <!-- Classes submenu - Access Level 5 -->
     <AuthorizeView>
         <Authorized>
             <MudNavGroup Title="Classes"

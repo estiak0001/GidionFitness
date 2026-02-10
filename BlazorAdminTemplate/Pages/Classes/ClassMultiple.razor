@@ -133,7 +133,7 @@
                                 @foreach (var group in membershipGroups)
                                 {
                                     <MudSelectItem Value="@group.MemberPaymentGroupGUID">
-                                        @group.MemberPaymentGroupName (@group.MemberPaymentPrice:C)/month
+                                        @group.MemberPaymentGroupName (@group.MemberPaymentPrice.ToString("0.00"))/month
                                     </MudSelectItem>
                                 }
                             </MudSelect>
@@ -359,7 +359,7 @@
         {
             var group = membershipGroups.FirstOrDefault(x => x.MemberPaymentGroupGUID == g);
             return group != null 
-                ? $"{group.MemberPaymentGroupName} ({group.MemberPaymentPrice:C}/month)" 
+                ? $"{group.MemberPaymentGroupName} ({group.MemberPaymentPrice.ToString("0.00")}/month)" 
                 : g;
         }).ToList();
 

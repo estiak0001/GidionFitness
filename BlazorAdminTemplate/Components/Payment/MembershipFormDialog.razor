@@ -68,47 +68,73 @@
                     </MudItem>
 
                     <MudItem xs="12" md="6">
-                        <MudSelect @bind-Value="model.PaymentProviderDataGUID"
+                        <MudSelect T="string" 
+                                   @bind-Value="model.PaymentProviderDataGUID"
                                    Label="Betalingsudbyder"
                                    Variant="Variant.Outlined"
-                                   Required="true">
-                            @foreach (var provider in paymentProviders)
+                                   Required="true"
+                                   Disabled="@(!paymentProviders.Any())"
+                                   Clearable="true"
+                                   ToStringFunc="@(guid => string.IsNullOrEmpty(guid) ? "Vælg betalingsudbyder" : (paymentProviders.FirstOrDefault(p => p.PaymentProviderDataGUID == guid)?.PaymentProviderName ?? "Ukendt"))">
+                            @if (paymentProviders.Any())
                             {
-                                <MudSelectItem Value="@provider.PaymentProviderDataGUID">
-                                    @provider.PaymentProviderName
+                                @foreach (var provider in paymentProviders)
+                                {
+                                    <MudSelectItem T="string" Value="@provider.PaymentProviderDataGUID">
+                                        @provider.PaymentProviderName
+                                    </MudSelectItem>
+                                }
+                            }
+                            else
+                            {
+                                <MudSelectItem T="string" Value="@string.Empty" Disabled="true">
+                                    Ingen betalingsudbydere tilgængelige
                                 </MudSelectItem>
                             }
                         </MudSelect>
                     </MudItem>
 
                     <MudItem xs="12" md="6">
-                        <MudSelect @bind-Value="model.MemberGroupDefaultGroupsGUID"
+                        <MudSelect T="string" 
+                                   @bind-Value="model.MemberGroupDefaultGroupsGUID"
                                    Label="Standard gruppe"
                                    Variant="Variant.Outlined"
-                                   Required="true">
-                            @foreach (var group in defaultGroups)
+                                   Required="true"
+                                   Disabled="@(!defaultGroups.Any())"
+                                   Clearable="true"
+                                   ToStringFunc="@(guid => string.IsNullOrEmpty(guid) ? "Vælg standard gruppe" : (defaultGroups.FirstOrDefault(g => g.MemberGroupDefaultGroupsGUID == guid)?.MemberGroupDefaultGroupsName ?? "Ukendt"))">
+                            @if (defaultGroups.Any())
                             {
-                                <MudSelectItem Value="@group.MemberGroupDefaultGroupsGUID">
-                                    @group.MemberGroupDefaultGroupsName
+                                @foreach (var group in defaultGroups)
+                                {
+                                    <MudSelectItem T="string" Value="@group.MemberGroupDefaultGroupsGUID">
+                                        @group.MemberGroupDefaultGroupsName
+                                    </MudSelectItem>
+                                }
+                            }
+                            else
+                            {
+                                <MudSelectItem T="string" Value="@string.Empty" Disabled="true">
+                                    Ingen standardgrupper tilgængelige
                                 </MudSelectItem>
                             }
                         </MudSelect>
                     </MudItem>
 
                     <MudItem xs="12" md="4">
-                        <MudSwitch T="bool" @bind-Checked="enableChecked"
+                        <MudSwitch @bind-Value="enableChecked"
                                    Label="Aktiv"
                                    Color="Color.Success" />
                     </MudItem>
 
                     <MudItem xs="12" md="4">
-                        <MudSwitch T="bool" @bind-Checked="defaultChecked"
+                        <MudSwitch @bind-Value="defaultChecked"
                                    Label="Standard medlemskab"
                                    Color="Color.Primary" />
                     </MudItem>
 
                     <MudItem xs="12" md="4">
-                        <MudSwitch T="bool" @bind-Checked="vatChecked"
+                        <MudSwitch @bind-Value="vatChecked"
                                    Label="Inkl. moms"
                                    Color="Color.Info" />
                     </MudItem>
@@ -156,8 +182,13 @@
         get => _enableChecked;
         set
         {
-            _enableChecked = value;
-            model.MemberPaymentEnable = value ? 1 : 0;
+            if (_enableChecked != value)
+            {
+                _enableChecked = value;
+                model.MemberPaymentEnable = value ? 1 : 0;
+                Console.WriteLine($"Enable switch changed: {value}, model value: {model.MemberPaymentEnable}");
+                StateHasChanged();
+            }
         }
     }
 
@@ -166,8 +197,13 @@
         get => _defaultChecked;
         set
         {
-            _defaultChecked = value;
-            model.MemberPaymentDefault = value ? 1 : 0;
+            if (_defaultChecked != value)
+            {
+                _defaultChecked = value;
+                model.MemberPaymentDefault = value ? 1 : 0;
+                Console.WriteLine($"Default switch changed: {value}, model value: {model.MemberPaymentDefault}");
+                StateHasChanged();
+            }
         }
     }
 
@@ -176,13 +212,21 @@
         get => _vatChecked;
         set
         {
-            _vatChecked = value;
-            model.MemberPaymentPriceVAT = value ? 1 : 0;
+            if (_vatChecked != value)
+            {
+                _vatChecked = value;
+                model.MemberPaymentPriceVAT = value ? 1 : 0;
+                Console.WriteLine($"VAT switch changed: {value}, model value: {model.MemberPaymentPriceVAT}");
+                StateHasChanged();
+            }
         }
     }
 
     protected override async Task OnInitializedAsync()
     {
+        // Load dropdown data first
+        await LoadDropdownData();
+        
         if (IsEditMode && PaymentGroup != null)
         {
             model.MemberPaymentGroupGUID = PaymentGroup.MemberPaymentGroupGUID;
@@ -202,9 +246,18 @@
             _enableChecked = PaymentGroup.MemberPaymentEnable == 1;
             _defaultChecked = PaymentGroup.MemberPaymentDefault == 1;
             _vatChecked = PaymentGroup.MemberPaymentPriceVAT == 1;
+            
+            Console.WriteLine($"Backing fields set - Enable: {_enableChecked}, Default: {_defaultChecked}, VAT: {_vatChecked}");
+            StateHasChanged();
+        }
+        else
+        {
+            // Initialize default values for create mode
+            _enableChecked = true;
+            model.MemberPaymentEnable = 1;
+            Console.WriteLine("Create mode - Enable switch initialized to true");
         }
 
-        await LoadDropdownData();
         isLoading = false;
     }
 
@@ -212,13 +265,33 @@
     {
         try
         {
-            var providersTask = PaymentGroupService.GetPaymentProvidersAsync();
-            var groupsTask = PaymentGroupService.GetDefaultGroupsAsync();
+            // Load payment providers
+            try
+            {
+                var providersResponse = await PaymentGroupService.GetPaymentProvidersAsync();
+                paymentProviders = providersResponse?.PaymentProviders ?? new List<PaymentProviderDTO>();
+                Console.WriteLine($"Loaded {paymentProviders.Count} payment providers");
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading payment providers: {ex.Message}");
+                Snackbar.Add($"Fejl ved indlæsning af betalingsudbydere: {ex.Message}", Severity.Error);
+            }
 
-            await Task.WhenAll(providersTask, groupsTask);
-
-            paymentProviders = (await providersTask).PaymentProviders;
-            defaultGroups = (await groupsTask).MemberGroupDefaultGroups;
+            // Load default groups
+            try
+            {
+                var groupsResponse = await PaymentGroupService.GetDefaultGroupsAsync();
+                defaultGroups = groupsResponse?.MemberGroupDefaultGroups ?? new List<MemberGroupDefaultDTO>();
+                Console.WriteLine($"Loaded {defaultGroups.Count} default groups");
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading default groups: {ex.Message}");
+                Snackbar.Add($"Fejl ved indlæsning af standardgrupper: {ex.Message}", Severity.Error);
+            }
 
             // Set defaults if available
             if (!IsEditMode)
@@ -228,7 +301,7 @@
                 if (defaultGroups.Any())
                     model.MemberGroupDefaultGroupsGUID = defaultGroups.First().MemberGroupDefaultGroupsGUID;
                 
-                model.MemberPaymentEnable = 1;
+                StateHasChanged();
             }
         }
         catch (Exception ex)

@@ -1,0 +1,366 @@
+@using BlazorAdminTemplate.Application.DTOs.Authentication
+@using BlazorAdminTemplate.Application.DTOs.Payment
+@using BlazorAdminTemplate.Application.Interfaces
+@using BlazorAdminTemplate.Application.Validators
+@using System.Net.Http
+@using FluentValidation
+@using Blazored.FluentValidation
+@using Microsoft.AspNetCore.Components.Forms
+@using MudSeverity = MudBlazor.Severity
+@inject IRegisterService RegisterService
+@inject IPaymentGroupService PaymentGroupService
+@inject ILoginService LoginService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Class="mr-2" />
+            Opret personale
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center py-4">
+                <MudProgressCircular Indeterminate="true" />
+            </div>
+        }
+        else
+        {
+            <EditForm id="staff-form" Model="model" OnValidSubmit="Submit">
+                <FluentValidationValidator @ref="fluentValidationValidator" />
+                
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="model.MemberFirstName"
+                                      For="@(() => model.MemberFirstName)"
+                                      Label="Fornavn"
+                                      Required="true"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="model.MemberLastName"
+                                      For="@(() => model.MemberLastName)"
+                                      Label="Efternavn"
+                                      Required="true"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="model.MemberEmail"
+                                      For="@(() => model.MemberEmail)"
+                                      Label="Email"
+                                      Required="true"
+                                      InputType="InputType.Email"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="model.MemberPassword"
+                                      For="@(() => model.MemberPassword)"
+                                      Label="Adgangskode"
+                                      Required="true"
+                                      InputType="@passwordInputType"
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.End"
+                                      AdornmentIcon="@passwordIcon"
+                                      OnAdornmentClick="TogglePasswordVisibility" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="model.MemberPhonePrivate"
+                                      For="@(() => model.MemberPhonePrivate)"
+                                      Label="Telefon (privat)"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="model.MemberPhoneWork"
+                                      For="@(() => model.MemberPhoneWork)"
+                                      Label="Telefon (arbejde)"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudDatePicker @bind-Date="model.MemberBirthday"
+                                       For="@(() => model.MemberBirthday)"
+                                       Label="Fødselsdato"
+                                       Variant="Variant.Outlined"
+                                       MaxDate="DateTime.Today" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="int" 
+                                   @bind-Value="model.MemberSex"
+                                   For="@(() => model.MemberSex)"
+                                   Label="Køn"
+                                   Variant="Variant.Outlined">
+                            <MudSelectItem T="int" Value="0">Ikke angivet</MudSelectItem>
+                            <MudSelectItem T="int" Value="1">Mand</MudSelectItem>
+                            <MudSelectItem T="int" Value="2">Kvinde</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="model.MemberCPR"
+                                      For="@(() => model.MemberCPR)"
+                                      Label="CPR-nummer"
+                                      Variant="Variant.Outlined"
+                                      Placeholder="DDMMYY-XXXX" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="model.MemberAddress"
+                                      For="@(() => model.MemberAddress)"
+                                      Label="Adresse"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="8">
+                        <MudTextField @bind-Value="model.MemberCity"
+                                      For="@(() => model.MemberCity)"
+                                      Label="By"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="4">
+                        <MudNumericField @bind-Value="model.MemberZipCode"
+                                         For="@(() => model.MemberZipCode)"
+                                         Label="Postnummer"
+                                         Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="model.MemberJobTitle"
+                                      For="@(() => model.MemberJobTitle)"
+                                      Label="Jobtitel"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="string" 
+                                   @bind-Value="model.MemberPaymentGroupGUID"
+                                   For="@(() => model.MemberPaymentGroupGUID)"
+                                   Label="Medlemskab"
+                                   Required="true"
+                                   RequiredError="Medlemskab er påkrævet"
+                                   Variant="Variant.Outlined"
+                                   Disabled="@(!paymentGroups.Any())">
+                            @if (paymentGroups.Any())
+                            {
+                                @foreach (var group in paymentGroups)
+                                {
+                                    <MudSelectItem T="string" Value="@group.MemberPaymentGroupGUID">
+                                        @group.MemberPaymentGroupName
+                                    </MudSelectItem>
+                                }
+                            }
+                            else
+                            {
+                                <MudSelectItem T="string" Value="@string.Empty" Disabled="true">
+                                    Ingen medlemskaber tilgængelige
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="model.MemberComment"
+                                      For="@(() => model.MemberComment)"
+                                      Label="Kommentar"
+                                      Lines="3"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                </MudGrid>
+            </EditForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Annuller</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   ButtonType="ButtonType.Submit"
+                   Disabled="@isSaving"
+                   Form="staff-form">
+            @if (isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Opret
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private FluentValidationValidator? fluentValidationValidator;
+    private bool isLoading = true;
+    private bool isSaving = false;
+
+    private RegisterRequestDTO model = new();
+    private List<StaffPaymentGroupDTO> paymentGroups = new();
+
+    private bool showPassword = false;
+    private InputType passwordInputType = InputType.Password;
+    private string passwordIcon = Icons.Material.Filled.VisibilityOff;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Set member type to Staff (2)
+        model.MemberType = 2;
+        
+        await LoadOrganisationInfo();
+        await LoadPaymentGroups();
+        isLoading = false;
+    }
+
+    private async Task LoadOrganisationInfo()
+    {
+        try
+        {
+            var token = await LoginService.GetTokenAsync();
+            if (!string.IsNullOrEmpty(token))
+            {
+                model.OrganisationMainGUID = GetClaimFromToken(token, "OrganisationMainGUID");
+                model.OrganisationSubGUID = GetClaimFromToken(token, "OrganisationSubGUID");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fejl ved indlæsning af organisation: {ex.Message}", MudSeverity.Error);
+        }
+    }
+
+    private async Task LoadPaymentGroups()
+    {
+        try
+        {
+            var response = await PaymentGroupService.GetPaymentGroupsAsync(1, 100, "");
+            paymentGroups = response?.PaymentGroups ?? new List<StaffPaymentGroupDTO>();
+            
+            if (paymentGroups.Any())
+            {
+                model.MemberPaymentGroupGUID = paymentGroups.First().MemberPaymentGroupGUID;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fejl ved indlæsning af medlemskaber: {ex.Message}", MudSeverity.Error);
+        }
+    }
+
+    private string GetClaimFromToken(string token, string claimType)
+    {
+        try
+        {
+            var parts = token.Split('.');
+            if (parts.Length < 2) return string.Empty;
+
+            var payload = parts[1];
+            var jsonBytes = ParseBase64WithoutPadding(payload);
+            var json = System.Text.Encoding.UTF8.GetString(jsonBytes);
+            var claims = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, System.Text.Json.JsonElement>>(json);
+
+            if (claims != null && claims.ContainsKey(claimType))
+            {
+                return claims[claimType].GetString() ?? string.Empty;
+            }
+
+            return string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private byte[] ParseBase64WithoutPadding(string base64)
+    {
+        switch (base64.Length % 4)
+        {
+            case 2: base64 += "=="; break;
+            case 3: base64 += "="; break;
+        }
+        return Convert.FromBase64String(base64);
+    }
+
+    private void TogglePasswordVisibility()
+    {
+        showPassword = !showPassword;
+        passwordInputType = showPassword ? InputType.Text : InputType.Password;
+        passwordIcon = showPassword ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff;
+    }
+
+    private async Task Submit()
+    {
+        // Validate using FluentValidation
+        if (fluentValidationValidator == null || !await fluentValidationValidator.ValidateAsync())
+        {
+            return;
+        }
+
+        // Check organization GUIDs
+        if (string.IsNullOrWhiteSpace(model.OrganisationMainGUID) || string.IsNullOrWhiteSpace(model.OrganisationSubGUID))
+        {
+            Snackbar.Add("Organisation oplysninger mangler. Prøv at logge ind igen.", MudSeverity.Warning);
+            return;
+        }
+
+        try
+        {
+            isSaving = true;
+
+            // Ensure MemberType is set to 2 for staff
+            model.MemberType = 2;
+
+            var response = await RegisterService.StaffRegisterAsync(model);
+
+            if (response != null && !string.IsNullOrEmpty(response.MemberGUID))
+            {
+                Snackbar.Add($"Personale '{response.MemberName}' oprettet succesfuldt", MudSeverity.Success);
+                MudDialog.Close(DialogResult.Ok(response.MemberGUID));
+            }
+            else
+            {
+                // Check if there's an error message from the API
+                var errorMsg = !string.IsNullOrEmpty(response?.ErrorMessage) 
+                    ? response.ErrorMessage 
+                    : "Der opstod en fejl ved oprettelse af personale. Kontroller at alle felter er udfyldt korrekt.";
+                Snackbar.Add(errorMsg, MudSeverity.Error);
+                Console.WriteLine($"Registration failed: {errorMsg}");
+            }
+        }
+        catch (HttpRequestException httpEx)
+        {
+            Snackbar.Add($"Netværksfejl: Kunne ikke oprette forbindelse til serveren", MudSeverity.Error);
+            Console.WriteLine($"HTTP Error: {httpEx.Message}");
+        }
+        catch (Exception ex)
+        {
+            var errorMessage = ex.Message;
+            if (errorMessage.Contains("Email already exists", StringComparison.OrdinalIgnoreCase) ||
+                errorMessage.Contains("email", StringComparison.OrdinalIgnoreCase))
+            {
+                Snackbar.Add("Email findes allerede i systemet", MudSeverity.Error);
+            }
+            else if (errorMessage.Contains("not authenticated", StringComparison.OrdinalIgnoreCase))
+            {
+                Snackbar.Add("Du er ikke logget ind. Log venligst ind igen.", MudSeverity.Error);
+            }
+            else
+            {
+                Snackbar.Add($"Fejl ved oprettelse af personale: {errorMessage}", MudSeverity.Error);
+            }
+            Console.WriteLine($"Error: {ex}");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
